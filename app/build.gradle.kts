@@ -7,31 +7,26 @@
 
 plugins {
     // Apply the org.jetbrains.kotlin.jvm Plugin to add support for Kotlin.
-    alias(libs.plugins.kotlin.jvm)
+//    alias(libs.plugins.kotlin.jvm)
 
     // Apply the application plugin to add support for building a CLI application in Java.
     application
+    kotlin("jvm") version "2.0.21"
 }
 
 repositories {
-    // Use Maven Central for resolving dependencies.
     mavenCentral()
 }
 
 dependencies {
+    implementation(kotlin("stdlib"))
+    implementation(kotlin("compiler-embeddable"))
 
+    // Add these for PSI processing
+//    implementation("org.jetbrains.kotlin:kotlin-compiler:2.0.21")
+//    implementation("com.jetbrains.intellij.idea:ideaIC:2024.2.4")
 
-    // Use JUnit Jupiter for testing.
-    testImplementation(libs.junit.jupiter)
-
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-
-    // This dependency is used by the application.
-    implementation(libs.guava)
-    implementation("org.jetbrains.kotlin:kotlin-compiler:2.0.21")
-//    implementation("org.jetbrains.intellij.deps:intellij-core:223.8836.41")
-    implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.0.21")
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:2.0.21")
+    testImplementation(kotlin("test"))
 }
 
 // Apply a specific Java toolchain to ease working on different environments.
