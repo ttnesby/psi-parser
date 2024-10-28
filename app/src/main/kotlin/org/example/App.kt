@@ -87,7 +87,7 @@ fun extractRuleService(ktFile: KtFile): List<RuleServiceInfo> {
                         val serviceInfo =
                                 RuleServiceInfo(
                                         className = klass.name ?: "anonymous",
-                                         filePath = ktFile.virtualFile?.path ?: "",
+                                         filePath = ktFile.containingFile.name,
                                         genericType =
                                                 klass.getSuperTypeListEntries()
                                                         .firstOrNull {
