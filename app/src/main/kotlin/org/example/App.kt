@@ -118,6 +118,7 @@ fun main(args: Array<String>) {
     try {
         val ruleServices =
                 processRepository(File("/Users/torsteinnesby/gitHub/navikt/pensjon-regler"))
+                    .sortedBy { it.className }
 
         ruleServices.forEach { info ->
             println(
