@@ -17,7 +17,7 @@ import org.jetbrains.kotlin.psi.*
 // Add this data class at the top level
 data class RuleServiceInfo(
         val className: String,
-        // val filePath: String,
+         val filePath: String,
         val genericType: String?,
         val methods: List<String>
 )
@@ -87,8 +87,7 @@ fun extractRuleService(ktFile: KtFile): List<RuleServiceInfo> {
                         val serviceInfo =
                                 RuleServiceInfo(
                                         className = klass.name ?: "anonymous",
-                                        // filePath = ktFile.virtualFilePath
-                                        //                 ?: ktFile.name ?: "unknown!",
+                                         filePath = ktFile.virtualFile?.path ?: "",
                                         genericType =
                                                 klass.getSuperTypeListEntries()
                                                         .firstOrNull {
@@ -124,6 +123,7 @@ fun main(args: Array<String>) {
             println(
                     """
                     Class: ${info.className}
+                    FilePath: ${info.filePath}
                     Generic Type: ${info.genericType}
                     Methods: ${info.methods.joinToString(", ")}
                     ----------------------
