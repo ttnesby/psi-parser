@@ -1,7 +1,15 @@
 # psi-parser
 
-Et `bare minimum` start på embedded kotlin compiler og PSI iterasjon.
+Rammen er konseptuell enkel, kotlin cli program som har en embedded kotlin compiler.
+Håper embedded compiler har nødvendig PSI funksjonalitet for å parse og isolere relevante elementer fra `pensjon-regler`.
 
-Ignorer detaljene, bare en test som kompilerer og viser noe.
+Eksempler på `relevante elementer`;
+- Tjenestenivå, tjenester basert på `AbstractRuleService<T>`, f.eks. `FastsettTrygdetidService`
+- Flytnivå, flyter basert på 'AbstractRuleflow<T : Any>', f.eks. `StartTrygdetidFlyt` 
+- Diverse subflyter, forgreining, gren
+- Regelsett
+- ...
 
-To be continued.
+## Tjenestenivå
+
+Konkret regeltjeneste: ønsker å finne alle `children` av `AbstractRuleService<T>` med vilkårlig T.
