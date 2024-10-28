@@ -6,7 +6,6 @@ import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
-import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiFileFactory
 import org.jetbrains.kotlin.com.intellij.psi.impl.PsiFileFactoryImpl
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
@@ -15,19 +14,27 @@ import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.*
 
-fun processRepository(rootDir: File) {
+// Add this data class at the top level
+data class RuleServiceInfo(
+        val className: String,
+        // val filePath: String,
+        val genericType: String?,
+        val methods: List<String>
+)
+
+fun processRepository(rootDir: File): List<RuleServiceInfo> {
     // Create compiler configuration
     val configuration =
-        CompilerConfiguration().apply {
-            put(
-                CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY,
-                PrintingMessageCollector(
-                    System.err,
-                    MessageRenderer.PLAIN_FULL_PATHS,
-                    false
+            CompilerConfiguration().apply {
+                put(
+                        CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY,
+                        PrintingMessageCollector(
+                                System.err,
+                                MessageRenderer.PLAIN_FULL_PATHS,
+                                false
+                        )
                 )
-            )
-        }
+            }
 
     val disposable = Disposer.newDisposable()
     val environment =
@@ -37,68 +44,92 @@ fun processRepository(rootDir: File) {
                     EnvironmentConfigFiles.JVM_CONFIG_FILES
             )
 
+    val psiFactory = PsiFileFactory.getInstance(environment.project) as PsiFileFactoryImpl
+
     // Process files in batches
-    rootDir.walk()
+    return rootDir.walk()
             .filter { it.extension == "kt" }
             .chunked(100) // Process 100 files at a time
-            .forEach { batch ->
-                processBatch(batch, environment)
-                System.gc() // Suggest garbage collection between batches
+            .flatMap { batch -> processRuleService(batch, psiFactory) }
+            .toList()
+            .also { disposable.dispose() }
+}
+
+fun processRuleService(files: List<File>, psiFactory: PsiFileFactoryImpl): List<RuleServiceInfo> =
+        files.flatMap { file ->
+            file.readText().let { content ->
+                val psiFile =
+                        psiFactory.createFileFromText(
+                                file.name,
+                                KotlinFileType.INSTANCE,
+                                content,
+                        ) as
+                                KtFile
+
+                extractRuleService(psiFile).also { (psiFile as PsiFileImpl).clearCaches() }
             }
-}
+        }
 
-fun processBatch(files: List<File>, environment: KotlinCoreEnvironment) {
-    files.forEach { file ->
-        val content = File(file.absolutePath).readText()
-        val psiFactory = PsiFileFactory.getInstance(environment.project) as PsiFileFactoryImpl
-        val psiFile =
-                psiFactory.createFileFromText(
-                        file.name,
-                        KotlinFileType.INSTANCE,
-                        content,
-                ) as
-                        KtFile
+fun extractRuleService(ktFile: KtFile): List<RuleServiceInfo> {
+    val ruleServices = mutableListOf<RuleServiceInfo>()
 
-        // Process the PSI file
-        extractRelevantInformation(psiFile)
-
-        // Clear references to allow garbage collection
-        (psiFile as PsiFileImpl).clearCaches()
-    }
-}
-
-fun extractRelevantInformation(ktFile: KtFile) {
     val visitor =
             object : KtTreeVisitorVoid() {
-                override fun visitElement(element: PsiElement) {
-                    // Process only what you need
-                    when (element) {
-                        is KtClass -> {
-                            // Extract class information
-                            println(
-                                "Found class: ${element.name}"
-                            )
-                        }
-                        is KtFunction -> {
-                            // Extract function information
-                            println(
-                                "Found function: ${element.name}"
-                            )
-                        }
-                    // Add other relevant elements
+                override fun visitClass(klass: KtClass) {
+                    super.visitClass(klass)
+
+                    // Check if class extends AbstractRuleService
+                    if (klass.getSuperTypeListEntries().any { superTypeEntry ->
+                                val superTypeName = superTypeEntry.typeReference?.text
+                                superTypeName?.contains("AbstractPensjonRuleService") == true
+                            }
+                    ) {
+                        val serviceInfo =
+                                RuleServiceInfo(
+                                        className = klass.name ?: "anonymous",
+                                        // filePath = ktFile.virtualFilePath
+                                        //                 ?: ktFile.name ?: "unknown!",
+                                        genericType =
+                                                klass.getSuperTypeListEntries()
+                                                        .firstOrNull {
+                                                            it.typeReference?.text?.contains(
+                                                                    "AbstractPensjonRuleService"
+                                                            ) == true
+                                                        }
+                                                        ?.typeReference
+                                                        ?.text
+                                                        ?.substringAfter("<")
+                                                        ?.removeSuffix(">"),
+                                        methods =
+                                                klass.declarations.filterIsInstance<
+                                                                KtNamedFunction>()
+                                                        .mapNotNull { it.name }
+                                )
+                        ruleServices.add(serviceInfo)
                     }
-                    super.visitElement(element)
                 }
             }
 
     ktFile.accept(visitor)
+    return ruleServices
 }
 
 fun main(args: Array<String>) {
     val disposable = Disposer.newDisposable()
     try {
-        // Your processing logic
-        processRepository(File("/Users/torsteinnesby/gitHub/navikt/pensjon-regler"))
+        val ruleServices =
+                processRepository(File("/Users/torsteinnesby/gitHub/navikt/pensjon-regler"))
+
+        ruleServices.forEach { info ->
+            println(
+                    """
+                    Class: ${info.className}
+                    Generic Type: ${info.genericType}
+                    Methods: ${info.methods.joinToString(", ")}
+                    ----------------------
+                """.trimIndent()
+            )
+        }
     } finally {
         disposable.dispose()
     }
