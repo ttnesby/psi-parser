@@ -22,7 +22,7 @@ data class RuleServiceInfo(
 )
 
 fun processRepository(rootDir: File): List<RuleServiceInfo> {
-    // Create compiler configuration
+    // create compiler configuration
 
     val configuration =
             CompilerConfiguration().apply {
@@ -45,6 +45,8 @@ fun processRepository(rootDir: File): List<RuleServiceInfo> {
             }
 
     val disposable = Disposer.newDisposable()
+
+    // init kotlin compiler environment
     // createForTests is `lighter` (faster init, less memory), BUT ide plugins dependency
     val environment =
             KotlinCoreEnvironment.createForProduction(
@@ -53,12 +55,13 @@ fun processRepository(rootDir: File): List<RuleServiceInfo> {
                     EnvironmentConfigFiles.JVM_CONFIG_FILES
             )
 
+    // init psi factory from kotlin compiler env
     val psiFactory = PsiFileFactory.getInstance(environment.project) as PsiFileFactoryImpl
 
-    // Process files in batches
+    // process repo files in batches
     return rootDir.walk()
             .filter { it.extension == "kt" }
-            .chunked(100) // Process 100 files at a time
+            .chunked(100) // 100 files at a time
             .flatMap { batch -> processRuleService(batch, psiFactory) }
             .toList()
             .also { disposable.dispose() }
