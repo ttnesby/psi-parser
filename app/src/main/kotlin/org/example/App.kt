@@ -9,34 +9,43 @@ import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.com.intellij.psi.PsiFileFactory
 import org.jetbrains.kotlin.com.intellij.psi.impl.PsiFileFactoryImpl
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
-import org.jetbrains.kotlin.config.CommonConfigurationKeys
-import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.*
 
 // Add this data class at the top level
 data class RuleServiceInfo(
         val className: String,
-         val filePath: String,
+        val filePath: String,
         val genericType: String?,
         val methods: List<String>
 )
 
 fun processRepository(rootDir: File): List<RuleServiceInfo> {
     // Create compiler configuration
+
     val configuration =
             CompilerConfiguration().apply {
                 put(
-                        CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY,
-                        PrintingMessageCollector(
-                                System.err,
-                                MessageRenderer.PLAIN_FULL_PATHS,
-                                false
+                        CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, // configuration key
+                        PrintingMessageCollector( // how to handle compiler messages
+                                System.err, // direct error to standard error
+                                MessageRenderer.PLAIN_FULL_PATHS, // full path in error messages
+                                false // don't report errors as warnings
                         )
                 )
+                put(
+                        CommonConfigurationKeys.LANGUAGE_VERSION_SETTINGS,
+                        LanguageVersionSettingsImpl(
+                                languageVersion = LanguageVersion.KOTLIN_2_0,
+                                apiVersion = ApiVersion.KOTLIN_2_0
+                        )
+                )
+                put(JVMConfigurationKeys.JVM_TARGET, JvmTarget.JVM_21)
             }
 
     val disposable = Disposer.newDisposable()
+    // createForTests is `lighter` (faster init, less memory), BUT ide plugins dependency
     val environment =
             KotlinCoreEnvironment.createForProduction(
                     disposable,
@@ -87,7 +96,7 @@ fun extractRuleService(ktFile: KtFile): List<RuleServiceInfo> {
                         val serviceInfo =
                                 RuleServiceInfo(
                                         className = klass.name ?: "anonymous",
-                                         filePath = ktFile.containingFile.name,
+                                        filePath = ktFile.containingFile.name,
                                         genericType =
                                                 klass.getSuperTypeListEntries()
                                                         .firstOrNull {
@@ -118,7 +127,7 @@ fun main(args: Array<String>) {
     try {
         val ruleServices =
                 processRepository(File("/Users/torsteinnesby/gitHub/navikt/pensjon-regler"))
-                    .sortedBy { it.className }
+                        .sortedBy { it.className }
 
         ruleServices.forEach { info ->
             println(
