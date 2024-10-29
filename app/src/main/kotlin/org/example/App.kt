@@ -61,6 +61,15 @@ fun processRepository(rootDir: File): List<RuleServiceInfo> {
     // process repo files in batches
     return rootDir.walk()
             .filter { it.extension == "kt" }
+            .filter { file ->
+                // Exclude common build and test directories
+                !file.absolutePath.contains("/build/") &&
+                        !file.absolutePath.contains("/target/") &&
+                        !file.absolutePath.contains("/generated/") &&
+                        // Optional: only include main source directories
+                        file.absolutePath.contains("/src/main/")
+            }
+            .distinctBy { it.canonicalPath } // Use canonical path to handle symlinks
             .chunked(100) // 100 files at a time
             .flatMap { batch -> processRuleService(batch, psiFactory) }
             .toList()
@@ -131,6 +140,8 @@ fun main(args: Array<String>) {
         val ruleServices =
                 processRepository(File("/Users/torsteinnesby/gitHub/navikt/pensjon-regler"))
                         .sortedBy { it.className }
+
+        println("Found ${ruleServices.size} rule services")
 
         ruleServices.forEach { info ->
             println(
