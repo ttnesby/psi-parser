@@ -10,11 +10,11 @@ import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.com.intellij.psi.PsiFileFactory
 import org.jetbrains.kotlin.com.intellij.psi.impl.PsiFileFactoryImpl
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
-import org.jetbrains.kotlin.com.intellij.psi.search.GlobalSearchScope
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.idea.KotlinFileType
-import org.jetbrains.kotlin.load.kotlin.PackagePartProvider
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.resolve.BindingContext
+import org.jetbrains.kotlin.resolve.DelegatingBindingTrace
 
 data class RuleServiceDoc(
         val navn: String,
@@ -32,123 +32,98 @@ data class PropertyDoc(
 fun processRepository(rootDir: File): List<RuleServiceDoc> {
     // create compiler configuration
 
-    val configuration =
-            CompilerConfiguration().apply {
-                put(
-                        CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, // configuration key
-                        PrintingMessageCollector( // how to handle compiler messages
-                                System.err, // direct error to standard error
-                                MessageRenderer.PLAIN_FULL_PATHS, // full path in error messages
-                                false // don't report errors as warnings
-                        )
-                )
-                put(
-                        CommonConfigurationKeys.LANGUAGE_VERSION_SETTINGS,
-                        LanguageVersionSettingsImpl(
-                                languageVersion = LanguageVersion.KOTLIN_2_0,
-                                apiVersion = ApiVersion.KOTLIN_2_0
-                        )
-                )
-                put(JVMConfigurationKeys.JVM_TARGET, JvmTarget.JVM_21)
-
-                // Add source roots to the configuration
-                addKotlinSourceRoots(
-                        rootDir.walk()
-                                .filter { it.isDirectory && it.name == "kotlin" }
-                                .map { it.absolutePath }
-                                .toList()
-                )
-            }
-
     val disposable = Disposer.newDisposable()
+    val messageCollector = PrintingMessageCollector(System.err, MessageRenderer.PLAIN_FULL_PATHS, false)
 
-    // init kotlin compiler environment
-    // createForTests is `lighter` (faster init, less memory), BUT ide plugins dependency
-    val environment =
-            KotlinCoreEnvironment.createForProduction(
-                    disposable,
-                    configuration,
-                    EnvironmentConfigFiles.JVM_CONFIG_FILES
-            )
+    try {
+        val configuration =
+                CompilerConfiguration().apply {
+                    put(
+                            CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector
+                    )
+                    put(
+                            CommonConfigurationKeys.LANGUAGE_VERSION_SETTINGS,
+                            LanguageVersionSettingsImpl(
+                                    languageVersion = LanguageVersion.KOTLIN_2_0,
+                                    apiVersion = ApiVersion.KOTLIN_2_0
+                            )
+                    )
+                    put(JVMConfigurationKeys.JVM_TARGET, JvmTarget.JVM_21)
 
-    // Create an analysis context
-    val analyzer = AnalyzerWithCompilerReport(configuration)
+                    // Add source roots to the configuration
+                    addKotlinSourceRoots(
+                            rootDir.walk()
+                                    .filter { it.isDirectory && it.name == "kotlin" }
+                                    .map { it.absolutePath }
+                                    .toList()
+                    )
+                }
 
-    // Analyze all files
-//    // Create trace holder
-//    val trace = CliLightClassGenerationSupport.NoScopeRecordCliBindingTrace()
-
-    // Get the module
-//    val moduleContext =
-//            TopDownAnalyzerFacadeForJVM.createContextWithSealedModule(
-//                    environment.project,
-//                    environment.configuration
-//            )
-
-    // Analyze all files
-    val analysisResult =
-            analyzer.analyzeAndReport(environment.getSourceFiles()) {
-                TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration(
-                    project = environment.project,
-                    files = environment.getSourceFiles(),
-                    trace = NoScopeRecordCliBindingTrace(environment.project),
-                    configuration = configuration,
-                    packagePartProvider = environment.createPackagePartProvider(scope = GlobalSearchScope.fileScope()),
-                    declarationProviderFactory = TODO(),
-                    sourceModuleSearchScope = TODO(),
-                    klibList = TODO(),
-                    explicitModuleDependencyList = TODO(),
-                    explicitModuleFriendsList = TODO(),
-                    explicitCompilerEnvironment = TODO(),
-                    packagePartProvider = TODO(),
-                    declarationProviderFactory = TODO(),
-                    sourceModuleSearchScope = TODO(),
-                    klibList = TODO(),
-                    explicitModuleDependencyList = TODO(),
-                    explicitModuleFriendsList = TODO(),
-                    explicitCompilerEnvironment = TODO()
+        // init kotlin compiler environment
+        // createForTests is `lighter` (faster init, less memory), BUT ide plugins dependency
+        // EnvironmentConfigFiles.METADATA_CONFIG_FILES gives `lighter` environment, but does not
+        // support
+        // resolve of user type reference across kotlin files, dependent on analyze context
+        val environment =
+                KotlinCoreEnvironment.createForProduction(
+                        disposable,
+                        configuration,
+                        EnvironmentConfigFiles.JVM_CONFIG_FILES
                 )
-//                ,
-//                        packagePartProvider = environment.createPackagePartProvider(),
-//                        containerSource = null
-//                )
-            }
 
-    // init psi factory from kotlin compiler env
-    val psiFactory = PsiFileFactory.getInstance(environment.project) as PsiFileFactoryImpl
+        // init psi factory from kotlin compiler env
+        val psiFactory = PsiFileFactory.getInstance(environment.project) as PsiFileFactoryImpl
 
-    // process repo files in batches
-    return rootDir.walk()
-            .filter { it.extension == "kt" }
-            .filter { file ->
-                //                // Exclude common build and test directories
-                //                !file.absolutePath.contains("/build/") &&
-                //                        !file.absolutePath.contains("/target/") &&
-                //                        !file.absolutePath.contains("/generated/") &&
-                //                        // Optional: only include main source directories
-                file.absolutePath.contains("/src/main/")
-            }
-            .distinctBy { it.canonicalPath } // Use canonical path to handle symlinks
-            .chunked(100) // 100 files at a time
-            .flatMap { batch -> processRuleService(batch, psiFactory) }
-            .toList()
-            .also { disposable.dispose() }
-}
+        val psiSourceFiles =
+                rootDir.walk()
+                        .filter { it.extension == "kt" }
+                        .filter { file -> file.absolutePath.contains("/src/main/") }
+                        .distinctBy { it.canonicalPath } // Use canonical path to handle symlinks
+                        .map { file ->
+                            val content = file.readText()
+                            val psiFile =
+                                    psiFactory.createFileFromText(
+                                            file.name,
+                                            KotlinFileType.INSTANCE,
+                                            content
+                                    ) as
+                                            KtFile
+                            psiFile
+                        }
+                        .toList()
 
-fun processRuleService(files: List<File>, psiFactory: PsiFileFactoryImpl): List<RuleServiceDoc> =
-        files.flatMap { file ->
-            file.readText().let { content ->
-                val psiFile =
-                        psiFactory.createFileFromText(
-                                file.name,
-                                KotlinFileType.INSTANCE,
-                                content,
-                        ) as
-                                KtFile
+        // Create an analyzer with a message collector
+        val analyzer = AnalyzerWithCompilerReport(configuration)
 
-                extractRuleService(psiFile).also { (psiFile as PsiFileImpl).clearCaches() }
+        val trace = DelegatingBindingTrace(
+            BindingContext.EMPTY,
+            "Trace for analyzing source files"
+        )
+
+        // Perform analysis
+        analyzer.analyzeAndReport(psiSourceFiles) {
+            TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration(
+                    environment.project,
+                    psiSourceFiles,
+                    trace, // BindingTrace implementation
+                    environment.configuration,
+                    environment::createPackagePartProvider
+            )
+        }
+
+        // Get the BindingContext
+        val bindingContext = analyzer.analysisResult.bindingContext
+
+        // process psi files in batches
+        return psiSourceFiles.chunked(100).flatMap { batch ->
+            batch.flatMap { file ->
+                extractRuleService(file).also { (file as PsiFileImpl).clearCaches() }
             }
         }
+    } finally {
+        disposable.dispose()
+    }
+}
 
 fun extractRuleService(ktFile: KtFile): List<RuleServiceDoc> {
     val ruleServices = mutableListOf<RuleServiceDoc>()
