@@ -33,14 +33,13 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
     // create compiler configuration
 
     val disposable = Disposer.newDisposable()
-    val messageCollector = PrintingMessageCollector(System.err, MessageRenderer.PLAIN_FULL_PATHS, false)
+    val messageCollector =
+            PrintingMessageCollector(System.err, MessageRenderer.PLAIN_FULL_PATHS, false)
 
     try {
         val configuration =
                 CompilerConfiguration().apply {
-                    put(
-                            CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector
-                    )
+                    put(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
                     put(
                             CommonConfigurationKeys.LANGUAGE_VERSION_SETTINGS,
                             LanguageVersionSettingsImpl(
@@ -57,6 +56,27 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
                                     .map { it.absolutePath }
                                     .toList()
                     )
+
+                    // to be continued on Monday
+
+                    put(CommonConfigurationKeys.MODULE_NAME, "nav-merknad-pensjon")
+                    put(CommonConfigurationKeys.MODULE_NAME, "nav-presentation-pensjon-guimodel")
+                    put(CommonConfigurationKeys.MODULE_NAME, "nav-provider-pensjon-acl")
+                    put(CommonConfigurationKeys.MODULE_NAME, "nav-provider-pensjon-api")
+                    put(CommonConfigurationKeys.MODULE_NAME, "nav-repository-pensjon")
+                    put(CommonConfigurationKeys.MODULE_NAME, "nav-sats-pensjon")
+                    put(CommonConfigurationKeys.MODULE_NAME, "nav-system-pensjon-domain")
+                    put(CommonConfigurationKeys.MODULE_NAME, "nav-presentation-pensjon-guimodel")
+                    put(CommonConfigurationKeys.MODULE_NAME, "nav-system-pensjon-unleash")
+                    put(CommonConfigurationKeys.MODULE_NAME, "nav-system-pensjon-util")
+                    put(CommonConfigurationKeys.MODULE_NAME, "nav-merknad-pensjon")
+                    put(CommonConfigurationKeys.MODULE_NAME, "no.nav.pensjonregler")
+                    put(CommonConfigurationKeys.MODULE_NAME, "presentation")
+                    put(CommonConfigurationKeys.MODULE_NAME, "provider")
+                    put(CommonConfigurationKeys.MODULE_NAME, "repository")
+                    put(CommonConfigurationKeys.MODULE_NAME, "system")
+
+                    // classpath settings?
                 }
 
         // init kotlin compiler environment
@@ -95,10 +115,7 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
         // Create an analyzer with a message collector
         val analyzer = AnalyzerWithCompilerReport(configuration)
 
-        val trace = DelegatingBindingTrace(
-            BindingContext.EMPTY,
-            "Trace for analyzing source files"
-        )
+        val trace = DelegatingBindingTrace(BindingContext.EMPTY, "Trace for analyzing source files")
 
         // Perform analysis
         analyzer.analyzeAndReport(psiSourceFiles) {
