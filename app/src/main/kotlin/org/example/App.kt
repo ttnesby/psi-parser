@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport
 import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector
 import org.jetbrains.kotlin.cli.jvm.compiler.*
+import org.jetbrains.kotlin.cli.jvm.compiler.CliBindingTrace
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.com.intellij.psi.PsiFileFactory
 import org.jetbrains.kotlin.com.intellij.psi.impl.PsiFileFactoryImpl
@@ -13,8 +14,6 @@ import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.resolve.BindingContext
-import org.jetbrains.kotlin.resolve.DelegatingBindingTrace
 
 data class RuleServiceDoc(
         val navn: String,
@@ -31,6 +30,14 @@ data class PropertyDoc(
 
 fun processRepository(rootDir: File): List<RuleServiceDoc> {
     // create compiler configuration
+
+    // rootDir.walkTopDown().filter { it.isFile && it.extension == "kt" }.forEach { file ->
+    //     //        println("Processing file: ${file.absolutePath}")
+    //     val text = file.readText()
+    //     if (text.contains("\r\n")) {
+    //         println("File with wrong line separators detected: ${file.absolutePath}")
+    //     }
+    // }
 
     val disposable = Disposer.newDisposable()
     val messageCollector =
@@ -56,8 +63,6 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
                                     .map { it.absolutePath }
                                     .toList()
                     )
-
-                    // to be continued on Monday
 
                     put(CommonConfigurationKeys.MODULE_NAME, "nav-merknad-pensjon")
                     put(CommonConfigurationKeys.MODULE_NAME, "nav-presentation-pensjon-guimodel")
@@ -97,6 +102,24 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
         val psiSourceFiles =
                 rootDir.walk()
                         .filter { it.extension == "kt" }
+                        .filter { file -> file.absolutePath.contains("/src/main/kotlin") }
+                        // .distinctBy { it.canonicalPath } // Use canonical path to handle symlinks
+                        .map { file ->
+                            val content = file.readText()
+                            val psiFile =
+                                    psiFactory.createFileFromText(
+                                            file.name,
+                                            KotlinFileType.INSTANCE,
+                                            content
+                                    ) as
+                                            KtFile
+                            psiFile
+                        }
+                        .toList()
+
+        val psiSourceFilesOld =
+                rootDir.walk()
+                        .filter { it.extension == "kt" }
                         .filter { file -> file.absolutePath.contains("/src/main/") }
                         .distinctBy { it.canonicalPath } // Use canonical path to handle symlinks
                         .map { file ->
@@ -115,7 +138,9 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
         // Create an analyzer with a message collector
         val analyzer = AnalyzerWithCompilerReport(configuration)
 
-        val trace = DelegatingBindingTrace(BindingContext.EMPTY, "Trace for analyzing source files")
+        // val trace = DelegatingBindingTrace(BindingContext.EMPTY, "Trace for analyzing source
+        // files")
+        val trace = CliBindingTrace(environment.project)
 
         // Perform analysis
         analyzer.analyzeAndReport(psiSourceFiles) {
