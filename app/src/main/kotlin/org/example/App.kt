@@ -227,7 +227,7 @@ fun extractRuleService(ktFile: KtFile, bindingContext: BindingContext): List<Rul
                                         navn = navn,
                                         beskrivelse = "test regeltjeneste ${navn}",
                                         inndata = extractRequestFields(klass, bindingContext),
-                                        utdata = emptyList(),
+                                        utdata = extractResponseFields(klass, bindingContext),
                                 )
 
                         ruleServices.add(serviceDoc)
@@ -277,6 +277,57 @@ fun extractRequestFields(ktClass: KtClass, bindingContext: BindingContext): List
 
                 props.addAll(properties)
             }
+        }
+    }
+
+    return props
+}
+
+fun extractResponseFields(ktClass: KtClass, bindingContext: BindingContext): List<PropertyDoc> {
+    val props = mutableListOf<PropertyDoc>()
+
+    // Find the supertype entry for AbstractPensjonRuleService
+    val abstractServiceEntry =
+            ktClass.getSuperTypeListEntries().find { superTypeEntry ->
+                superTypeEntry.typeReference?.text?.contains("AbstractPensjonRuleService") == true
+            }
+                    ?: return emptyList()
+
+    // Get the generic type argument (response type)
+    val typeArguments = abstractServiceEntry.typeReference?.typeElement?.typeArgumentsAsTypes
+    val responseTypeRef = typeArguments?.getOrNull(0) ?: return emptyList()
+
+    // Get binding context information for the response type
+    val responseType = bindingContext.get(BindingContext.TYPE, responseTypeRef)
+    val typeClassifier = responseType?.constructor?.declarationDescriptor
+
+    if (typeClassifier != null) {
+        // Find the source declaration for the response type
+        val declaration = DescriptorToSourceUtils.getSourceFromDescriptor(typeClassifier)
+
+        if (declaration is KtClass) {
+            // Add the response class itself
+            props.add(
+                    PropertyDoc(
+                            navn = declaration.name ?: "",
+                            type = responseTypeRef.text,
+                            beskrivelse = declaration.docComment?.getText()
+                                            ?: "Response for ${ktClass.name}"
+                    )
+            )
+
+            // Add all properties from the response class
+            val properties =
+                    declaration.body?.properties?.map { prop ->
+                        PropertyDoc(
+                                navn = prop.name ?: "",
+                                type = prop.typeReference?.text ?: "Unknown",
+                                beskrivelse = prop.docComment?.getText() ?: ""
+                        )
+                    }
+                            ?: emptyList()
+
+            props.addAll(properties)
         }
     }
 
