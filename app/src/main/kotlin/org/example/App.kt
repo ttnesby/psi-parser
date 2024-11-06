@@ -38,7 +38,8 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
             rootDir.walk()
                     .filter { file ->
                         file.isDirectory &&
-                                (file.absolutePath.contains("repository/") || file.absolutePath.contains("system/")) &&
+                                (file.absolutePath.contains("repository/") ||
+                                        file.absolutePath.contains("system/")) &&
                                 !file.absolutePath.contains("src/test/") &&
                                 !file.absolutePath.contains("/target/") &&
                                 file.name == "kotlin"
@@ -252,80 +253,12 @@ fun extractRequestFields(ktClass: KtClass, bindingContext: BindingContext): List
                 )
 
                 props.addAll(properties)
-
-                // You might want to process the properties of the referenced class here
-                // properties.addAll(extractPropertiesFromClass(declaration))
             }
         }
     }
 
     return props
 }
-
-// fun extractRequestFields(ktClass: KtClass, bindingContext: BindingContext): List<PropertyDoc> {
-//     val properties = mutableListOf<PropertyDoc>()
-
-//     val primaryConstructor: KtPrimaryConstructor = ktClass.primaryConstructor ?: return
-// emptyList()
-
-//     // Print parameter names
-//     primaryConstructor.valueParameters.forEach { parameter ->
-//         val typeRef = parameter.typeReference ?: return@forEach
-
-//         // If it's a user-defined type
-//         val userType = typeRef.typeElement as? KtUserType
-//         val referencedClass =
-//                 userType?.referenceExpression?.references?.firstNotNullOfOrNull { ref ->
-//                     when (val resolved = ref.resolve()) {
-//                         is KtClass -> resolved // Kotlin class
-//                         else -> null
-//                     }
-//                 }
-
-//         properties.add(
-//                 PropertyDoc(
-//                         navn = parameter.name ?: "",
-//                         type = typeRef.text,
-//                         beskrivelse = referencedClass?.name ?: "Unknown type"
-//                 )
-//         )
-
-//         // If you need to process the referenced class further
-//         if (referencedClass is KtClass) {
-//             // Process the referenced class properties, methods, etc.
-//             println("Referenced class: ${referencedClass.name}")
-//             println("Location: ${referencedClass.containingFile.virtualFile?.path}")
-//         }
-//     }
-
-//     // println("Parameter name: ${parameter.name}, Type: ${parameter.typeReference?.text}")
-
-//     // // Resolve the reference
-//     // val typeReference: KtTypeReference = parameter.typeReference ?: return@forEach
-//     // val nameReferenceExpression =
-//     //         (typeReference.firstChild as? KtUserType)?.firstChild as?
-// KtNameReferenceExpression
-
-//     // //        if (nameReferenceExpression == null) {
-//     // //            return@forEach
-//     // //        }
-
-//     // val target: PsiElement = nameReferenceExpression.resolve() ?: return@forEach
-
-//     // // Navigate to the target's declaration
-//     // if (target is KtClass && target.isValid) {
-//     //     val navigationElement = target.navigationElement
-//     //     if (navigationElement is Navigatable && navigationElement.canNavigate()) {
-//     //         navigationElement.navigate(true)
-
-//     //         // Further processing with the KtClass target
-//     //         println("Found class: ${target.name}")
-//     //         // Add any additional handling for the KtClass here
-//     //     }
-//     // }
-
-//     return properties
-// }
 
 fun main(args: Array<String>) {
     val disposable = Disposer.newDisposable()
