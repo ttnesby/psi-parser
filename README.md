@@ -25,6 +25,19 @@ Oppsett av embeddable compiler:
 3) Analyse av kotlin moduler og filer
 4) Klar for ekstrahering av relevante elementer gjennom PSI parsing
 
+### Konfigurasjon og Analyse
+
+Repo `pensjon-regler` har mange avhengigheter. For å forenkle situasjonen er følgende hardkodet:
+```zsh
+mvn dependency:copy-dependencies -DoutputDirectory=/Users/torsteinnesby/tmp/Libs
+```
+
+Da er det ganske lett å laste opp samtlige avhengigheter som `JVMClasspathRoots`.
+
+Forutsetningen for en enkel navigering mellom PSI filer basert på avhengigheter, er full analyse og tilhørende `BindingContext`.
+En `god nok` bindingContext forutsetter færrest mulig feil. Per nå er antall feil og advarsler så godt som det kan bli.
+
+
 ### Program Structure Interface (PSI)
 
 PSI tilbyr ulike mekanismer for finne relevante elementer gjennom PSUtil mange `visitor pattern` metoder.
