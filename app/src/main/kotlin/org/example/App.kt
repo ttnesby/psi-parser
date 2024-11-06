@@ -89,23 +89,6 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
                     addKotlinSourceRoots(kotlinSourceRoots)
 
                     put(CommonConfigurationKeys.MODULE_NAME, "repository-analysis")
-
-                    // put(CommonConfigurationKeys.MODULE_NAME, "nav-merknad-pensjon")
-                    // put(CommonConfigurationKeys.MODULE_NAME, "nav-repository-pensjon")
-                    // put(CommonConfigurationKeys.MODULE_NAME, "nav-sats-pensjon")
-                    // put(CommonConfigurationKeys.MODULE_NAME, "repository")
-                    // put(CommonConfigurationKeys.MODULE_NAME, "nav-presentation-pensjon-guimodel")
-                    // put(CommonConfigurationKeys.MODULE_NAME, "nav-provider-pensjon-acl")
-                    // put(CommonConfigurationKeys.MODULE_NAME, "nav-provider-pensjon-api")
-                    // put(CommonConfigurationKeys.MODULE_NAME, "nav-system-pensjon-domain")
-                    // put(CommonConfigurationKeys.MODULE_NAME, "nav-presentation-pensjon-guimodel")
-                    // put(CommonConfigurationKeys.MODULE_NAME, "nav-system-pensjon-unleash")
-                    // put(CommonConfigurationKeys.MODULE_NAME, "nav-system-pensjon-util")
-                    // put(CommonConfigurationKeys.MODULE_NAME, "nav-merknad-pensjon")
-                    // put(CommonConfigurationKeys.MODULE_NAME, "no.nav.pensjonregler")
-                    // put(CommonConfigurationKeys.MODULE_NAME, "presentation")
-                    // put(CommonConfigurationKeys.MODULE_NAME, "provider")
-                    // put(CommonConfigurationKeys.MODULE_NAME, "system")
                 }
 
         // add kotlin stdlib and reflection
@@ -118,7 +101,7 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
                         )
                 )
         )
-        // add pensjon-regler JARS
+        // add pensjon-regler dependency JARs
         // based on `mvn dependency:copy-dependencies
         // -DoutputDirectory=/Users/torsteinnesby/tmp/Libs`
 
