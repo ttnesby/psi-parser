@@ -3,8 +3,9 @@ package org.example
 import java.io.File
 import org.jetbrains.kotlin.cli.common.config.addKotlinSourceRoots
 import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport
-import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
-import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
+import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.jvm.compiler.*
 import org.jetbrains.kotlin.cli.jvm.compiler.CliBindingTrace
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoots
@@ -30,6 +31,41 @@ data class PropertyDoc(
         val type: String,
         val beskrivelse: String,
 )
+
+class MessageCollectorSummary : MessageCollector {
+    private var errorCount = 0
+    private var warningCount = 0
+    private var infoCount = 0
+
+    override fun clear() {
+        errorCount = 0
+        warningCount = 0
+        infoCount = 0
+    }
+
+    override fun hasErrors(): Boolean = errorCount > 0
+
+    override fun report(
+            severity: CompilerMessageSeverity,
+            message: String,
+            location: CompilerMessageSourceLocation?
+    ) {
+        when (severity) {
+            CompilerMessageSeverity.ERROR, CompilerMessageSeverity.EXCEPTION -> errorCount++
+            CompilerMessageSeverity.WARNING -> warningCount++
+            CompilerMessageSeverity.INFO -> infoCount++
+            else -> {} // ignore other severities
+        }
+    }
+
+    fun printSummary() {
+        println("Compilation summary:")
+        println("- Errors: $errorCount")
+        println("- Warnings: $warningCount")
+        println("- Info messages: $infoCount")
+        println()
+    }
+}
 
 fun processRepository(rootDir: File): List<RuleServiceDoc> {
     // create compiler configuration
@@ -64,8 +100,9 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
     // return emptyList()
 
     val disposable = Disposer.newDisposable()
-    val messageCollector =
-            PrintingMessageCollector(System.err, MessageRenderer.PLAIN_FULL_PATHS, false)
+    // val messageCollector =
+    //         PrintingMessageCollector(System.err, MessageRenderer.PLAIN_FULL_PATHS, false)
+    val messageCollector = MessageCollectorSummary()
 
     try {
         val configuration =
@@ -150,6 +187,9 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
                     environment::createPackagePartProvider
             )
         }
+
+        // summary of messages from the analysis phase
+        messageCollector.printSummary()
 
         // Get the BindingContext
         val bindingContext = analyzer.analysisResult.bindingContext
