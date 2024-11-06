@@ -38,7 +38,7 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
             rootDir.walk()
                     .filter { file ->
                         file.isDirectory &&
-                                file.absolutePath.contains("repository/") &&
+                                (file.absolutePath.contains("repository/") || file.absolutePath.contains("system/")) &&
                                 !file.absolutePath.contains("src/test/") &&
                                 !file.absolutePath.contains("/target/") &&
                                 file.name == "kotlin"
@@ -250,6 +250,8 @@ fun extractRequestFields(ktClass: KtClass, bindingContext: BindingContext): List
                                 beskrivelse = "Parameter of ${ktClass.name}"
                         )
                 )
+
+                props.addAll(properties)
 
                 // You might want to process the properties of the referenced class here
                 // properties.addAll(extractPropertiesFromClass(declaration))
