@@ -24,13 +24,34 @@ data class RuleServiceDoc(
         val beskrivelse: String,
         val inndata: List<PropertyDoc>,
         val utdata: List<PropertyDoc>,
-)
+) {
+    override fun toString(): String {
+        return """
+            |RuleServiceDoc(
+            |   navn = $navn,
+            |   beskrivelse = $beskrivelse,
+            |   inndata = $inndata,
+            |   utdata = $utdata
+            |)
+        """.trimMargin()
+    }
+}
 
 data class PropertyDoc(
         val navn: String,
         val type: String,
         val beskrivelse: String,
-)
+) {
+    override fun toString(): String {
+        return """
+                |PropertyDoc(
+                |   navn = $navn,
+                |   type = $type,
+                |   beskrivelse = $beskrivelse
+                |)
+            """.trimMargin()
+    }
+}
 
 class MessageCollectorSummary : MessageCollector {
     private var errorCount = 0
@@ -67,44 +88,20 @@ class MessageCollectorSummary : MessageCollector {
     }
 }
 
-fun processRepository(rootDir: File): List<RuleServiceDoc> {
-    // create compiler configuration
+data class CompilerAnalyzerResult(
+        val psiSourceFiles: List<KtFile>,
+        val analyzer: AnalyzerWithCompilerReport,
+        val environment: KotlinCoreEnvironment
+)
 
-    val kotlinSourceRoots =
-            rootDir.walk()
-                    .filter { file ->
-                        file.isDirectory &&
-                                (file.absolutePath.contains("repository/") ||
-                                        file.absolutePath.contains("system/")) &&
-                                !file.absolutePath.contains("src/test/") &&
-                                !file.absolutePath.contains("/target/") &&
-                                file.name == "kotlin"
-                    }
-                    .map { it.absolutePath }
-                    .toList()
-
-    // Then, find all Kotlin files under these roots
-    val kotlinSourceFiles =
-            kotlinSourceRoots
-                    .flatMap { sourceRoot ->
-                        File(sourceRoot)
-                                .walk()
-                                .filter { it.isFile }
-                                .filter { it.extension.lowercase() == "kt" }
-                                .map { it.absolutePath }
-                    }
-                    .toList()
-
-    // println(kotlinSourceRoots)
-    // println(kotlinSourceFiles)
-    // return emptyList()
-
+private fun compilerEnvironment(
+        kotlinSourceRoots: List<String>,
+        kotlinSourceFiles: List<String>
+): CompilerAnalyzerResult {
     val disposable = Disposer.newDisposable()
-    // val messageCollector =
-    //         PrintingMessageCollector(System.err, MessageRenderer.PLAIN_FULL_PATHS, false)
-    val messageCollector = MessageCollectorSummary()
 
     try {
+        val messageCollector = MessageCollectorSummary()
         val configuration =
                 CompilerConfiguration().apply {
                     put(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, messageCollector)
@@ -116,15 +113,11 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
                             )
                     )
                     put(JVMConfigurationKeys.JVM_TARGET, JvmTarget.JVM_21)
-
                     put(
                             JVMConfigurationKeys.JDK_HOME,
                             File("/Users/torsteinnesby/.sdkman/candidates/java/current")
                     )
-
-                    // Add source roots to the configuration
                     addKotlinSourceRoots(kotlinSourceRoots)
-
                     put(CommonConfigurationKeys.MODULE_NAME, "repository-analysis")
                 }
 
@@ -138,15 +131,11 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
                         )
                 )
         )
-        // add pensjon-regler dependency JARs
-        // based on `mvn dependency:copy-dependencies
-        // -DoutputDirectory=/Users/torsteinnesby/tmp/Libs`
 
         val libsDir = File("/Users/torsteinnesby/tmp/Libs")
         val dependencyJars = libsDir.walk().filter { it.isFile && it.extension == "jar" }.toList()
         configuration.addJvmClasspathRoots(dependencyJars)
 
-        // init kotlin compiler environment
         val environment =
                 KotlinCoreEnvironment.createForProduction(
                         disposable,
@@ -154,7 +143,6 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
                         EnvironmentConfigFiles.JVM_CONFIG_FILES
                 )
 
-        // init psi factory from kotlin compiler env
         val psiFactory = PsiFileFactory.getInstance(environment.project) as PsiFileFactoryImpl
 
         val psiSourceFiles =
@@ -173,29 +161,62 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
                         }
                         .toList()
 
-        // Create an analyzer with a message collector
         val analyzer = AnalyzerWithCompilerReport(configuration)
         val trace = CliBindingTrace(environment.project)
 
-        // Perform analysis
         analyzer.analyzeAndReport(psiSourceFiles) {
             TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration(
                     environment.project,
                     psiSourceFiles,
-                    trace, // BindingTrace implementation
+                    trace,
                     environment.configuration,
                     environment::createPackagePartProvider
             )
         }
 
-        // summary of messages from the analysis phase
         messageCollector.printSummary()
 
-        // Get the BindingContext
-        val bindingContext = analyzer.analysisResult.bindingContext
+        return CompilerAnalyzerResult(psiSourceFiles, analyzer, environment)
+    } finally {
+        disposable.dispose()
+    }
+}
+
+fun processRepository(rootDir: File): List<RuleServiceDoc> {
+    // define source roots
+    val kotlinSourceRoots =
+            rootDir.walk()
+                    .filter { file ->
+                        file.isDirectory &&
+                                (file.absolutePath.contains("repository/") ||
+                                        file.absolutePath.contains("system/")) &&
+                                !file.absolutePath.contains("src/test/") &&
+                                !file.absolutePath.contains("/target/") &&
+                                file.name == "kotlin"
+                    }
+                    .map { it.absolutePath }
+                    .toList()
+
+    // then, find all Kotlin files under these roots
+    val kotlinSourceFiles =
+            kotlinSourceRoots
+                    .flatMap { sourceRoot ->
+                        File(sourceRoot)
+                                .walk()
+                                .filter { it.isFile }
+                                .filter { it.extension.lowercase() == "kt" }
+                                .map { it.absolutePath }
+                    }
+                    .toList()
+
+    val disposable = Disposer.newDisposable()
+    try {
+        val compilerResult = compilerEnvironment(kotlinSourceRoots, kotlinSourceFiles)
+
+        val bindingContext = compilerResult.analyzer.analysisResult.bindingContext
 
         // process psi files in batches
-        return psiSourceFiles.chunked(100).flatMap { batch ->
+        return compilerResult.psiSourceFiles.chunked(100).flatMap { batch ->
             batch.flatMap { file ->
                 extractRuleService(file, bindingContext).also {
                     (file as PsiFileImpl).clearCaches()
@@ -210,32 +231,25 @@ fun processRepository(rootDir: File): List<RuleServiceDoc> {
 fun extractRuleService(ktFile: KtFile, bindingContext: BindingContext): List<RuleServiceDoc> {
     val ruleServices = mutableListOf<RuleServiceDoc>()
 
-    val visitor =
-            object : KtTreeVisitorVoid() {
-                override fun visitClass(klass: KtClass) {
-                    super.visitClass(klass)
-
-                    // Check if class extends AbstractRuleService
-                    if (klass.getSuperTypeListEntries().any { superTypeEntry ->
-                                val superTypeName = superTypeEntry.typeReference?.text
-                                superTypeName?.contains("AbstractPensjonRuleService") == true
-                            }
-                    ) {
-                        val navn = klass.name ?: "anonymous"
-                        val serviceDoc =
-                                RuleServiceDoc(
-                                        navn = navn,
-                                        beskrivelse = "test regeltjeneste ${navn}",
-                                        inndata = extractRequestFields(klass, bindingContext),
-                                        utdata = extractResponseFields(klass, bindingContext),
-                                )
-
-                        ruleServices.add(serviceDoc)
-                    }
+    val ruleServiceClasses =
+            ktFile.declarations.filterIsInstance<KtClass>().filter { klass ->
+                klass.getSuperTypeListEntries().any { superTypeEntry ->
+                    superTypeEntry.typeReference?.text?.contains("AbstractPensjonRuleService") ==
+                            true
                 }
             }
 
-    ktFile.accept(visitor)
+    ruleServices.addAll(
+            ruleServiceClasses.map { klass ->
+                val navn = klass.name ?: "anonymous"
+                RuleServiceDoc(
+                        navn = navn,
+                        beskrivelse = "test regeltjeneste ${navn}",
+                        inndata = extractRequestFields(klass, bindingContext),
+                        utdata = extractResponseFields(klass, bindingContext)
+                )
+            }
+    )
     return ruleServices
 }
 
@@ -341,17 +355,7 @@ fun main(args: Array<String>) {
                 processRepository(File("/Users/torsteinnesby/gitHub/navikt/pensjon-regler"))
                         .sortedBy { it.navn }
 
-        ruleServices.forEach { info ->
-            println(
-                    """
-                    Navn: ${info.navn}
-                    Beskrivelse: ${info.beskrivelse}
-                    Inndata: ${info.inndata.joinToString(", ")}
-                    Utdata: ${info.utdata.joinToString(", ")}
-                    ----------------------
-                """.trimIndent()
-            )
-        }
+        ruleServices.forEach { info -> println(info) }
         println("Found ${ruleServices.size} rule services")
     } finally {
         disposable.dispose()
