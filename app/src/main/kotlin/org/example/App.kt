@@ -53,6 +53,10 @@ data class PropertyDoc(
     }
 }
 
+data class RuleFlowDoc(
+        val navn: String,
+)
+
 class MessageCollectorSummary : MessageCollector {
     private var errorCount = 0
     private var warningCount = 0
@@ -346,6 +350,12 @@ fun extractResponseFields(ktClass: KtClass, bindingContext: BindingContext): Lis
     }
 
     return props
+}
+
+fun extractRuleFlow(ktClass: KtClass, bindingContext: BindingContext): List<RuleFlowDoc> {
+    val ruleFlows = mutableListOf<RuleFlowDoc>()
+
+    return ruleFlows
 }
 
 fun main(args: Array<String>) {
