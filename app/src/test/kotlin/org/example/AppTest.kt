@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 
@@ -39,10 +40,7 @@ class AppTest {
 
             val testCode =
                     """
-                class TestRuleService : AbstractPensjonRuleService<TestResponse>() {
-                    data class TestRequest(val field1: String)
-                    data class TestResponse(val result: String)
-                }
+                class TestRuleService : AbstractPensjonRuleService<TestResponse>() {}
             """.trimIndent()
 
             val ktFile =
@@ -51,7 +49,7 @@ class AppTest {
 
             val bindingContext = BindingContext.EMPTY
 
-            val result = extractRuleService(ktFile, bindingContext)
+            val result = analyzeRuleService(ktFile, bindingContext)
 
             assertEquals(1, result.size)
             assertEquals("TestRuleService", result[0].navn)
@@ -93,7 +91,65 @@ class AppTest {
 
             val bindingContext = BindingContext.EMPTY
 
-            val result = extractRuleService(ktFile, bindingContext)
+            val result = analyzeRuleService(ktFile, bindingContext)
+
+            assertTrue(result.isEmpty())
+        } finally {
+            disposable.dispose()
+        }
+    }
+
+    @Test
+    @DisplayName("Should extract RuleFlowStart from RuleService")
+    @Disabled("Not implemented yet")
+    fun testExtractRuleFlowStart() {
+        val disposable = Disposer.newDisposable()
+        try {
+            val configuration =
+                    CompilerConfiguration().apply {
+                        put(CommonConfigurationKeys.MODULE_NAME, "test-module")
+                        put(JVMConfigurationKeys.JVM_TARGET, JvmTarget.JVM_21)
+                    }
+
+            val environment =
+                    KotlinCoreEnvironment.createForProduction(
+                            disposable,
+                            configuration,
+                            EnvironmentConfigFiles.JVM_CONFIG_FILES
+                    )
+
+            val psiFactory = PsiFileFactory.getInstance(environment.project) as PsiFileFactoryImpl
+
+            val testCode =
+                    """
+                    class BeregnGjenlevendepensjonService(
+                        private val request: BeregnYtelseRequest
+                    ) : AbstractPensjonRuleService<BeregnYtelseResponse>(request) {
+                        override val ruleService: () -> BeregnYtelseResponse = {
+
+                            val retval = BeregnYtelseResponse()
+                            val beregnYtelseParametere = BeregnYtelseParametere()
+
+                            setupBeregnYtelseParametere(beregnYtelseParametere, request)
+                            beregnYtelseParametere.ytelseType = KravlinjeTypeEnum.GJP
+
+                            StartBeregnYtelseFlyt(beregnYtelseParametere).run(this)
+
+                            retval.beregningsListe.add(beregnYtelseParametere.beregnYtelseResultat[0])
+                            ryddOppBeregnYtelseRequest(request, beregnYtelseParametere)
+
+                            retval
+                        }
+                    }
+            """.trimIndent()
+
+            val ktFile =
+                    psiFactory.createFileFromText("Test.kt", KotlinFileType.INSTANCE, testCode) as
+                            KtFile
+
+            val bindingContext = BindingContext.EMPTY
+
+            val result = analyzeRuleService(ktFile, bindingContext)
 
             assertTrue(result.isEmpty())
         } finally {
