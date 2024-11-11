@@ -4,8 +4,6 @@ import org.jetbrains.kotlin.cli.jvm.compiler.*
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.psi.*
 
-data class AnalysisInput(val sourceCode: String, val fileName: String = "Test.kt")
-
 data class RuleServiceDoc(
         val navn: String,
         val beskrivelse: String,

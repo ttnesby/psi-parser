@@ -11,7 +11,6 @@ import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.psi.PsiFileFactory
 import org.jetbrains.kotlin.com.intellij.psi.impl.PsiFileFactoryImpl
 import org.jetbrains.kotlin.config.*
-import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
 
@@ -68,15 +67,6 @@ fun createCompilerContext(jdkHome: File, disposable: Disposable): Result<Compile
                     psiFactory = psiFactory
             )
         }
-
-fun createKtFile(input: AnalysisInput, context: CompilerContext): Result<KtFile> = runCatching {
-    context.psiFactory.createFileFromText(
-            input.fileName,
-            KotlinFileType.INSTANCE,
-            input.sourceCode
-    ) as
-            KtFile
-}
 
 // easy navigation between source files is done via binding context, which is a map of all symbols
 // in the project
