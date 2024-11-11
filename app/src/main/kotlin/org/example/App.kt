@@ -1,13 +1,18 @@
 package org.example
 
 import java.io.File
+import kotlin.getOrThrow
 import org.jetbrains.kotlin.cli.jvm.compiler.*
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoots
+import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
-import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.*
+
+fun <T> Result<T>.onFailurePrint(message: String): Result<T> = onFailure {
+    println("$message: ${it.message}")
+}
 
 private fun findSourceRoots(root: File): List<String> =
         root.walk()
@@ -22,89 +27,69 @@ private fun findSourceRoots(root: File): List<String> =
                 .map { it.absolutePath }
                 .toList()
 
-private fun findKotlinSourceFiles(root: File, context: CompilerContext): List<KtFile> {
-    val sourceRoots = findSourceRoots(root)
-    return sourceRoots
-            .flatMap { sourceRoot ->
-                File(sourceRoot)
-                        .walk()
-                        .filter { it.isFile && it.extension.lowercase() == "kt" }
-                        .map { file ->
-                            context.psiFactory.createFileFromText(
-                                    file.absolutePath,
-                                    KotlinFileType.INSTANCE,
-                                    file.readText()
-                            ) as
-                                    KtFile
-                        }
-            }
-            .toList()
-}
+private fun findKotlinSourceFiles(root: File, context: CompilerContext): List<KtFile> =
+        findSourceRoots(root)
+                .flatMap { sourceRoot ->
+                    File(sourceRoot)
+                            .walk()
+                            .filter { it.isFile && it.extension.lowercase() == "kt" }
+                            .map { file ->
+                                context.psiFactory.createFileFromText(
+                                        file.absolutePath,
+                                        KotlinFileType.INSTANCE,
+                                        file.readText()
+                                ) as
+                                        KtFile
+                            }
+                }
+                .toList()
 
 private fun addDependenciesToClasspath(folder: File, context: CompilerContext) {
-    val jarFiles = folder.walk().filter { it.isFile && it.extension == "jar" }.toList()
-    context.configuration.addJvmClasspathRoots(jarFiles)
+    folder.walk().filter { it.isFile && it.extension == "jar" }.toList().let { jarFiles ->
+        context.configuration.addJvmClasspathRoots(jarFiles)
+    }
 }
 
-fun processPensjonReglerRepo(
+fun processRepo(
         context: CompilerContext,
         root: File,
         dependencies: File? = null
-): List<RuleServiceDoc> {
-
-    // eventually, add the dependencies to the classpath
+): Result<List<RuleServiceDoc>> {
     dependencies?.let { addDependenciesToClasspath(it, context) }
 
-    // Get source roots and files
-    val kotlinSourceFiles = findKotlinSourceFiles(root, context)
-
-    // Process files with binding context
-    return getBindingContext(kotlinSourceFiles, context)
-            .fold(
-                    onSuccess = { bindingContext ->
-                        kotlinSourceFiles.chunked(100).flatMap { batch ->
-                            batch.flatMap { file ->
-                                analyzeRuleService(file, bindingContext).also {
-                                    (file as PsiFileImpl).clearCaches()
-                                }
-                            }
-                        }
-                    },
-                    onFailure = { error ->
-                        println("Failed to get binding context: ${error.message}")
-                        emptyList()
-                    }
-            )
+    return findKotlinSourceFiles(root, context).let { sourceFiles ->
+        getBindingContext(sourceFiles, context).map { bindingContext ->
+            analyzeSourceFiles(sourceFiles, bindingContext)
+        }
+    }
 }
+
+fun analyzeRepository(
+        jdkHome: File,
+        repoPath: File,
+        libsPath: File,
+        disposable: Disposable
+): Result<List<RuleServiceDoc>> =
+        createCompilerContext(jdkHome, disposable)
+                .map { context: CompilerContext ->
+                    processRepo(context, repoPath, libsPath).getOrThrow().sortedBy { it.navn }
+                }
+                .onFailurePrint("Repository analysis failed")
 
 fun main(args: Array<String>) {
     val disposable = Disposer.newDisposable()
     try {
-        val context: CompilerContext? =
-                createCompilerContext(
-                                File(System.getProperty("java.home")),
-                                disposable,
-                        )
-                        .fold(
-                                onSuccess = { context -> context },
-                                onFailure = { error ->
-                                    println("Failed to create compiler context: ${error.message}")
-                                    null
-                                }
-                        )
-
-        val ruleServices: List<RuleServiceDoc>? =
-                context?.let { ctx ->
-                    processPensjonReglerRepo(
-                                    ctx,
-                                    File("/Users/torsteinnesby/gitHub/navikt/pensjon-regler"),
-                                    File("/Users/torsteinnesby/tmp/Libs")
-                            )
-                            .sortedBy { it.navn }
+        analyzeRepository(
+                        jdkHome = File(System.getProperty("java.home")),
+                        repoPath = File("/Users/torsteinnesby/gitHub/navikt/pensjon-regler"),
+                        libsPath = File("/Users/torsteinnesby/tmp/Libs"),
+                        disposable = disposable
+                )
+                .getOrNull()
+                ?.let { ruleServices ->
+                    ruleServices.forEach(::println)
+                    println("Found ${ruleServices.size} rule services")
                 }
-
-        ruleServices?.forEach { info -> println(info) }
-        println("Found ${ruleServices?.size} rule services")
     } finally {
         disposable.dispose()
     }

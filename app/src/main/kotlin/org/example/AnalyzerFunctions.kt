@@ -1,10 +1,21 @@
 package org.example
 
-import org.jetbrains.kotlin.cli.jvm.compiler.*
-import org.jetbrains.kotlin.config.*
+import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
+
+fun analyzeSourceFiles(
+        sourceFiles: List<KtFile>,
+        bindingContext: BindingContext
+): List<RuleServiceDoc> =
+        sourceFiles.chunked(100).flatMap { batch ->
+            batch.flatMap { file ->
+                analyzeRuleService(file, bindingContext).also {
+                    (file as PsiFileImpl).clearCaches()
+                }
+            }
+        }
 
 fun analyzeRuleService(ktFile: KtFile, bindingContext: BindingContext): List<RuleServiceDoc> =
         ktFile.declarations
@@ -66,7 +77,7 @@ private fun createPropertyDoc(property: KtProperty): PropertyDoc =
         PropertyDoc(
                 navn = property.name ?: "",
                 type = property.typeReference?.text ?: "Unknown",
-                beskrivelse = property.docComment?.getText() ?: ""
+                beskrivelse = property.docComment?.text ?: ""
         )
 
 // Response fields analysis
@@ -105,7 +116,7 @@ private fun createResponseClassDoc(
         PropertyDoc(
                 navn = declaration.name ?: "",
                 type = responseTypeRef.text,
-                beskrivelse = declaration.docComment?.getText() ?: "Response for ${ktClass.name}"
+                beskrivelse = declaration.docComment?.text ?: "Response for ${ktClass.name}"
         )
 
 private fun extractClassProperties(declaration: KtClass): List<PropertyDoc> =
@@ -113,7 +124,7 @@ private fun extractClassProperties(declaration: KtClass): List<PropertyDoc> =
             PropertyDoc(
                     navn = prop.name ?: "",
                     type = prop.typeReference?.text ?: "Unknown",
-                    beskrivelse = prop.docComment?.getText() ?: ""
+                    beskrivelse = prop.docComment?.text ?: ""
             )
         }
                 ?: emptyList()
