@@ -76,7 +76,15 @@ private fun createParameterDoc(parameter: KtParameter, ktClass: KtClass): Proper
 private fun extractTypeProperties(
         declaration: KtClass,
         _bindingContext: BindingContext
-): List<PropertyDoc> = declaration.body?.properties?.map(::createPropertyDoc) ?: emptyList()
+): List<PropertyDoc> =
+        declaration.primaryConstructor?.valueParameters?.map { param ->
+            PropertyDoc(
+                    navn = param.name ?: "",
+                    type = param.typeReference?.text ?: "Unknown",
+                    beskrivelse = param.docComment?.text ?: ""
+            )
+        }
+                ?: emptyList()
 
 private fun createPropertyDoc(property: KtProperty): PropertyDoc =
         PropertyDoc(
