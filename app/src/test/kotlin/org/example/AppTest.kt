@@ -99,7 +99,7 @@ class AppTest {
                 var ${var2Name}: ${var2Type} = true
             ) : ServiceRequest()
 
-            class TestRuleService(private val ${requestName}: ${requestTypeName}) : AbstractPensjonRuleService<TestResponse>() {}
+            class TestRuleService(private val ${requestName}: ${requestTypeName}) : AbstractPensjonRuleService<Dummy>() {}
         """.trimIndent()
 
         analyzeKotlinCode(testCode).map { ruleServices ->
@@ -113,6 +113,31 @@ class AppTest {
             assertEquals(ruleServices.first().inndata.first().type, requestTypeName)
             assertEquals(ruleServices.first().inndata.last().navn, var2Name)
             assertEquals(ruleServices.first().inndata.last().type, var2Type)
+        }
+    }
+
+    @Test
+    @DisplayName("Should handle RuleService without Request")
+    fun testExtractRequestEmpty() {
+        val requestTypeName = "TestRequest"
+        val requestName = "request"
+        val var1Name = "att1"
+        val var1Type = "String"
+        val var2Name = "att2"
+        val var2Type = "Boolean"
+        val testCode =
+                """
+            class ${requestTypeName}(
+                var ${var1Name}: ${var1Type} = "test"
+                var ${var2Name}: ${var2Type} = true
+            ) : SomethingElse()
+
+            class TestRuleService(private val ${requestName}: ${requestTypeName}) : AbstractPensjonRuleService<Dummy>() {}
+        """.trimIndent()
+
+        analyzeKotlinCode(testCode).map { ruleServices ->
+            assert(ruleServices.count() == 1)
+            assert(ruleServices.first().inndata.isEmpty())
         }
     }
 
