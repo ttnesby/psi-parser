@@ -75,7 +75,7 @@ private fun createParameterDoc(parameter: KtParameter, ktClass: KtClass): Proper
 
 private fun extractTypeProperties(
         declaration: KtClass,
-        _bindingContext: BindingContext
+        _bindingContext: BindingContext // in case of recursvity of custom types
 ): List<PropertyDoc> =
         declaration.primaryConstructor?.valueParameters?.map { param ->
             PropertyDoc(
@@ -112,14 +112,22 @@ private fun extractResponseTypeProperties(
         responseTypeRef: KtTypeReference,
         ktClass: KtClass,
         bindingContext: BindingContext
-): List<PropertyDoc> {
-    val declaration = responseTypeRef.resolveToKtClass(bindingContext) ?: return emptyList()
+): List<PropertyDoc> =
+        responseTypeRef.let { typeRef ->
+            typeRef.resolveToKtClass(bindingContext)?.takeIf { isServiceResponseClass(it) }?.let {
+                    resolvedClass ->
+                buildList {
+                    add(createResponseClassDoc(resolvedClass, responseTypeRef, ktClass))
+                    addAll(extractTypeProperties(resolvedClass, bindingContext))
+                }
+            }
+        }
+                ?: emptyList()
 
-    return buildList {
-        add(createResponseClassDoc(declaration, responseTypeRef, ktClass))
-        addAll(extractClassProperties(declaration))
-    }
-}
+private fun isServiceResponseClass(klass: KtClass): Boolean =
+        klass.getSuperTypeListEntries().any {
+            it.typeReference?.text?.contains("ServiceResponse") == true
+        }
 
 private fun createResponseClassDoc(
         declaration: KtClass,
@@ -131,16 +139,6 @@ private fun createResponseClassDoc(
                 type = responseTypeRef.text,
                 beskrivelse = declaration.docComment?.text ?: "Response for ${ktClass.name}"
         )
-
-private fun extractClassProperties(declaration: KtClass): List<PropertyDoc> =
-        declaration.body?.properties?.map { prop ->
-            PropertyDoc(
-                    navn = prop.name ?: "",
-                    type = prop.typeReference?.text ?: "Unknown",
-                    beskrivelse = prop.docComment?.text ?: ""
-            )
-        }
-                ?: emptyList()
 
 // Utility extension function to reduce code duplication
 private fun KtTypeReference.resolveToKtClass(bindingContext: BindingContext): KtClass? =

@@ -61,7 +61,7 @@ class AppTest {
         val ruleServiceName = "TestRuleService"
         val testCode =
                 """
-            class ${ruleServiceName}() : AbstractPensjonRuleService<TestResponse>() {}
+            class ${ruleServiceName}() : AbstractPensjonRuleService<Dummy>() {}
         """.trimIndent()
 
         analyzeKotlinCode(testCode).map { ruleServices ->
@@ -138,6 +138,58 @@ class AppTest {
         analyzeKotlinCode(testCode).map { ruleServices ->
             assert(ruleServices.count() == 1)
             assert(ruleServices.first().inndata.isEmpty())
+        }
+    }
+
+    @Test
+    @DisplayName("Should extract Response from RuleService")
+    fun testExtractResponse() {
+        val responseTypeName = "TestResponse"
+        val var1Name = "att1"
+        val var1Type = "String"
+        val var2Name = "att2"
+        val var2Type = "Boolean"
+        val testCode =
+                """
+            class ${responseTypeName}(
+                var ${var1Name}: ${var1Type} = "test"
+                var ${var2Name}: ${var2Type} = true
+            ) : ServiceResponse()
+
+            class TestRuleService() : AbstractPensjonRuleService<${responseTypeName}>() {}
+        """.trimIndent()
+
+        analyzeKotlinCode(testCode).map { ruleServices ->
+            assert(ruleServices.count() == 1)
+            // 3 props: response, att1, att2
+            assertEquals(ruleServices.first().utdata.count(), 3)
+            assertEquals(ruleServices.first().utdata.first().navn, responseTypeName)
+            assertEquals(ruleServices.first().utdata.first().type, responseTypeName)
+            assertEquals(ruleServices.first().utdata.last().navn, var2Name)
+            assertEquals(ruleServices.first().utdata.last().type, var2Type)
+        }
+    }
+
+    @DisplayName("Should handle RuleService without Response")
+    fun testExtractResponseEmpty() {
+        val responseTypeName = "TestResponse"
+        val var1Name = "att1"
+        val var1Type = "String"
+        val var2Name = "att2"
+        val var2Type = "Boolean"
+        val testCode =
+                """
+            class ${responseTypeName}(
+                var ${var1Name}: ${var1Type} = "test"
+                var ${var2Name}: ${var2Type} = true
+            ) : SomethingElse()
+
+            class TestRuleService() : AbstractPensjonRuleService<${responseTypeName}>() {}
+        """.trimIndent()
+
+        analyzeKotlinCode(testCode).map { ruleServices ->
+            assert(ruleServices.count() == 1)
+            assert(ruleServices.first().utdata.isEmpty())
         }
     }
 
