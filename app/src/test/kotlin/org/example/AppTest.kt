@@ -90,10 +90,13 @@ class AppTest {
         val requestName = "request"
         val var1Name = "att1"
         val var1Type = "String"
+        val var2Name = "att2"
+        val var2Type = "Boolean"
         val testCode =
                 """
             class ${requestTypeName}(
                 var ${var1Name}: ${var1Type} = "test"
+                var ${var2Name}: ${var2Type} = true
             ) : ServiceRequest()
 
             class TestRuleService(private val ${requestName}: ${requestTypeName}) : AbstractPensjonRuleService<TestResponse>() {}
@@ -101,11 +104,15 @@ class AppTest {
 
         analyzeKotlinCode(testCode).map { ruleServices ->
             assert(ruleServices.count() == 1)
-            assertEquals(ruleServices.first().inndata.count(), 2)
-            assertEquals(requestTypeName, ruleServices.first().inndata.first().type)
-            assertEquals(requestName, ruleServices.first().inndata.first().navn)
-            assertEquals(var1Name, ruleServices.first().inndata.last().navn, var1Name)
-            assertEquals(var1Type, ruleServices.first().inndata.last().type, var1Type)
+            // 3 props: request, att1, att2
+            assertEquals(ruleServices.first().inndata.count(), 3)
+            assertEquals(
+                    ruleServices.first().inndata.first().navn,
+                    requestName,
+            )
+            assertEquals(ruleServices.first().inndata.first().type, requestTypeName)
+            assertEquals(ruleServices.first().inndata.last().navn, var2Name)
+            assertEquals(ruleServices.first().inndata.last().type, var2Type)
         }
     }
 
