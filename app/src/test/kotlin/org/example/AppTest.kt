@@ -12,9 +12,9 @@ import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.resolve.BindingContext
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 
@@ -30,7 +30,7 @@ class AppTest {
     private fun analyzeKotlinCode(
             sourceCode: String,
             fileName: String = "Test.kt"
-    ): Result<List<RuleServiceDoc>> = runCatching {
+    ): Result<List<RuleServiceDoc>> {
         val ktFile =
                 context.psiFactory.createFileFromText(
                         fileName,
@@ -39,7 +39,9 @@ class AppTest {
                 ) as
                         KtFile
 
-        analyzeRuleService(ktFile, BindingContext.EMPTY)
+        return getBindingContext(listOf(ktFile), context).map { bctx ->
+            analyzeRuleService(ktFile, bctx)
+        }
     }
 
     @BeforeEach
@@ -56,14 +58,15 @@ class AppTest {
     @Test
     @DisplayName("Should extract RuleService from KtFile")
     fun testExtractRuleService() {
+        val ruleServiceName = "TestRuleService"
         val testCode =
                 """
-            class TestRuleService : AbstractPensjonRuleService<TestResponse>() {}
+            class ${ruleServiceName}() : AbstractPensjonRuleService<TestResponse>() {}
         """.trimIndent()
 
         analyzeKotlinCode(testCode).map { ruleServices ->
             assert(ruleServices.isNotEmpty())
-            assertEquals("TestRuleService", ruleServices.first().navn)
+            assertEquals(ruleServiceName, ruleServices.first().navn)
         }
     }
 
@@ -72,7 +75,7 @@ class AppTest {
     fun testExtractRuleServiceEmpty() {
         val testCode =
                 """
-            class RegularClass {
+            class RegularClass() {
                 fun someFunction() {}
             }
         """.trimIndent()
@@ -80,36 +83,55 @@ class AppTest {
         analyzeKotlinCode(testCode).map { ruleServices -> assertTrue(ruleServices.isEmpty()) }
     }
 
-    //    @Test
-    //    @DisplayName("Should extract RuleFlowStart from RuleService")
-    //    @Disabled("Not implemented yet")
-    //    fun testExtractRuleFlowStart() {
-    //            val testCode =
-    //                    """
-    //                    class BeregnGjenlevendepensjonService(
-    //                        private val request: BeregnYtelseRequest
-    //                    ) : AbstractPensjonRuleService<BeregnYtelseResponse>(request) {
-    //                        override val ruleService: () -> BeregnYtelseResponse = {
-    //
-    //                            val retval = BeregnYtelseResponse()
-    //                            val beregnYtelseParametere = BeregnYtelseParametere()
-    //
-    //                            setupBeregnYtelseParametere(beregnYtelseParametere, request)
-    //                            beregnYtelseParametere.ytelseType = KravlinjeTypeEnum.GJP
-    //
-    //                            StartBeregnYtelseFlyt(beregnYtelseParametere).run(this)
-    //
-    //
-    // retval.beregningsListe.add(beregnYtelseParametere.beregnYtelseResultat[0])
-    //                            ryddOppBeregnYtelseRequest(request, beregnYtelseParametere)
-    //
-    //                            retval
-    //                        }
-    //                    }
-    //            """.trimIndent()
-    //
-    //            analyzeKotlinCode(testCode).map { ruleServices ->
-    //                assertTrue(ruleServices.isEmpty())
-    //            }
-    //    }
+    @Test
+    @DisplayName("Should extract Request from RuleService")
+    fun testExtractRequest() {
+        val requestTypeName = "TestRequest"
+        val requestName = "request"
+        val testCode =
+                """
+            class ${requestTypeName}(
+                var test: String = "test"
+            ) : ServiceRequest()
+
+            class TestRuleService(private val ${requestName}: ${requestTypeName}) : AbstractPensjonRuleService<TestResponse>() {}
+        """.trimIndent()
+
+        analyzeKotlinCode(testCode).map { ruleServices ->
+            assert(ruleServices.count() == 1)
+            assertEquals(ruleServices.first().inndata.count(), 1)
+            assertEquals(requestTypeName, ruleServices.first().inndata.first().type)
+            assertEquals(requestName, ruleServices.first().inndata.first().navn)
+        }
+    }
+
+    @Test
+    @DisplayName("Should extract RuleFlowStart from RuleService")
+    @Disabled("Not implemented yet")
+    fun testExtractRuleFlowStart() {
+        val testCode =
+                """
+                class BeregnGjenlevendepensjonService(
+                    private val request: BeregnYtelseRequest
+                ) : AbstractPensjonRuleService<BeregnYtelseResponse>(request) {
+                    override val ruleService: () -> BeregnYtelseResponse = {
+
+                        val retval = BeregnYtelseResponse()
+                        val beregnYtelseParametere = BeregnYtelseParametere()
+
+                        setupBeregnYtelseParametere(beregnYtelseParametere, request)
+                        beregnYtelseParametere.ytelseType = KravlinjeTypeEnum.GJP
+
+                        StartBeregnYtelseFlyt(beregnYtelseParametere).run(this)
+
+                        retval.beregningsListe.add(beregnYtelseParametere.beregnYtelseResultat[0])
+                        ryddOppBeregnYtelseRequest(request, beregnYtelseParametere)
+
+                        retval
+                    }
+                }
+               """.trimIndent()
+
+        analyzeKotlinCode(testCode).map { ruleServices -> assertTrue(ruleServices.isEmpty()) }
+    }
 }

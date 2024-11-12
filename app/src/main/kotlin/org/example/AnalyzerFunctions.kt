@@ -49,14 +49,22 @@ private fun extractParameterAndProperties(
         parameter: KtParameter,
         ktClass: KtClass,
         bindingContext: BindingContext
-): List<PropertyDoc> {
-    val typeRef = parameter.typeReference ?: return emptyList()
+): List<PropertyDoc> =
+        parameter.typeReference?.let { typeRef ->
+            typeRef.resolveToKtClass(bindingContext)?.takeIf { isServiceRequestClass(it) }?.let {
+                    resolvedClass ->
+                buildList {
+                    add(createParameterDoc(parameter, ktClass))
+                    addAll(extractTypeProperties(resolvedClass, bindingContext))
+                }
+            }
+        }
+                ?: emptyList()
 
-    return buildList {
-        add(createParameterDoc(parameter, ktClass))
-        addAll(extractTypeProperties(typeRef, bindingContext))
-    }
-}
+private fun isServiceRequestClass(klass: KtClass): Boolean =
+        klass.getSuperTypeListEntries().any {
+            it.typeReference?.text?.contains("ServiceRequest") == true
+        }
 
 private fun createParameterDoc(parameter: KtParameter, ktClass: KtClass): PropertyDoc =
         PropertyDoc(
@@ -66,12 +74,9 @@ private fun createParameterDoc(parameter: KtParameter, ktClass: KtClass): Proper
         )
 
 private fun extractTypeProperties(
-        typeRef: KtTypeReference,
-        bindingContext: BindingContext
-): List<PropertyDoc> {
-    val declaration = typeRef.resolveToKtClass(bindingContext) ?: return emptyList()
-    return declaration.body?.properties?.map(::createPropertyDoc) ?: emptyList()
-}
+        declaration: KtClass,
+        _bindingContext: BindingContext
+): List<PropertyDoc> = declaration.body?.properties?.map(::createPropertyDoc) ?: emptyList()
 
 private fun createPropertyDoc(property: KtProperty): PropertyDoc =
         PropertyDoc(
