@@ -6,7 +6,7 @@ import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 
-fun analyzeSourceFiles(
+fun analyzeSourceFilesForRuleServices(
         sourceFiles: List<KtFile>,
         bindingContext: BindingContext
 ): List<RuleServiceDoc> =
@@ -37,7 +37,13 @@ private fun createRuleServiceDoc(klass: KtClass, bindingContext: BindingContext)
                 beskrivelse = "to be defined - test beskrivelse",
                 inndata = analyzeRequestFields(klass, bindingContext),
                 utdata = analyzeResponseFields(klass, bindingContext),
-                tjeneste = analyzeRuleServiceMethod(klass, bindingContext)
+                flyt =
+                        FlowElement.RuleFlowDoc(
+                                beskrivelse = "to be defined - test beskrivelse",
+                                inndata = emptyList(),
+                                flyt = FlowElement.Flow(elementer = emptyList()),
+                                gitHubUrl = "to be defined later",
+                        )
         )
 
 // Request fields analysis

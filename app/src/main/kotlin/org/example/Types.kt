@@ -9,7 +9,7 @@ data class RuleServiceDoc(
         val beskrivelse: String,
         val inndata: List<PropertyDoc>,
         val utdata: List<PropertyDoc>,
-        val tjeneste: RuleServiceMethodDoc? = null
+        val flyt: FlowElement.RuleFlowDoc,
 ) {
     override fun toString(): String {
         return """
@@ -44,3 +44,22 @@ data class PropertyDoc(
 data class RuleServiceMethodDoc(val kdoc: List<String>, val flows: List<FlowCall>)
 
 data class FlowCall(val flowClass: String, val parameters: List<String>)
+
+// Suggested - Data classes to hold the extracted information
+
+sealed class FlowElement {
+    data class RuleFlowDoc(
+            val beskrivelse: String,
+            val inndata: List<PropertyDoc>,
+            val flyt: Flow,
+            val gitHubUrl: String,
+    ) : FlowElement()
+    data class Flow(val elementer: List<FlowElement>) : FlowElement()
+    data class Forgrening(val beskrivelse: String, val navn: String, val gren: List<Gren>) :
+            FlowElement()
+    data class Gren(val beskrivelse: String, val betingelse: String, val flyt: Flow) :
+            FlowElement()
+    data class Oppgave(
+            val beskrivelse: String,
+    ) : FlowElement()
+}

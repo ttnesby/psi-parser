@@ -59,7 +59,7 @@ fun processRepo(
 
     return findKotlinSourceFiles(root, context).let { sourceFiles ->
         getBindingContext(sourceFiles, context).map { bindingContext ->
-            analyzeSourceFiles(sourceFiles, bindingContext)
+            analyzeSourceFilesForRuleServices(sourceFiles, bindingContext)
         }
     }
 }
