@@ -14,7 +14,6 @@ import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 
@@ -195,31 +194,70 @@ class AppTest {
 
     @Test
     @DisplayName("Should extract RuleFlowStart from RuleService")
-    @Disabled("Not implemented yet")
     fun testExtractRuleFlowStart() {
         val testCode =
                 """
-                class BeregnGjenlevendepensjonService(
-                    private val request: BeregnYtelseRequest
-                ) : AbstractPensjonRuleService<BeregnYtelseResponse>(request) {
-                    override val ruleService: () -> BeregnYtelseResponse = {
+                class FastsettTrygdetidService(
+                    private val innTrygdetidRequest: TrygdetidRequest
+                ) : AbstractPensjonRuleService<TrygdetidResponse>(innTrygdetidRequest) {
+                    override val ruleService: () -> TrygdetidResponse = {
+                        log_debug("[FUN] startFastsettTrygdetid")
 
-                        val retval = BeregnYtelseResponse()
-                        val beregnYtelseParametere = BeregnYtelseParametere()
+                        /**
+                         * Test
+                         * Etabler grunnlag for fastsettelse av trygdetid.
+                         */
+                        val trygdetidParametere = TrygdetidParameterType(
+                            grunnlag = TrygdetidGrunnlag(
+                                bruker = innTrygdetidRequest.persongrunnlag,
+                                boddEllerArbeidetIUtlandet = innTrygdetidRequest.boddEllerArbeidetIUtlandet,
+                                førsteVirk = innTrygdetidRequest.brukerForsteVirk,
+                                virkFom = innTrygdetidRequest.virkFom,
+                                virkTom = innTrygdetidRequest.virkTom,
+                                ytelseType = innTrygdetidRequest.hovedKravlinjeType,
+                                regelverkType = innTrygdetidRequest.regelverkType,
+                                uttaksgradListe = innTrygdetidRequest.uttaksgradListe,
+                                beregningsvilkarsPeriodeListe = innTrygdetidRequest.sortedBeregningssvilkarPeriodeListe(),
+                                redusertFTTUT = innTrygdetidRequest.redusertFTTUT,
+                                beregning = null
+                            )
+                        )
 
-                        setupBeregnYtelseParametere(beregnYtelseParametere, request)
-                        beregnYtelseParametere.ytelseType = KravlinjeTypeEnum.GJP
+                        /**
+                         * Utled regelverkstype hvis ikke satt i request.
+                         * Default er G_REG.
+                         */
+                        if (trygdetidParametere.grunnlag?.regelverkType == null
+                            && trygdetidParametere.grunnlag?.bruker != null
+                            && trygdetidParametere.grunnlag?.ytelseType != null) {
+                            trygdetidParametere.grunnlag!!.regelverkType = utledRegelverkstype(
+                                trygdetidParametere.grunnlag?.bruker!!,
+                                trygdetidParametere.grunnlag?.ytelseType!!
+                            )
+                        }
 
-                        StartBeregnYtelseFlyt(beregnYtelseParametere).run(this)
+                        trygdetidParametere.resultat = TrygdetidResultat(pakkseddel = Pakkseddel())
 
-                        retval.beregningsListe.add(beregnYtelseParametere.beregnYtelseResultat[0])
-                        ryddOppBeregnYtelseRequest(request, beregnYtelseParametere)
+                        // Kjør reglene
+                        StartTrygdetidFlyt(trygdetidParametere).run(this)
 
-                        retval
+                        /**
+                         * Test
+                         * Klargjør respons fra resultatet av reglene.
+                         */
+                        TrygdetidResponse(
+                            trygdetid = trygdetidParametere.resultat?.trygdetid,
+                            trygdetidAlternativ = trygdetidParametere.resultat?.trygdetidAlternativ,
+                            trygdetidKapittel20 = trygdetidParametere.resultat?.trygdetidKapittel20,
+                            pakkseddel = trygdetidParametere.resultat?.pakkseddel!!
+                        )
                     }
                 }
                """.trimIndent()
 
-        analyzeKotlinCode(testCode).map { ruleServices -> assertTrue(ruleServices.isEmpty()) }
+        analyzeKotlinCode(testCode).map { ruleServices ->
+            assertEquals(ruleServices.count(), 1)
+            assertEquals(ruleServices.first().tjeneste?.kdoc?.count(), 3)
+        }
     }
 }

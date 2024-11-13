@@ -9,6 +9,7 @@ data class RuleServiceDoc(
         val beskrivelse: String,
         val inndata: List<PropertyDoc>,
         val utdata: List<PropertyDoc>,
+        val tjeneste: RuleServiceMethodDoc? = null
 ) {
     override fun toString(): String {
         return """
@@ -38,6 +39,8 @@ data class PropertyDoc(
     }
 }
 
-data class RuleFlowDoc(
-        val navn: String,
-)
+// TODO - transform to Mural data modell when ready
+// Data classes to hold the extracted information
+data class RuleServiceMethodDoc(val kdoc: List<String>, val flows: List<FlowCall>)
+
+data class FlowCall(val flowClass: String, val parameters: List<String>)
