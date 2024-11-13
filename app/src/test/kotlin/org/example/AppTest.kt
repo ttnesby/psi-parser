@@ -39,7 +39,7 @@ class AppTest {
                         KtFile
 
         return getBindingContext(listOf(ktFile), context).map { bctx ->
-            analyzeRuleService(ktFile, bctx)
+            analyzeSourceFiles(listOf(ktFile), bctx)
         }
     }
 
