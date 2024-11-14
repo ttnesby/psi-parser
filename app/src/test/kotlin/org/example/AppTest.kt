@@ -155,8 +155,8 @@ class AppTest {
                     var ${var1Name}: ${var1Type} = "test"
                     var ${var2Name}: ${var2Type} = true
                 ) : SomethingElse()
-
-        """.trimIndent()
+        """.trimIndent(),
+                        DEFAULT_PATH + requestTypeName + ".kt"
                 )
         val ruleService =
                 SourceCode(
@@ -186,7 +186,8 @@ class AppTest {
                 var ${var1Name}: ${var1Type} = "test"
                 var ${var2Name}: ${var2Type} = true
             ) : ServiceResponse()
-        """.trimIndent()
+        """.trimIndent(),
+                        DEFAULT_PATH + responseTypeName + ".kt"
                 )
         val ruleService =
                 SourceCode(
@@ -222,6 +223,8 @@ class AppTest {
             ) : SomethingElse()
 
         """.trimIndent()
+                ),
+                DEFAULT_PATH + responseTypeName + ".kt"
                 )
         val ruleService =
                 SourceCode(
