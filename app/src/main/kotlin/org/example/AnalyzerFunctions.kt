@@ -2,7 +2,6 @@ package org.example
 
 import java.net.URI
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
-import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
@@ -44,13 +43,7 @@ private fun createRuleServiceDoc(
                                 ?: "",
                 inndata = analyzeRequestFields(klass, bindingContext),
                 utdata = analyzeResponseFields(klass, bindingContext),
-                flyt =
-                        FlowElement.RuleFlowDoc(
-                                beskrivelse = "to be defined - test beskrivelse",
-                                inndata = emptyList(),
-                                flyt = FlowElement.Flow(elementer = emptyList()),
-                                gitHubUrl = "to be defined later",
-                        ),
+                flyt = FlowElement.Flow(elementer = emptyList()),
                 gitHubUri = URI("$filePath")
         )
 
@@ -156,43 +149,43 @@ private fun createResponseClassDoc(
                 beskrivelse = declaration.docComment?.text ?: "Response for ${ktClass.name}"
         )
 
-fun analyzeRuleServiceMethod(
-        ktClass: KtClass,
-        bindingContext: BindingContext
-): RuleServiceMethodDoc? =
-        ktClass.body
-                ?.declarations
-                ?.filterIsInstance<KtNamedDeclaration>()
-                ?.find { it.name == "ruleService" }
-                ?.let { ruleServiceDecl ->
-                    (ruleServiceDecl as? KtProperty)?.initializer as? KtLambdaExpression
-                }
-                ?.bodyExpression
-                ?.let { blockExpr ->
-                    RuleServiceMethodDoc(
-                            kdoc = extractKDoc(blockExpr),
-                            flows = extractFlowCalls(blockExpr, bindingContext)
-                    )
-                }
-/**
- * Extracts the KDoc comments from the block expression BE AWARE of that KDoc can be attached to
- * properties as well, and several other places Other places for KDoc is unknwon at the moment
- */
-private fun extractKDoc(blockExpr: KtBlockExpression): List<String> =
-        blockExpr.children.flatMap { child ->
-            when (child) {
-                is KDoc -> listOf(child.text.trimIndent())
-                is KtProperty ->
-                        child.children.filterIsInstance<KDoc>().map { it.text.trimIndent() }
-                else -> emptyList()
-            }
-        }
+// fun analyzeRuleServiceMethod(
+//         ktClass: KtClass,
+//         bindingContext: BindingContext
+// ): RuleServiceMethodDoc? =
+//         ktClass.body
+//                 ?.declarations
+//                 ?.filterIsInstance<KtNamedDeclaration>()
+//                 ?.find { it.name == "ruleService" }
+//                 ?.let { ruleServiceDecl ->
+//                     (ruleServiceDecl as? KtProperty)?.initializer as? KtLambdaExpression
+//                 }
+//                 ?.bodyExpression
+//                 ?.let { blockExpr ->
+//                     RuleServiceMethodDoc(
+//                             kdoc = extractKDoc(blockExpr),
+//                             flows = extractFlowCalls(blockExpr, bindingContext)
+//                     )
+//                 }
+// /**
+//  * Extracts the KDoc comments from the block expression BE AWARE of that KDoc can be attached to
+//  * properties as well, and several other places Other places for KDoc is unknwon at the moment
+//  */
+// private fun extractKDoc(blockExpr: KtBlockExpression): List<String> =
+//         blockExpr.children.flatMap { child ->
+//             when (child) {
+//                 is KDoc -> listOf(child.text.trimIndent())
+//                 is KtProperty ->
+//                         child.children.filterIsInstance<KDoc>().map { it.text.trimIndent() }
+//                 else -> emptyList()
+//             }
+//         }
 
-// TODO: Implement flow call extraction
-private fun extractFlowCalls(
-        _blockExpr: KtBlockExpression,
-        _bindingContext: BindingContext
-): List<FlowCall> = emptyList()
+// // TODO: Implement flow call extraction
+// private fun extractFlowCalls(
+//         _blockExpr: KtBlockExpression,
+//         _bindingContext: BindingContext
+// ): List<FlowCall> = emptyList()
 
 // Utility extension functions to reduce code duplication
 //
