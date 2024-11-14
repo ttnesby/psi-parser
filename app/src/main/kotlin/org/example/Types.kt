@@ -1,5 +1,6 @@
 package org.example
 
+import java.net.URI
 import org.jetbrains.kotlin.cli.jvm.compiler.*
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.psi.*
@@ -10,6 +11,7 @@ data class RuleServiceDoc(
         val inndata: List<PropertyDoc>,
         val utdata: List<PropertyDoc>,
         val flyt: FlowElement.RuleFlowDoc,
+        val gitHubUri: URI,
 ) {
     override fun toString(): String {
         return """

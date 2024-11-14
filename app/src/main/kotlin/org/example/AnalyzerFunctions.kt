@@ -1,5 +1,6 @@
 package org.example
 
+import java.net.URI
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.psi.*
@@ -23,7 +24,7 @@ fun analyzeRuleService(ktFile: KtFile, bindingContext: BindingContext): List<Rul
                 .asSequence()
                 .filterIsInstance<KtClass>()
                 .filter(::isRuleServiceClass)
-                .map { createRuleServiceDoc(it, bindingContext) }
+                .map { createRuleServiceDoc(it, bindingContext, ktFile.name) }
                 .toList()
 
 private fun isRuleServiceClass(klass: KtClass): Boolean =
@@ -31,7 +32,11 @@ private fun isRuleServiceClass(klass: KtClass): Boolean =
             it.typeReference?.text?.contains("AbstractPensjonRuleService") == true
         }
 
-private fun createRuleServiceDoc(klass: KtClass, bindingContext: BindingContext): RuleServiceDoc =
+private fun createRuleServiceDoc(
+        klass: KtClass,
+        bindingContext: BindingContext,
+        filePath: String
+): RuleServiceDoc =
         RuleServiceDoc(
                 navn = klass.name ?: "anonymous",
                 beskrivelse = "to be defined - test beskrivelse",
@@ -43,7 +48,8 @@ private fun createRuleServiceDoc(klass: KtClass, bindingContext: BindingContext)
                                 inndata = emptyList(),
                                 flyt = FlowElement.Flow(elementer = emptyList()),
                                 gitHubUrl = "to be defined later",
-                        )
+                        ),
+                gitHubUri = URI("$filePath")
         )
 
 // Request fields analysis

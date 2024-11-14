@@ -4,6 +4,7 @@
 package org.example
 
 import java.io.File
+import java.net.URI
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.jetbrains.kotlin.cli.jvm.compiler.*
@@ -18,6 +19,9 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 
+const val FILE_NAME = "app/src/test/kotlin/org/example/Test.kt"
+const val DEFAULT_PATH = "app/src/test/kotlin/org/example/"
+
 class AppTest {
 
     private lateinit var disposable: Disposable
@@ -27,22 +31,25 @@ class AppTest {
         return createCompilerContext(File(System.getProperty("java.home")), disposable).getOrThrow()
     }
 
-    private fun analyzeKotlinCode(
-            sourceCode: String,
-            fileName: String = "Test.kt"
-    ): Result<List<RuleServiceDoc>> {
-        val ktFile =
-                context.psiFactory.createFileFromText(
-                        fileName,
-                        KotlinFileType.INSTANCE,
-                        sourceCode
-                ) as
-                        KtFile
+    data class SourceCode(val code: String, val fileName: String = FILE_NAME)
 
-        return getBindingContext(listOf(ktFile), context).map { bctx ->
-            analyzeSourceFilesForRuleServices(listOf(ktFile), bctx)
-        }
-    }
+    private fun analyzeKotlinCode(
+            code: List<SourceCode>,
+    ): Result<List<RuleServiceDoc>> =
+            code
+                    .map { (sourceCode, fileName) ->
+                        context.psiFactory.createFileFromText(
+                                fileName,
+                                KotlinFileType.INSTANCE,
+                                sourceCode
+                        ) as
+                                KtFile
+                    }
+                    .let { ktFiles ->
+                        getBindingContext(ktFiles, context).map { bctx ->
+                            analyzeSourceFilesForRuleServices(ktFiles, bctx)
+                        }
+                    }
 
     @BeforeEach
     fun setUp() {
@@ -55,18 +62,22 @@ class AppTest {
         disposable.dispose()
     }
 
+    /** Test Types.kt::RuleServiceDoc */
     @Test
     @DisplayName("Should extract RuleService from KtFile")
     fun testExtractRuleService() {
         val ruleServiceName = "TestRuleService"
-        val testCode =
-                """
+        val ruleService =
+                SourceCode(
+                        """
             class ${ruleServiceName}() : AbstractPensjonRuleService<Dummy>() {}
         """.trimIndent()
+                )
 
-        analyzeKotlinCode(testCode).map { ruleServices ->
+        analyzeKotlinCode(listOf(ruleService)).map { ruleServices ->
             assert(ruleServices.isNotEmpty())
             assertEquals(ruleServiceName, ruleServices.first().navn)
+            assertEquals(URI(FILE_NAME), ruleServices.first().gitHubUri)
         }
     }
 
@@ -74,17 +85,21 @@ class AppTest {
     @DisplayName("Should handle KtFile with no RuleServices")
     fun testExtractRuleServiceEmpty() {
         val testCode =
-                """
+                SourceCode(
+                        """
             class RegularClass() {
                 fun someFunction() {}
             }
         """.trimIndent()
+                )
 
-        analyzeKotlinCode(testCode).map { ruleServices -> assertTrue(ruleServices.isEmpty()) }
+        analyzeKotlinCode(listOf(testCode)).map { ruleServices ->
+            assertTrue(ruleServices.isEmpty())
+        }
     }
 
     @Test
-    @DisplayName("Should extract Request from RuleService")
+    @DisplayName("Should extract ServiceRequest from RuleService")
     fun testExtractRequest() {
         val requestTypeName = "TestRequest"
         val requestName = "request"
@@ -92,17 +107,25 @@ class AppTest {
         val var1Type = "String"
         val var2Name = "att2"
         val var2Type = "Boolean"
-        val testCode =
-                """
+        val request =
+                SourceCode(
+                        """
             class ${requestTypeName}(
                 var ${var1Name}: ${var1Type} = "test"
                 var ${var2Name}: ${var2Type} = true
             ) : ServiceRequest()
+        """.trimIndent(),
+                        DEFAULT_PATH + requestTypeName + ".kt"
+                )
 
+        val ruleService =
+                SourceCode(
+                        """
             class TestRuleService(private val ${requestName}: ${requestTypeName}) : AbstractPensjonRuleService<Dummy>() {}
         """.trimIndent()
+                )
 
-        analyzeKotlinCode(testCode).map { ruleServices ->
+        analyzeKotlinCode(listOf(request, ruleService)).map { ruleServices ->
             assert(ruleServices.count() == 1)
             // 3 props: request, att1, att2
             assertEquals(ruleServices.first().inndata.count(), 3)
@@ -117,7 +140,7 @@ class AppTest {
     }
 
     @Test
-    @DisplayName("Should handle RuleService without Request")
+    @DisplayName("Should handle RuleService without ServiceRequest")
     fun testExtractRequestEmpty() {
         val requestTypeName = "TestRequest"
         val requestName = "request"
@@ -125,41 +148,54 @@ class AppTest {
         val var1Type = "String"
         val var2Name = "att2"
         val var2Type = "Boolean"
-        val testCode =
-                """
-            class ${requestTypeName}(
-                var ${var1Name}: ${var1Type} = "test"
-                var ${var2Name}: ${var2Type} = true
-            ) : SomethingElse()
+        val somethingElse =
+                SourceCode(
+                        """
+                class ${requestTypeName}(
+                    var ${var1Name}: ${var1Type} = "test"
+                    var ${var2Name}: ${var2Type} = true
+                ) : SomethingElse()
 
+        """.trimIndent()
+                )
+        val ruleService =
+                SourceCode(
+                        """
             class TestRuleService(private val ${requestName}: ${requestTypeName}) : AbstractPensjonRuleService<Dummy>() {}
         """.trimIndent()
+                )
 
-        analyzeKotlinCode(testCode).map { ruleServices ->
+        analyzeKotlinCode(listOf(ruleService, somethingElse)).map { ruleServices ->
             assert(ruleServices.count() == 1)
             assert(ruleServices.first().inndata.isEmpty())
         }
     }
 
     @Test
-    @DisplayName("Should extract Response from RuleService")
+    @DisplayName("Should extract ServiceResponse from RuleService")
     fun testExtractResponse() {
         val responseTypeName = "TestResponse"
         val var1Name = "att1"
         val var1Type = "String"
         val var2Name = "att2"
         val var2Type = "Boolean"
-        val testCode =
-                """
+        val response =
+                SourceCode(
+                        """
             class ${responseTypeName}(
                 var ${var1Name}: ${var1Type} = "test"
                 var ${var2Name}: ${var2Type} = true
             ) : ServiceResponse()
-
+        """.trimIndent()
+                )
+        val ruleService =
+                SourceCode(
+                        """
             class TestRuleService() : AbstractPensjonRuleService<${responseTypeName}>() {}
         """.trimIndent()
+                )
 
-        analyzeKotlinCode(testCode).map { ruleServices ->
+        analyzeKotlinCode(listOf(response, ruleService)).map { ruleServices ->
             assert(ruleServices.count() == 1)
             // 3 props: response, att1, att2
             assertEquals(ruleServices.first().utdata.count(), 3)
@@ -170,24 +206,31 @@ class AppTest {
         }
     }
 
-    @DisplayName("Should handle RuleService without Response")
+    @DisplayName("Should handle RuleService without ServiceResponse")
     fun testExtractResponseEmpty() {
         val responseTypeName = "TestResponse"
         val var1Name = "att1"
         val var1Type = "String"
         val var2Name = "att2"
         val var2Type = "Boolean"
-        val testCode =
-                """
+        val somethingElse =
+                SourceCode(
+                        """
             class ${responseTypeName}(
                 var ${var1Name}: ${var1Type} = "test"
                 var ${var2Name}: ${var2Type} = true
             ) : SomethingElse()
 
+        """.trimIndent()
+                )
+        val ruleService =
+                SourceCode(
+                        """
             class TestRuleService() : AbstractPensjonRuleService<${responseTypeName}>() {}
         """.trimIndent()
+                )
 
-        analyzeKotlinCode(testCode).map { ruleServices ->
+        analyzeKotlinCode(listOf(somethingElse, ruleService)).map { ruleServices ->
             assert(ruleServices.count() == 1)
             assert(ruleServices.first().utdata.isEmpty())
         }
@@ -257,6 +300,8 @@ class AppTest {
                 }
                """.trimIndent()
 
-        analyzeKotlinCode(testCode).map { ruleServices -> assertEquals(ruleServices.count(), 1) }
+        analyzeKotlinCode(listOf(SourceCode(testCode))).map { ruleServices ->
+            assertEquals(ruleServices.count(), 1)
+        }
     }
 }
