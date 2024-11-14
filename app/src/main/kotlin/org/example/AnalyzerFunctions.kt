@@ -39,7 +39,9 @@ private fun createRuleServiceDoc(
 ): RuleServiceDoc =
         RuleServiceDoc(
                 navn = klass.name ?: "anonymous",
-                beskrivelse = "to be defined - test beskrivelse",
+                beskrivelse =
+                        klass.docComment?.let { kdoc -> kdoc.getDefaultSection().getContent() }
+                                ?: "",
                 inndata = analyzeRequestFields(klass, bindingContext),
                 utdata = analyzeResponseFields(klass, bindingContext),
                 flyt =

@@ -64,7 +64,7 @@ class AppTest {
 
     /** Test Types.kt::RuleServiceDoc */
     @Test
-    @DisplayName("Should extract RuleService from KtFile")
+    @DisplayName("Should extract RuleService from KtFile and no KDoc")
     fun testExtractRuleService() {
         val ruleServiceName = "TestRuleService"
         val ruleService =
@@ -78,6 +78,7 @@ class AppTest {
             assert(ruleServices.isNotEmpty())
             assertEquals(ruleServiceName, ruleServices.first().navn)
             assertEquals(URI(FILE_NAME), ruleServices.first().gitHubUri)
+            assert(ruleServices.first().beskrivelse.isEmpty())
         }
     }
 
@@ -95,6 +96,67 @@ class AppTest {
 
         analyzeKotlinCode(listOf(testCode)).map { ruleServices ->
             assertTrue(ruleServices.isEmpty())
+        }
+    }
+
+    @Test
+    @DisplayName("Should extract KDoc for RuleServices")
+    fun testExtractKDocForRuleService() {
+        val request =
+                SourceCode(
+                        """
+            class BeregnPoengtallBatchRequest(
+                val dummy: String
+            ) : ServiceRequest()
+            """.trimIndent(),
+                        "${DEFAULT_PATH + "BeregnPoengtallBatchRequest.kt"}"
+                )
+        val response =
+                SourceCode(
+                        """
+                    class BeregnPoengtallBatchResponse(
+                        val dummy: String
+                    ) : ServiceResponse()
+                    """.trimIndent(),
+                        "${DEFAULT_PATH + "BeregnPoengtallBatchResponse.kt"}"
+                )
+
+        val ruleService =
+                SourceCode(
+                        """
+                        /**
+                         * Behøver ikke sjekke her. ejb-laget fanger en krasj og kaster exception videre.Huskeliste for å få
+                         * ønsket ytelse på beregning av poengtall i
+                         * batch.---------------------------------------------------------------------1.
+                         * Regeltjenesteprosjektet heter BeregnPoengtallBatchProj, testprosjektet heter
+                         * BeregnPoengtallbatchTestProj2. Følgende execution mode flagg må settes:startBatchBeregnPoengtall -
+                         * compiledpoengrekke-tekBeregnFaktiskePoengtallRS - compiled sequential (opprinnelig
+                         * sequential)beregnPoengtallAvOpptjening - compiled(opprinnelig
+                         * Default)BeregnPoengtallAvOpptjeningsgrunnlagRS - compiled sequential (default eller
+                         * compiled?)støttefunksjoner-tekVeiet grunnbeløp TATempl - compiled sequential (opprinnelig
+                         * sequential)3.Regeltjenesteprosjektet BeregnPoengtallBatch må ha  Project Settings-> Object Life
+                         * Cycle ->Explicit deletion satt 4. Ved deployment til BeregnPoengtallBatch.server må Recycle policy
+                         * settes til Reinitializeog maximum iterations til 1.5. Før kompilering må
+                         * UseDeploymentClassLoadingContext på BeregnPoengtallBatch.serversettes til trueMålt ytelse er 700 ms
+                         * for 10000 elementer
+                         */
+                        class BeregnPoengtallBatchService(
+                            private val innBeregnPoengtallBatchRequest: BeregnPoengtallBatchRequest
+                        ) : AbstractPensjonRuleService<BeregnPoengtallBatchResponse>(innBeregnPoengtallBatchRequest) {
+
+                            override val ruleService: () -> BeregnPoengtallBatchResponse = {
+                                BeregnPoengtallAvOpptjeningsgrunnlagRS(innBeregnPoengtallBatchRequest.personOpptjeningsgrunnlagListe).run(this)
+                                BeregnPoengtallBatchResponse(innBeregnPoengtallBatchRequest.personOpptjeningsgrunnlagListe)
+                            }
+                        }
+        """.trimIndent()
+                )
+
+        analyzeKotlinCode(listOf(ruleService, request, response)).map { ruleServices ->
+            assertTrue(ruleServices.count() == 1)
+            assert(ruleServices.first().beskrivelse.isNotEmpty())
+            assertTrue(ruleServices.first().inndata.isNotEmpty())
+            assertTrue(ruleServices.first().utdata.isNotEmpty())
         }
     }
 
@@ -221,10 +283,8 @@ class AppTest {
                 var ${var1Name}: ${var1Type} = "test"
                 var ${var2Name}: ${var2Type} = true
             ) : SomethingElse()
-
-        """.trimIndent()
-                ),
-                DEFAULT_PATH + responseTypeName + ".kt"
+        """.trimIndent(),
+                        DEFAULT_PATH + responseTypeName + ".kt"
                 )
         val ruleService =
                 SourceCode(
