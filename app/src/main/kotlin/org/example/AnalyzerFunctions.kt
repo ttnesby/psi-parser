@@ -7,7 +7,6 @@ import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
-import org.jetbrains.kotlin.resolve.calls.util.getType
 
 fun analyzeSourceFilesForRuleServices(
         sourceFiles: List<KtFile>,
@@ -153,7 +152,6 @@ private fun createResponseClassDoc(
         )
 
 fun analyzeRuleServiceMethod(ktClass: KtClass, bindingContext: BindingContext): FlowElement.Flow {
-    // Get the ruleService property
     val ruleServiceLambda =
             ktClass.body
                     ?.declarations
@@ -161,12 +159,23 @@ fun analyzeRuleServiceMethod(ktClass: KtClass, bindingContext: BindingContext): 
                     ?.find { it.name == "ruleService" }
                     ?.initializer as?
                     KtLambdaExpression
-                    ?: return FlowElement.Flow(emptyList()) // or appropriate default
+                    ?: return FlowElement.Flow(emptyList())
 
-    // Process the lambda body
     val references =
             ruleServiceLambda.bodyExpression?.children?.mapNotNull { child ->
                 when (child) {
+                    is KtProperty -> {
+                        // Get KDoc from property, return null if no KDoc exists
+                        val kdocText =
+                                child.children
+                                        .filterIsInstance<KDoc>()
+                                        .map { it.text.trimIndent() }
+                                        .takeIf { it.isNotEmpty() } // Only process if KDoc exists
+                                        ?.joinToString()
+
+                        // Only create Documentation reference if KDoc exists
+                        kdocText?.let { FlowReference.Documentation(it) }
+                    }
                     is KDoc -> {
                         FlowReference.Documentation(child.getDefaultSection().getContent().trim())
                     }
@@ -178,47 +187,86 @@ fun analyzeRuleServiceMethod(ktClass: KtClass, bindingContext: BindingContext): 
             }
                     ?: emptyList()
 
-    return FlowElement.Flow(references as List<FlowElement.Reference>)
+    val safeReferences = references.map { ref -> FlowElement.Reference(ref) }
+
+    return FlowElement.Flow(safeReferences)
 }
 
 private fun processFlowExpression(
         expression: KtDotQualifiedExpression,
         bindingContext: BindingContext
 ): FlowReference? {
-    // Get the type of the receiver (left side of the dot)
-    val receiverType = expression.receiverExpression.getType(bindingContext)
+    val referenceExpression = expression.receiverExpression as? KtReferenceExpression ?: return null
 
-    // Check if it's a subtype of AbstractPensjonRuleflow
-    val isRuleFlow =
-            receiverType?.let { type ->
-                type.constructor.supertypes.any {
-                    it.toString().contains("AbstractPensjonRuleflow")
-                }
-            }
-                    ?: false
+    // Get the KotlinType of the expression
+    val type = bindingContext.getType(referenceExpression) ?: return null
 
-    if (!isRuleFlow) return null
+    // Access the declaration descriptor from the type's constructor
+    val descriptor = type.constructor.declarationDescriptor ?: return null
 
-    val callExpression = expression.selectorExpression as? KtCallExpression
-    val name = callExpression?.calleeExpression?.text ?: return null
+    // Convert the descriptor to a KtClass
+    val typeDeclaration =
+            DescriptorToSourceUtils.getSourceFromDescriptor(descriptor) as? KtClass ?: return null
 
-    // Get the containing file
+    // Check if the class has 'AbstractPensjonRuleflow' as a superclass
+    val isRuleflow =
+            typeDeclaration.superTypeListEntries
+                    .mapNotNull { it.typeReference?.resolveToKtClass(bindingContext) }
+                    .any { it.name == "AbstractPensjonRuleflow" }
+
+    if (!isRuleflow) return null
+
+    val name = referenceExpression.text
     val file =
-            expression.containingFile.virtualFile?.let { File(it.path) }
-                    ?: File("") // or handle missing file case appropriately
+            File(
+                    typeDeclaration.containingFile.virtualFile?.path
+                            ?: typeDeclaration.containingFile.name
+            )
 
     return FlowReference.RuleFlow(name, file)
 }
 
-// private fun extractKDoc(blockExpr: KtBlockExpression): List<String> =
-//         blockExpr.children.flatMap { child ->
-//             when (child) {
-//                 is KDoc -> listOf(child.text.trimIndent())
-//                 is KtProperty ->
-//                         child.children.filterIsInstance<KDoc>().map { it.text.trimIndent() }
-//                 else -> emptyList()
-//             }
+// private fun KtTypeReference.resolveToKtClass(bindingContext: BindingContext): KtClass? =
+//         bindingContext[BindingContext.TYPE, this]?.constructor?.declarationDescriptor?.let {
+//             DescriptorToSourceUtils.getSourceFromDescriptor(it) as? KtClass
 //         }
+
+// Helper function to check if class is a Ruleflow
+private fun isRuleflowClass(ktClass: KtClass, bindingContext: BindingContext): Boolean =
+        ktClass.superTypeListEntries
+                .mapNotNull { it.typeReference?.resolveToKtClass(bindingContext) }
+                .any {
+                    it.name == "AbstractPensjonRuleflow"
+                } // or check full qualified name if needed
+
+// private fun processFlowExpression(
+//         expression: KtDotQualifiedExpression,
+//         bindingContext: BindingContext
+// ): FlowReference? {
+//     // Get the type of the receiver (left side of the dot)
+//     val receiverType = expression.receiverExpression.getType(bindingContext)
+
+//     // Check if it's a subtype of AbstractPensjonRuleflow
+//     val isRuleFlow =
+//             receiverType?.let { type ->
+//                 type.constructor.supertypes.any {
+//                     it.toString().contains("AbstractPensjonRuleflow")
+//                 }
+//             }
+//                     ?: false
+
+//     if (!isRuleFlow) return null
+
+//     val callExpression = expression.selectorExpression as? KtCallExpression
+//     val name = callExpression?.calleeExpression?.text ?: return null
+
+//     // Get the containing file
+//     val file =
+//             expression.containingFile.virtualFile?.let { File(it.path) }
+//                     ?: File("") // or handle missing file case appropriately
+
+//     return FlowReference.RuleFlow(name, file)
+// }
 
 // Utility extension functions to reduce code duplication
 //

@@ -303,8 +303,83 @@ class AppTest {
     @DisplayName("Should extract RuleFlowStart from RuleService")
     // @Disabled("Not implemented yet")
     fun testExtractRuleFlowStart() {
+        val request =
+                SourceCode(
+                        """
+                class TrygdetidRequest(
+                    /**
+                     * Virkningstidspunktets fom. for �nsket ytelse.
+                     */
+                    var virkFom: Date? = null,
+
+                    /**
+                     * Tom for trygdetiden som skal beregnes. Kun for AP2011, AP2016 og AP2025.
+                     */
+                    var virkTom: Date? = null,
+
+                    /**
+                     * F�rste virkningstidspunkt,denne m� v�re satt dersom personen er SOKER i persongrunnlaget.
+                     */
+                    var brukerForsteVirk: Date? = null,
+
+                    /**
+                     * Type ytelse (AP,UP osv)
+                     */
+                    var hovedKravlinjeType: KravlinjeTypeEnum? = null,
+
+                    /**
+                     * Persongrunnlag for personen.
+                     * Dersom ytelsesType er UP m� uforegrunnlag og uforehistorikk v�re utfylt.
+                     */
+                    var persongrunnlag: Persongrunnlag? = null,
+
+                    /**
+                     * Angir om personen har bodd eller arbeidet i utlandet.
+                     */
+                    var boddEllerArbeidetIUtlandet: Boolean = false,
+
+                    /**
+                     * Regelverktype bestemmer om trygdetid skal regnes etter gamle eller nye regler.
+                     */
+                    var regelverkType: RegelverkTypeEnum? = null,
+
+                    var uttaksgradListe: MutableList<Uttaksgrad> = mutableListOf(),
+
+                    var redusertFTTUT: Boolean? = null,
+                    /**
+                     * Liste av beregningsvilkarPerioder, p�krevd ved uf�retrygd.
+                     */
+                    var beregningsvilkarPeriodeListe: MutableList<BeregningsvilkarPeriode> = mutableListOf()
+                ) : ServiceRequest() {
+                )
+        """.trimIndent(),
+                        DEFAULT_PATH + "TrygdeTidRequest.kt"
+                )
+        val response =
+                SourceCode(
+                        """
+                        class TrygdetidResponse(
+                            /**
+                             * Fastsatt trygdetid.
+                             */
+                            var trygdetid: Trygdetid? = null,
+
+                            /**
+                             * Fastsatt trygdetid for AP2016 iht. kapittel 20 og AP2025.
+                             */
+                            var trygdetidKapittel20: Trygdetid? = null,
+
+                            /**
+                             * Fastsatt trygdetid for annet uf�retidspunkt.
+                             */
+                            var trygdetidAlternativ: Trygdetid? = null,
+                            override val pakkseddel: Pakkseddel = Pakkseddel()
+                        ) : ServiceResponse(pakkseddel)        """.trimIndent(),
+                        DEFAULT_PATH + "TrygdeTidResponse.kt"
+                )
         val testCode =
-                """
+                SourceCode(
+                        """
                 class FastsettTrygdetidService(
                     private val innTrygdetidRequest: TrygdetidRequest
                 ) : AbstractPensjonRuleService<TrygdetidResponse>(innTrygdetidRequest) {
@@ -362,10 +437,11 @@ class AppTest {
                     }
                 }
                """.trimIndent()
+                )
 
-        analyzeKotlinCode(listOf(SourceCode(testCode))).map { ruleServices ->
-            assertEquals(ruleServices.count(), 1)
-            assertEquals(ruleServices.first().flyt.elementer.count(), 2)
+        analyzeKotlinCode(listOf(testCode, request)).map { ruleServices ->
+            assertEquals(1, ruleServices.count())
+            assertEquals(4, ruleServices.first().flyt.elementer.count())
         }
     }
 }

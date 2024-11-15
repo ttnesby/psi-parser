@@ -18,11 +18,11 @@ data class RuleServiceDoc(
     override fun toString(): String {
         return """
             |RuleServiceDoc(
-            |   navn = $navn,
-            |   beskrivelse = $beskrivelse,
-            |   inndata = $inndata,
+            |   navn = $navn
+            |   beskrivelse = $beskrivelse
+            |   inndata = $inndata
             |   utdata = $utdata
-            |   flyt = "TDODO"
+            |   flyt = $flyt
             |   gitHubUri = ${gitHubUri.toString()}
             |)
         """.trimMargin()
@@ -77,7 +77,7 @@ sealed class FlowElement {
 }
 
 sealed class FlowReference {
-    data class Documentation(val beskrivelse: String)
+    data class Documentation(val beskrivelse: String) : FlowReference()
     data class RuleFlow(val navn: String, val fil: File) : FlowReference()
     data class RuleSet(val navn: String, val fil: File) : FlowReference()
     data class Function(val navn: String, val fil: File) : FlowReference()
