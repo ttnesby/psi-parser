@@ -1,10 +1,13 @@
 package org.example
 
+import java.io.File
 import java.net.URI
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
+import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
+import org.jetbrains.kotlin.resolve.calls.util.getType
 
 fun analyzeSourceFilesForRuleServices(
         sourceFiles: List<KtFile>,
@@ -43,7 +46,7 @@ private fun createRuleServiceDoc(
                                 ?: "",
                 inndata = analyzeRequestFields(klass, bindingContext),
                 utdata = analyzeResponseFields(klass, bindingContext),
-                flyt = FlowElement.Flow(elementer = emptyList()),
+                flyt = analyzeRuleServiceMethod(klass, bindingContext),
                 gitHubUri = URI("$filePath")
         )
 
@@ -149,28 +152,64 @@ private fun createResponseClassDoc(
                 beskrivelse = declaration.docComment?.text ?: "Response for ${ktClass.name}"
         )
 
-// fun analyzeRuleServiceMethod(
-//         ktClass: KtClass,
-//         bindingContext: BindingContext
-// ): RuleServiceMethodDoc? =
-//         ktClass.body
-//                 ?.declarations
-//                 ?.filterIsInstance<KtNamedDeclaration>()
-//                 ?.find { it.name == "ruleService" }
-//                 ?.let { ruleServiceDecl ->
-//                     (ruleServiceDecl as? KtProperty)?.initializer as? KtLambdaExpression
-//                 }
-//                 ?.bodyExpression
-//                 ?.let { blockExpr ->
-//                     RuleServiceMethodDoc(
-//                             kdoc = extractKDoc(blockExpr),
-//                             flows = extractFlowCalls(blockExpr, bindingContext)
-//                     )
-//                 }
-// /**
-//  * Extracts the KDoc comments from the block expression BE AWARE of that KDoc can be attached to
-//  * properties as well, and several other places Other places for KDoc is unknwon at the moment
-//  */
+fun analyzeRuleServiceMethod(ktClass: KtClass, bindingContext: BindingContext): FlowElement.Flow {
+    // Get the ruleService property
+    val ruleServiceLambda =
+            ktClass.body
+                    ?.declarations
+                    ?.filterIsInstance<KtProperty>()
+                    ?.find { it.name == "ruleService" }
+                    ?.initializer as?
+                    KtLambdaExpression
+                    ?: return FlowElement.Flow(emptyList()) // or appropriate default
+
+    // Process the lambda body
+    val references =
+            ruleServiceLambda.bodyExpression?.children?.mapNotNull { child ->
+                when (child) {
+                    is KDoc -> {
+                        FlowReference.Documentation(child.getDefaultSection().getContent().trim())
+                    }
+                    is KtDotQualifiedExpression -> {
+                        processFlowExpression(child, bindingContext)
+                    }
+                    else -> null
+                }
+            }
+                    ?: emptyList()
+
+    return FlowElement.Flow(references as List<FlowElement.Reference>)
+}
+
+private fun processFlowExpression(
+        expression: KtDotQualifiedExpression,
+        bindingContext: BindingContext
+): FlowReference? {
+    // Get the type of the receiver (left side of the dot)
+    val receiverType = expression.receiverExpression.getType(bindingContext)
+
+    // Check if it's a subtype of AbstractPensjonRuleflow
+    val isRuleFlow =
+            receiverType?.let { type ->
+                type.constructor.supertypes.any {
+                    it.toString().contains("AbstractPensjonRuleflow")
+                }
+            }
+                    ?: false
+
+    if (!isRuleFlow) return null
+
+    val callExpression = expression.selectorExpression as? KtCallExpression
+    val name = callExpression?.calleeExpression?.text ?: return null
+
+    // Get the containing file
+    val file =
+            expression.containingFile.virtualFile?.let { File(it.path) }
+                    ?: File("") // or handle missing file case appropriately
+
+    return FlowReference.RuleFlow(name, file)
+}
+
 // private fun extractKDoc(blockExpr: KtBlockExpression): List<String> =
 //         blockExpr.children.flatMap { child ->
 //             when (child) {
@@ -180,12 +219,6 @@ private fun createResponseClassDoc(
 //                 else -> emptyList()
 //             }
 //         }
-
-// // TODO: Implement flow call extraction
-// private fun extractFlowCalls(
-//         _blockExpr: KtBlockExpression,
-//         _bindingContext: BindingContext
-// ): List<FlowCall> = emptyList()
 
 // Utility extension functions to reduce code duplication
 //
