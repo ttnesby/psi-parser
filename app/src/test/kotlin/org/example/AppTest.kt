@@ -64,7 +64,7 @@ class AppTest {
 
     /** Test Types.kt::RuleServiceDoc */
     @Test
-    @DisplayName("Should extract RuleService from KtFile and no KDoc")
+    @DisplayName("Should extract RuleService from KtFile, without KDoc, with file reference")
     fun testExtractRuleService() {
         val ruleServiceName = "TestRuleService"
         val ruleService =
@@ -79,6 +79,7 @@ class AppTest {
             assertEquals(ruleServiceName, ruleServices.first().navn)
             assertEquals(URI(FILE_NAME), ruleServices.first().gitHubUri)
             assert(ruleServices.first().beskrivelse.isEmpty())
+            assert(ruleServices.first().gitHubUri.toString().isNotEmpty())
         }
     }
 

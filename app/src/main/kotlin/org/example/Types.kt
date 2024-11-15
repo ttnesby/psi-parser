@@ -1,5 +1,6 @@
 package org.example
 
+import java.io.File
 import java.net.URI
 import org.jetbrains.kotlin.cli.jvm.compiler.*
 import org.jetbrains.kotlin.config.*
@@ -21,6 +22,8 @@ data class RuleServiceDoc(
             |   beskrivelse = $beskrivelse,
             |   inndata = $inndata,
             |   utdata = $utdata
+            |   flyt = "TDODO"
+            |   gitHubUri = ${gitHubUri.toString()}
             |)
         """.trimMargin()
     }
@@ -52,7 +55,9 @@ data class PropertyDoc(
  * Rule set flow is invoked from a rule flow, but also from other rule sets
  *
  * Forgrening: branching a flow into multiple branches, each with condition Gren: a branch in a
- * branching flow Reference: reference to another flow element, avoiding containment
+ * branching flow
+ *
+ * Reference: reference to another flow element, avoiding containment
  */
 sealed class FlowElement {
     // Rule flow or rule set flow documentation
@@ -73,7 +78,7 @@ sealed class FlowElement {
 
 sealed class FlowReference {
     data class Documentation(val beskrivelse: String)
-    data class RuleFlow(val navn: String) : FlowReference()
-    data class RuleSet(val navn: String) : FlowReference()
-    data class Function(val navn: String) : FlowReference()
+    data class RuleFlow(val navn: String, val fil: File) : FlowReference()
+    data class RuleSet(val navn: String, val fil: File) : FlowReference()
+    data class Function(val navn: String, val fil: File) : FlowReference()
 }
