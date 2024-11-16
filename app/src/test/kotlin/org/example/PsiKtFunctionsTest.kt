@@ -103,6 +103,7 @@ class PsiKtFunctionsTest {
              * $doc1
              * $doc2
              */
+
             class Test() : AbstractPensjonRuleService {}
         """.trimIndent()
                 )
@@ -110,8 +111,8 @@ class PsiKtFunctionsTest {
         analyzeKotlinCode(code).let { ktFile ->
             ktFile.getClassOfSuperType(::isRuleServiceClass)
                     .map {
-                        val doc = it.getKDocOrEmpty()
-                        assertEquals(listOf(doc1, doc2).joinToString("\n").trim(), doc)
+                        val expected = listOf(doc1, doc2).joinToString("\n").trim()
+                        assertEquals(expected, it.getKDocOrEmpty())
                     }
                     .onFailure { assert(false) }
         }
@@ -123,7 +124,6 @@ class PsiKtFunctionsTest {
         val code =
                 SourceCode(
                         """
-            /** Some documentation */
             class Test() : AbstractPensjonRuleService {}
         """.trimIndent()
                 )
