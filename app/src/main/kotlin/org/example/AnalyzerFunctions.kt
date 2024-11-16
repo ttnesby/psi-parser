@@ -28,11 +28,6 @@ fun analyzeRuleService(ktFile: KtFile, bindingContext: BindingContext): List<Rul
                 .map { createRuleServiceDoc(it, bindingContext, ktFile.name) }
                 .toList()
 
-private fun isRuleServiceClass(klass: KtClass): Boolean =
-        klass.getSuperTypeListEntries().any {
-            it.typeReference?.text?.contains("AbstractPensjonRuleService") == true
-        }
-
 private fun createRuleServiceDoc(
         klass: KtClass,
         bindingContext: BindingContext,

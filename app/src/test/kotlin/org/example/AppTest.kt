@@ -15,11 +15,9 @@ import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
-
-const val FILE_NAME = "app/src/test/kotlin/org/example/Test.kt"
-const val DEFAULT_PATH = "app/src/test/kotlin/org/example/"
 
 class AppTest {
 
@@ -29,8 +27,6 @@ class AppTest {
     private fun createTestCompilerContext(): CompilerContext {
         return createCompilerContext(File(System.getProperty("java.home")), disposable).getOrThrow()
     }
-
-    data class SourceCode(val code: String, val fileName: String = FILE_NAME)
 
     private fun analyzeKotlinCode(
             code: List<SourceCode>,
@@ -301,7 +297,7 @@ class AppTest {
 
     @Test
     @DisplayName("Should extract RuleFlowStart from RuleService")
-    // @Disabled("Not implemented yet")
+    @Disabled("Not implemented yet")
     fun testExtractRuleFlowStart() {
         val request =
                 SourceCode(
