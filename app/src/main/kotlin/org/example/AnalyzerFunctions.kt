@@ -21,12 +21,9 @@ fun analyzeSourceFilesForRuleServices(
         }
 
 fun analyzeRuleService(ktFile: KtFile, bindingContext: BindingContext): List<RuleServiceDoc> =
-        ktFile.declarations
-                .asSequence()
-                .filterIsInstance<KtClass>()
-                .filter(::isRuleServiceClass)
-                .map { createRuleServiceDoc(it, bindingContext, ktFile.name) }
-                .toList()
+        ktFile.getClassOfSuperType(::isRuleServiceClass)
+                .map { klass -> listOf(createRuleServiceDoc(klass, bindingContext, ktFile.name)) }
+                .getOrDefault(emptyList())
 
 private fun createRuleServiceDoc(
         klass: KtClass,
@@ -35,9 +32,7 @@ private fun createRuleServiceDoc(
 ): RuleServiceDoc =
         RuleServiceDoc(
                 navn = klass.name ?: "anonymous",
-                beskrivelse =
-                        klass.docComment?.let { kdoc -> kdoc.getDefaultSection().getContent() }
-                                ?: "",
+                beskrivelse = klass.getKDocOrEmpty(),
                 inndata = analyzeRequestFields(klass, bindingContext),
                 utdata = analyzeResponseFields(klass, bindingContext),
                 flyt = analyzeRuleServiceMethod(klass, bindingContext),
