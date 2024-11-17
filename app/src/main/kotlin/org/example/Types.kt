@@ -12,7 +12,7 @@ data class RuleServiceDoc(
         val beskrivelse: String,
         val inndata: List<PropertyDoc>,
         val utdata: List<PropertyDoc>,
-        val flyt: FlowElement.Flow,
+        // val flyt: FlowElement.Flow,
         val gitHubUri: URI,
 ) {
     override fun toString(): String {
@@ -22,7 +22,7 @@ data class RuleServiceDoc(
             |   beskrivelse = $beskrivelse
             |   inndata = $inndata
             |   utdata = $utdata
-            |   flyt = $flyt
+            |   flyt = flyt
             |   gitHubUri = ${gitHubUri.toString()}
             |)
         """.trimMargin()

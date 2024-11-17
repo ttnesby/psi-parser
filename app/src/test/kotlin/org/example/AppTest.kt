@@ -15,7 +15,6 @@ import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 
@@ -295,149 +294,157 @@ class AppTest {
         }
     }
 
-    @Test
-    @DisplayName("Should extract RuleFlowStart from RuleService")
-    @Disabled("Not implemented yet")
-    fun testExtractRuleFlowStart() {
-        val request =
-                SourceCode(
-                        """
-                class TrygdetidRequest(
-                    /**
-                     * Virkningstidspunktets fom. for �nsket ytelse.
-                     */
-                    var virkFom: Date? = null,
+    // @Test
+    // @DisplayName("Should extract RuleFlowStart from RuleService")
+    // @Disabled("Not implemented yet")
+    // fun testExtractRuleFlowStart() {
+    //     val request =
+    //             SourceCode(
+    //                     """
+    //             class TrygdetidRequest(
+    //                 /**
+    //                  * Virkningstidspunktets fom. for �nsket ytelse.
+    //                  */
+    //                 var virkFom: Date? = null,
 
-                    /**
-                     * Tom for trygdetiden som skal beregnes. Kun for AP2011, AP2016 og AP2025.
-                     */
-                    var virkTom: Date? = null,
+    //                 /**
+    //                  * Tom for trygdetiden som skal beregnes. Kun for AP2011, AP2016 og AP2025.
+    //                  */
+    //                 var virkTom: Date? = null,
 
-                    /**
-                     * F�rste virkningstidspunkt,denne m� v�re satt dersom personen er SOKER i persongrunnlaget.
-                     */
-                    var brukerForsteVirk: Date? = null,
+    //                 /**
+    //                  * F�rste virkningstidspunkt,denne m� v�re satt dersom personen er SOKER i
+    // persongrunnlaget.
+    //                  */
+    //                 var brukerForsteVirk: Date? = null,
 
-                    /**
-                     * Type ytelse (AP,UP osv)
-                     */
-                    var hovedKravlinjeType: KravlinjeTypeEnum? = null,
+    //                 /**
+    //                  * Type ytelse (AP,UP osv)
+    //                  */
+    //                 var hovedKravlinjeType: KravlinjeTypeEnum? = null,
 
-                    /**
-                     * Persongrunnlag for personen.
-                     * Dersom ytelsesType er UP m� uforegrunnlag og uforehistorikk v�re utfylt.
-                     */
-                    var persongrunnlag: Persongrunnlag? = null,
+    //                 /**
+    //                  * Persongrunnlag for personen.
+    //                  * Dersom ytelsesType er UP m� uforegrunnlag og uforehistorikk v�re utfylt.
+    //                  */
+    //                 var persongrunnlag: Persongrunnlag? = null,
 
-                    /**
-                     * Angir om personen har bodd eller arbeidet i utlandet.
-                     */
-                    var boddEllerArbeidetIUtlandet: Boolean = false,
+    //                 /**
+    //                  * Angir om personen har bodd eller arbeidet i utlandet.
+    //                  */
+    //                 var boddEllerArbeidetIUtlandet: Boolean = false,
 
-                    /**
-                     * Regelverktype bestemmer om trygdetid skal regnes etter gamle eller nye regler.
-                     */
-                    var regelverkType: RegelverkTypeEnum? = null,
+    //                 /**
+    //                  * Regelverktype bestemmer om trygdetid skal regnes etter gamle eller nye
+    // regler.
+    //                  */
+    //                 var regelverkType: RegelverkTypeEnum? = null,
 
-                    var uttaksgradListe: MutableList<Uttaksgrad> = mutableListOf(),
+    //                 var uttaksgradListe: MutableList<Uttaksgrad> = mutableListOf(),
 
-                    var redusertFTTUT: Boolean? = null,
-                    /**
-                     * Liste av beregningsvilkarPerioder, p�krevd ved uf�retrygd.
-                     */
-                    var beregningsvilkarPeriodeListe: MutableList<BeregningsvilkarPeriode> = mutableListOf()
-                ) : ServiceRequest() {
-                )
-        """.trimIndent(),
-                        DEFAULT_PATH + "TrygdeTidRequest.kt"
-                )
-        val response =
-                SourceCode(
-                        """
-                        class TrygdetidResponse(
-                            /**
-                             * Fastsatt trygdetid.
-                             */
-                            var trygdetid: Trygdetid? = null,
+    //                 var redusertFTTUT: Boolean? = null,
+    //                 /**
+    //                  * Liste av beregningsvilkarPerioder, p�krevd ved uf�retrygd.
+    //                  */
+    //                 var beregningsvilkarPeriodeListe: MutableList<BeregningsvilkarPeriode> =
+    // mutableListOf()
+    //             ) : ServiceRequest() {
+    //             )
+    //     """.trimIndent(),
+    //                     DEFAULT_PATH + "TrygdeTidRequest.kt"
+    //             )
+    //     val response =
+    //             SourceCode(
+    //                     """
+    //                     class TrygdetidResponse(
+    //                         /**
+    //                          * Fastsatt trygdetid.
+    //                          */
+    //                         var trygdetid: Trygdetid? = null,
 
-                            /**
-                             * Fastsatt trygdetid for AP2016 iht. kapittel 20 og AP2025.
-                             */
-                            var trygdetidKapittel20: Trygdetid? = null,
+    //                         /**
+    //                          * Fastsatt trygdetid for AP2016 iht. kapittel 20 og AP2025.
+    //                          */
+    //                         var trygdetidKapittel20: Trygdetid? = null,
 
-                            /**
-                             * Fastsatt trygdetid for annet uf�retidspunkt.
-                             */
-                            var trygdetidAlternativ: Trygdetid? = null,
-                            override val pakkseddel: Pakkseddel = Pakkseddel()
-                        ) : ServiceResponse(pakkseddel)        """.trimIndent(),
-                        DEFAULT_PATH + "TrygdeTidResponse.kt"
-                )
-        val testCode =
-                SourceCode(
-                        """
-                class FastsettTrygdetidService(
-                    private val innTrygdetidRequest: TrygdetidRequest
-                ) : AbstractPensjonRuleService<TrygdetidResponse>(innTrygdetidRequest) {
-                    override val ruleService: () -> TrygdetidResponse = {
-                        log_debug("[FUN] startFastsettTrygdetid")
+    //                         /**
+    //                          * Fastsatt trygdetid for annet uf�retidspunkt.
+    //                          */
+    //                         var trygdetidAlternativ: Trygdetid? = null,
+    //                         override val pakkseddel: Pakkseddel = Pakkseddel()
+    //                     ) : ServiceResponse(pakkseddel)        """.trimIndent(),
+    //                     DEFAULT_PATH + "TrygdeTidResponse.kt"
+    //             )
+    //     val testCode =
+    //             SourceCode(
+    //                     """
+    //             class FastsettTrygdetidService(
+    //                 private val innTrygdetidRequest: TrygdetidRequest
+    //             ) : AbstractPensjonRuleService<TrygdetidResponse>(innTrygdetidRequest) {
+    //                 override val ruleService: () -> TrygdetidResponse = {
+    //                     log_debug("[FUN] startFastsettTrygdetid")
 
-                        /**
-                         * Test
-                         * Etabler grunnlag for fastsettelse av trygdetid.
-                         */
-                        val trygdetidParametere = TrygdetidParameterType(
-                            grunnlag = TrygdetidGrunnlag(
-                                bruker = innTrygdetidRequest.persongrunnlag,
-                                boddEllerArbeidetIUtlandet = innTrygdetidRequest.boddEllerArbeidetIUtlandet,
-                                førsteVirk = innTrygdetidRequest.brukerForsteVirk,
-                                virkFom = innTrygdetidRequest.virkFom,
-                                virkTom = innTrygdetidRequest.virkTom,
-                                ytelseType = innTrygdetidRequest.hovedKravlinjeType,
-                                regelverkType = innTrygdetidRequest.regelverkType,
-                                uttaksgradListe = innTrygdetidRequest.uttaksgradListe,
-                                beregningsvilkarsPeriodeListe = innTrygdetidRequest.sortedBeregningssvilkarPeriodeListe(),
-                                redusertFTTUT = innTrygdetidRequest.redusertFTTUT,
-                                beregning = null
-                            )
-                        )
+    //                     /**
+    //                      * Test
+    //                      * Etabler grunnlag for fastsettelse av trygdetid.
+    //                      */
+    //                     val trygdetidParametere = TrygdetidParameterType(
+    //                         grunnlag = TrygdetidGrunnlag(
+    //                             bruker = innTrygdetidRequest.persongrunnlag,
+    //                             boddEllerArbeidetIUtlandet =
+    // innTrygdetidRequest.boddEllerArbeidetIUtlandet,
+    //                             førsteVirk = innTrygdetidRequest.brukerForsteVirk,
+    //                             virkFom = innTrygdetidRequest.virkFom,
+    //                             virkTom = innTrygdetidRequest.virkTom,
+    //                             ytelseType = innTrygdetidRequest.hovedKravlinjeType,
+    //                             regelverkType = innTrygdetidRequest.regelverkType,
+    //                             uttaksgradListe = innTrygdetidRequest.uttaksgradListe,
+    //                             beregningsvilkarsPeriodeListe =
+    // innTrygdetidRequest.sortedBeregningssvilkarPeriodeListe(),
+    //                             redusertFTTUT = innTrygdetidRequest.redusertFTTUT,
+    //                             beregning = null
+    //                         )
+    //                     )
 
-                        /**
-                         * Utled regelverkstype hvis ikke satt i request.
-                         * Default er G_REG.
-                         */
-                        if (trygdetidParametere.grunnlag?.regelverkType == null
-                            && trygdetidParametere.grunnlag?.bruker != null
-                            && trygdetidParametere.grunnlag?.ytelseType != null) {
-                            trygdetidParametere.grunnlag!!.regelverkType = utledRegelverkstype(
-                                trygdetidParametere.grunnlag?.bruker!!,
-                                trygdetidParametere.grunnlag?.ytelseType!!
-                            )
-                        }
+    //                     /**
+    //                      * Utled regelverkstype hvis ikke satt i request.
+    //                      * Default er G_REG.
+    //                      */
+    //                     if (trygdetidParametere.grunnlag?.regelverkType == null
+    //                         && trygdetidParametere.grunnlag?.bruker != null
+    //                         && trygdetidParametere.grunnlag?.ytelseType != null) {
+    //                         trygdetidParametere.grunnlag!!.regelverkType = utledRegelverkstype(
+    //                             trygdetidParametere.grunnlag?.bruker!!,
+    //                             trygdetidParametere.grunnlag?.ytelseType!!
+    //                         )
+    //                     }
 
-                        trygdetidParametere.resultat = TrygdetidResultat(pakkseddel = Pakkseddel())
+    //                     trygdetidParametere.resultat = TrygdetidResultat(pakkseddel =
+    // Pakkseddel())
 
-                        // Kjør reglene
-                        StartTrygdetidFlyt(trygdetidParametere).run(this)
+    //                     // Kjør reglene
+    //                     StartTrygdetidFlyt(trygdetidParametere).run(this)
 
-                        /**
-                         * Test
-                         * Klargjør respons fra resultatet av reglene.
-                         */
-                        TrygdetidResponse(
-                            trygdetid = trygdetidParametere.resultat?.trygdetid,
-                            trygdetidAlternativ = trygdetidParametere.resultat?.trygdetidAlternativ,
-                            trygdetidKapittel20 = trygdetidParametere.resultat?.trygdetidKapittel20,
-                            pakkseddel = trygdetidParametere.resultat?.pakkseddel!!
-                        )
-                    }
-                }
-               """.trimIndent()
-                )
+    //                     /**
+    //                      * Test
+    //                      * Klargjør respons fra resultatet av reglene.
+    //                      */
+    //                     TrygdetidResponse(
+    //                         trygdetid = trygdetidParametere.resultat?.trygdetid,
+    //                         trygdetidAlternativ =
+    // trygdetidParametere.resultat?.trygdetidAlternativ,
+    //                         trygdetidKapittel20 =
+    // trygdetidParametere.resultat?.trygdetidKapittel20,
+    //                         pakkseddel = trygdetidParametere.resultat?.pakkseddel!!
+    //                     )
+    //                 }
+    //             }
+    //            """.trimIndent()
+    //             )
 
-        analyzeKotlinCode(listOf(testCode, request)).map { ruleServices ->
-            assertEquals(1, ruleServices.count())
-            assertEquals(4, ruleServices.first().flyt.elementer.count())
-        }
-    }
+    //     analyzeKotlinCode(listOf(testCode, request)).map { ruleServices ->
+    //         assertEquals(1, ruleServices.count())
+    //         assertEquals(4, ruleServices.first().flyt.elementer.count())
+    //     }
+    // }
 }

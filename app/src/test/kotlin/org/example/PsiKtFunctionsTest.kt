@@ -56,7 +56,7 @@ class PsiKtFunctionsTest {
                 )
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassOfSuperType(::isRuleServiceClass).map { assert(true) }.onFailure {
+            ktFile.getClassOfSuperType(KtClass::isRuleServiceClass).map { assert(true) }.onFailure {
                 assert(false)
             }
         }
@@ -71,9 +71,9 @@ class PsiKtFunctionsTest {
         """.trimIndent())
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassOfSuperType(::isRuleServiceClass).map { assert(false) }.onFailure {
-                assert(it is NoSuchElementException)
-            }
+            ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+                    .map { assert(false) }
+                    .onFailure { assert(it is NoSuchElementException) }
         }
     }
 
@@ -85,9 +85,9 @@ class PsiKtFunctionsTest {
         """.trimIndent())
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassOfSuperType(::isRuleServiceClass).map { assert(false) }.onFailure {
-                assert(it is NoSuchElementException)
-            }
+            ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+                    .map { assert(false) }
+                    .onFailure { assert(it is NoSuchElementException) }
         }
     }
 
@@ -109,7 +109,7 @@ class PsiKtFunctionsTest {
                 )
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassOfSuperType(::isRuleServiceClass)
+            ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
                     .map {
                         val expected = listOf(doc1, doc2).joinToString("\n").trim()
                         assertEquals(expected, it.getKDocOrEmpty())
@@ -129,7 +129,7 @@ class PsiKtFunctionsTest {
                 )
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassOfSuperType(::isRuleServiceClass)
+            ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
                     .map { it.getKDocOrEmpty().isEmpty() }
                     .onFailure { assert(false) }
         }
