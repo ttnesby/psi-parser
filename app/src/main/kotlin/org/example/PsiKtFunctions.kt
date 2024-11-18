@@ -1,6 +1,7 @@
 package org.example
 
 import java.util.Optional
+import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtParameter
@@ -34,18 +35,7 @@ fun KtClass.isServiceResponseClass(): Boolean = isSubTypeOf("ServiceResponse")
 private fun KtClass.isSubTypeOf(simpleName: String): Boolean =
         getSuperTypeListEntries().any { it.typeReference?.text?.contains(simpleName) == true }
 
-/** Get the KDoc from a class */
-fun KtClass.getKDocOrEmpty(): String =
-        docComment?.text?.let { kdoc ->
-            kdoc.lines()
-                    .map { it.trim().removePrefix("*").trim() }
-                    .filter { it.isNotEmpty() && it != "/" } // Add filter for lone "/"
-                    .joinToString("\n")
-                    .removePrefix("/**")
-                    .removeSuffix("*/")
-                    .trim()
-        }
-                ?: ""
+fun KtClass.getKDocOrEmpty(): String = docComment?.getOrEmpty() ?: ""
 
 fun KtClass.getServiceResponseClass(bindingContext: BindingContext): Result<KtClass> = runCatching {
     getSuperTypeListEntries()
@@ -59,6 +49,21 @@ fun KtClass.getServiceResponseClass(bindingContext: BindingContext): Result<KtCl
             ?: throw NoSuchElementException("No ServiceResponse type found")
 }
 
+/** KDoc extension functions */
+//
+
+fun KDoc.getOrEmpty(): String =
+        text?.let { text ->
+            text.lines()
+                    .map { it.trim().removePrefix("*").trim() }
+                    .filter { it.isNotEmpty() && it != "/" } // Add filter for lone "/"
+                    .joinToString("\n")
+                    .removePrefix("/**")
+                    .removeSuffix("*/")
+                    .trim()
+        }
+                ?: ""
+
 /** KtParameter extension functions */
 //
 
@@ -71,6 +76,8 @@ fun KtParameter.getServiceRequestClass(bindingContext: BindingContext): Optional
                     }
                     .getOrElse { Optional.empty() }
         }
+
+fun KtParameter.getKDocOrEmpty(): String = docComment?.getOrEmpty() ?: ""
 
 /** KtTypeReference extension functions */
 //

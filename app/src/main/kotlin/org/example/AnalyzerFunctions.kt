@@ -75,7 +75,7 @@ private fun extractTypeProperties(
             PropertyDoc(
                     navn = param.name ?: "",
                     type = param.typeReference?.text ?: "Unknown",
-                    beskrivelse = param.docComment?.text ?: ""
+                    beskrivelse = param.getKDocOrEmpty()
             )
         }
                 ?: emptyList()
