@@ -8,6 +8,12 @@ import org.jetbrains.kotlin.psi.KtTypeReference
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 
+const val SERVICE_REQUEST_CLASS_NAME = "ServiceRequest"
+const val SERVICE_RESPONSE_CLASS_NAME = "ServiceResponse"
+const val RULE_SERVICE_CLASS_NAME = "AbstractPensjonRuleService"
+const val RULE_FLOW_CLASS_NAME = "AbstractPensjonRuleflow"
+const val RULE_SET_CLASS_NAME = "AbstractPensjonRuleSet"
+
 /** KtFile extension functions */
 //
 
@@ -21,15 +27,15 @@ fun KtFile.getClassOfSuperType(superTypeRef: (KtClass) -> Boolean): Result<KtCla
 //
 
 // functions to be superTypeRef parameter in KtFile.getClassOfSuperType
-fun KtClass.isRuleServiceClass(): Boolean = isSubTypeOf("AbstractPensjonRuleService")
+fun KtClass.isRuleServiceClass(): Boolean = isSubTypeOf(RULE_SERVICE_CLASS_NAME)
 
-fun KtClass.isRuleFlowClass(): Boolean = isSubTypeOf("AbstractPensjonRuleflow")
+fun KtClass.isRuleFlowClass(): Boolean = isSubTypeOf(RULE_FLOW_CLASS_NAME)
 
-fun KtClass.isRuleSetClass(): Boolean = isSubTypeOf("AbstractPensjonRuleSet")
+fun KtClass.isRuleSetClass(): Boolean = isSubTypeOf(RULE_SET_CLASS_NAME)
 
-fun KtClass.isServiceRequestClass(): Boolean = isSubTypeOf("ServiceRequest")
+fun KtClass.isServiceRequestClass(): Boolean = isSubTypeOf(SERVICE_REQUEST_CLASS_NAME)
 
-fun KtClass.isServiceResponseClass(): Boolean = isSubTypeOf("ServiceResponse")
+fun KtClass.isServiceResponseClass(): Boolean = isSubTypeOf(SERVICE_RESPONSE_CLASS_NAME)
 
 private fun KtClass.isSubTypeOf(simpleName: String): Boolean =
         getSuperTypeListEntries().any { it.typeReference?.text?.contains(simpleName) == true }
@@ -56,16 +62,31 @@ fun KtClass.getServiceRequestInfo(bindingContext: BindingContext): Result<Servic
             parameter
         }
 
-fun KtClass.getServiceResponseClass(bindingContext: BindingContext): Result<KtClass> = runCatching {
+fun KtClass.getServiceResponseClass(bindingContext: BindingContext): Result<KtClass> =
+        getClassOfSuperTypeParam(
+                supertype = RULE_SERVICE_CLASS_NAME,
+                classTypeRef = KtClass::isServiceResponseClass,
+                bindingContext = bindingContext
+        )
+
+private fun KtClass.getClassOfSuperTypeParam(
+        supertype: String, // e.g., "AbstractPensjonRuleService"
+        classTypeRef: (KtClass) -> Boolean, // e.g., KtClass::isServiceResponseClass
+        bindingContext: BindingContext
+): Result<KtClass> = runCatching {
     getSuperTypeListEntries()
-            .find { it.typeReference?.text?.contains("AbstractPensjonRuleService") == true }
+            .find { it.typeReference?.text?.contains(supertype) == true }
             ?.typeReference
             ?.typeElement
             ?.typeArgumentsAsTypes
             ?.getOrNull(0)
-            ?.getServiceResponseClass(bindingContext)
+            ?.resolveToKtClass(bindingContext)
+            ?.map { resolvedClass ->
+                if (classTypeRef(resolvedClass)) resolvedClass
+                else throw NoSuchElementException("Class is not of expected type")
+            }
             ?.getOrThrow()
-            ?: throw NoSuchElementException("No ServiceResponse type found")
+            ?: throw NoSuchElementException("No type parameter found for $supertype")
 }
 
 /** KDoc extension functions */
@@ -110,10 +131,4 @@ fun KtTypeReference.resolveToKtClass(bindingContext: BindingContext): Result<KtC
                 DescriptorToSourceUtils.getSourceFromDescriptor(it) as? KtClass
             }
                     ?: throw NoSuchElementException("Could not resolve type reference to KtClass")
-        }
-
-fun KtTypeReference.getServiceResponseClass(bindingContext: BindingContext): Result<KtClass> =
-        resolveToKtClass(bindingContext).map { resolvedClass ->
-            if (resolvedClass.isServiceResponseClass()) resolvedClass
-            else throw NoSuchElementException("Class is not a ServiceResponse")
         }

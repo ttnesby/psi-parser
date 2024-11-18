@@ -59,7 +59,7 @@ fun getResponseFields(ktClass: KtClass, bindingContext: BindingContext): List<Pr
                                 PropertyDoc.new(
                                         serviceResponseClass.name!!,
                                         serviceResponseClass.name!!,
-                                        ""
+                                        "Response for ${ktClass.name}"
                                 )
                         )
                         addAll(
