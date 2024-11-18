@@ -166,7 +166,7 @@ class PsiKtFunctionsTest {
     }
 
     @Test
-    @DisplayName("Should get ServiceResponse class from RuleService KtClass")
+    @DisplayName("Should get ServiceResponse class for RuleService KtClass")
     fun testGetResponseClassFromRuleServiceClass() {
         val respType = "AResponse"
         val code =
@@ -187,6 +187,32 @@ class PsiKtFunctionsTest {
                                         assertEquals(respType, responseClass.name)
                                     }
                                     .onFailure { assert(false) }
+                        }
+                        .onFailure { assert(false) }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Should handle no ServiceResponse class for RuleService KtClass")
+    fun testGetResponseClassFromRuleServiceClassError() {
+        val respType = "AResponse"
+        val code =
+                SourceCode(
+                        """
+            class $respType() : SomeThingElse() {}
+            class Test() : AbstractPensjonRuleService<$respType> {}
+        """.trimIndent()
+                )
+
+        analyzeKotlinCode(code).let { ktFile ->
+            getBindingContext(listOf(ktFile), context).map { bindingContext ->
+                ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+                        .map { ruleService ->
+                            ruleService
+                                    .getServiceResponseClass(bindingContext)
+                                    .map { _ -> assert(false) }
+                                    .onFailure { assert(it is NoSuchElementException) }
                         }
                         .onFailure { assert(false) }
             }
