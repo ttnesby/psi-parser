@@ -60,11 +60,6 @@ private fun extractParameterAndProperties(
     addAll(extractTypeProperties(resolvedClass, bindingContext))
 }
 
-private fun isServiceRequestClass(klass: KtClass): Boolean =
-        klass.getSuperTypeListEntries().any {
-            it.typeReference?.text?.contains("ServiceRequest") == true
-        }
-
 private fun createParameterDoc(parameter: KtParameter, ktClass: KtClass): PropertyDoc =
         PropertyDoc(
                 navn = parameter.name ?: "",
