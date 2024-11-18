@@ -111,11 +111,13 @@ class PsiKtFunctionsTest {
     @Test
     @DisplayName("Should get ServiceRequestInfo data class from RuleService KtClass")
     fun testGetRequestClassFromRuleServiceClass() {
+        val reqName = "req"
+        val reqType = "ARequest"
         val code =
                 SourceCode(
                         """
             class ARequest() : ServiceRequest {}
-            class Test(val req: ARequest) : AbstractPensjonRuleService {}
+            class Test(val $reqName: $reqType) : AbstractPensjonRuleService {}
         """.trimIndent()
                 )
 
@@ -126,10 +128,37 @@ class PsiKtFunctionsTest {
                             ruleService
                                     .getServiceRequestInfo(bindingContext)
                                     .map { (param, requestClass) ->
-                                        assertEquals("req", param.name)
-                                        assertEquals("ARequest", requestClass.name)
+                                        assertEquals(reqName, param.name)
+                                        assertEquals(reqType, requestClass.name)
                                     }
                                     .onFailure { assert(false) }
+                        }
+                        .onFailure { assert(false) }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Should handle no ServiceRequestInfo data class from RuleService KtClass")
+    fun testGetRequestClassFromRuleServiceClassError() {
+        val reqName = "req"
+        val reqType = "ARequest"
+        val code =
+                SourceCode(
+                        """
+            class ARequest() : SomethingElse() {}
+            class Test(val $reqName: $reqType) : AbstractPensjonRuleService {}
+        """.trimIndent()
+                )
+
+        analyzeKotlinCode(code).let { ktFile ->
+            getBindingContext(listOf(ktFile), context).map { bindingContext ->
+                ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+                        .map { ruleService ->
+                            ruleService
+                                    .getServiceRequestInfo(bindingContext)
+                                    .map { (_, _) -> assert(false) }
+                                    .onFailure { assert(it is NoSuchElementException) }
                         }
                         .onFailure { assert(false) }
             }

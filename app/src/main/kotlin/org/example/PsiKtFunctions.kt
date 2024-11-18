@@ -8,12 +8,6 @@ import org.jetbrains.kotlin.psi.KtTypeReference
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 
-// const val SERVICE_REQUEST_CLASS_NAME = "ServiceRequest"
-// const val SERVICE_RESPONSE_CLASS_NAME = "ServiceResponse"
-// const val RULE_SERVICE_CLASS_NAME = "AbstractPensjonRuleService"
-// const val RULE_FLOW_CLASS_NAME = "AbstractPensjonRuleflow"
-// const val RULE_SET_CLASS_NAME = "AbstractPensjonRuleSet"
-
 enum class RuleSuperType(val className: String) {
     SERVICE_REQUEST("ServiceRequest"),
     SERVICE_RESPONSE("ServiceResponse"),
