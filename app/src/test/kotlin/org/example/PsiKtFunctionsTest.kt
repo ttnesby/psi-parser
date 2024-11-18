@@ -116,7 +116,7 @@ class PsiKtFunctionsTest {
         val code =
                 SourceCode(
                         """
-            class ARequest() : ServiceRequest {}
+            class $reqType() : ServiceRequest {}
             class Test(val $reqName: $reqType) : AbstractPensjonRuleService {}
         """.trimIndent()
                 )
@@ -146,7 +146,7 @@ class PsiKtFunctionsTest {
         val code =
                 SourceCode(
                         """
-            class ARequest() : SomethingElse() {}
+            class $reqType() : SomethingElse() {}
             class Test(val $reqName: $reqType) : AbstractPensjonRuleService {}
         """.trimIndent()
                 )
@@ -260,6 +260,64 @@ class PsiKtFunctionsTest {
             ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
                     .map { it.getKDocOrEmpty().isEmpty() }
                     .onFailure { assert(false) }
+        }
+    }
+
+    @Test
+    @DisplayName("Should extract KDoc in ServiceRequest primary constructor")
+    fun testKDocFromRequestPrimaryConstructor() {
+        val reqName = "req"
+        val reqType = "ARequest"
+        val code =
+                SourceCode(
+                        """
+            class $reqType(
+                /**
+                * Virkningstidspunktets fom. for �nsket ytelse.
+                */
+                var virkFom: Date? = null,
+
+                /**
+                * Tom for trygdetiden som skal beregnes. Kun for AP2011, AP2016 og AP2025.
+                */
+                var virkTom: Date? = null
+            ) : ServiceRequest {}
+
+            class Test(val $reqName: $reqType) : AbstractPensjonRuleService {}
+        """.trimIndent()
+                )
+
+        analyzeKotlinCode(code).let { ktFile ->
+            getBindingContext(listOf(ktFile), context).map { bindingContext ->
+                ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+                        .map { ruleService ->
+                            ruleService
+                                    .getServiceRequestInfo(bindingContext)
+                                    .map { (_, requestClass) ->
+                                        assertEquals(reqType, requestClass.name)
+                                        requestClass.primaryConstructor?.let { primaryConstructor ->
+                                            primaryConstructor.valueParameters.forEach { param ->
+                                                when (param.name) {
+                                                    "virkFom" ->
+                                                            assertEquals(
+                                                                    "Virkningstidspunktets fom. for �nsket ytelse.",
+                                                                    param.getKDocOrEmpty()
+                                                            )
+                                                    "virkTom" ->
+                                                            assertEquals(
+                                                                    "Tom for trygdetiden som skal beregnes. Kun for AP2011, AP2016 og AP2025.",
+                                                                    param.getKDocOrEmpty()
+                                                            )
+                                                    else -> assert(false)
+                                                }
+                                            }
+                                        }
+                                                ?: assert(false)
+                                    }
+                                    .onFailure { assert(false) }
+                        }
+                        .onFailure { assert(false) }
+            }
         }
     }
 }
