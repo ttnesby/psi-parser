@@ -5,6 +5,8 @@ import java.net.URI
 import org.jetbrains.kotlin.cli.jvm.compiler.*
 import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.psi.KtClass
+import org.jetbrains.kotlin.psi.KtParameter
 
 // data class for rule service documentation, see AbstractPensjonRuleService
 data class RuleServiceDoc(
@@ -34,6 +36,35 @@ data class PropertyDoc(
         val type: String,
         val beskrivelse: String,
 ) {
+
+    companion object {
+        fun new(navn: String, type: String, beskrivelse: String): PropertyDoc =
+                PropertyDoc(navn, type, beskrivelse)
+
+        fun fromParameter(parameter: KtParameter, ktClass: KtClass): PropertyDoc =
+                PropertyDoc(
+                        navn = parameter.name ?: "",
+                        type = parameter.typeReference?.text ?: "Unknown",
+                        beskrivelse = "Parameter of ${ktClass.name}"
+                )
+
+        fun fromPrimaryConstructor(constructor: KtPrimaryConstructor): List<PropertyDoc> =
+                constructor.valueParameters.map { param ->
+                    PropertyDoc(
+                            navn = param.name ?: "",
+                            type = param.typeReference?.text ?: "Unknown",
+                            beskrivelse = param.getKDocOrEmpty()
+                    )
+                }
+
+        // fun fromProperty(property: KtProperty): PropertyDoc =
+        //         PropertyDoc(
+        //                 navn = property.name ?: "",
+        //                 type = property.typeReference?.text ?: "Unknown",
+        //                 beskrivelse = property.docComment?.text ?: ""
+        //         )
+    }
+
     override fun toString(): String {
         return """
                 |PropertyDoc(

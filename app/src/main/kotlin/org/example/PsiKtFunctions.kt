@@ -36,10 +36,9 @@ private fun KtClass.isSubTypeOf(simpleName: String): Boolean =
 
 fun KtClass.getKDocOrEmpty(): String = docComment?.getOrEmpty() ?: ""
 
-// ServiceRequestInfo is a data class that holds a parameter and its resolved class
 data class ServiceRequestInfo(val parameter: KtParameter, val resolvedClass: KtClass)
 
-fun KtClass.getServiceRequest(bindingContext: BindingContext): Result<ServiceRequestInfo> =
+fun KtClass.getServiceRequestInfo(bindingContext: BindingContext): Result<ServiceRequestInfo> =
         runCatching {
             val parameter =
                     primaryConstructor?.valueParameters?.firstNotNullOfOrNull { parameter ->

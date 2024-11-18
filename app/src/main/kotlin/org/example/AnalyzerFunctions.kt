@@ -31,71 +31,46 @@ private fun newRuleServiceDoc(
                 navn = klass.name ?: "anonymous",
                 beskrivelse = klass.getKDocOrEmpty(),
                 inndata = getRequestFields(klass, bindingContext),
-                utdata = analyzeResponseFields(klass, bindingContext),
+                utdata = getResponseFields(klass, bindingContext),
                 // flyt = analyzeRuleServiceMethod(klass, bindingContext),
                 gitHubUri = URI("$filePath")
         )
 
 fun getRequestFields(ktClass: KtClass, bindingContext: BindingContext): List<PropertyDoc> =
-        ktClass.getServiceRequest(bindingContext)
+        ktClass.getServiceRequestInfo(bindingContext)
                 .map { (parameter, serviceRequestClass) ->
                     buildList {
-                        add(createParameterDoc(parameter, ktClass))
-                        addAll(extractTypeProperties(serviceRequestClass, bindingContext))
+                        add(PropertyDoc.fromParameter(parameter, ktClass))
+                        addAll(
+                                serviceRequestClass.primaryConstructor?.let {
+                                    PropertyDoc.fromPrimaryConstructor(it)
+                                }
+                                        ?: emptyList()
+                        )
                     }
                 }
                 .getOrDefault(emptyList())
 
-private fun createParameterDoc(parameter: KtParameter, ktClass: KtClass): PropertyDoc =
-        PropertyDoc(
-                navn = parameter.name ?: "",
-                type = parameter.typeReference?.text ?: "Unknown",
-                beskrivelse = "Parameter of ${ktClass.name}"
-        )
-
-private fun extractTypeProperties(
-        declaration: KtClass,
-        _bindingContext: BindingContext // in case of recursvity of custom types
-): List<PropertyDoc> =
-        declaration.primaryConstructor?.valueParameters?.map { param ->
-            PropertyDoc(
-                    navn = param.name ?: "",
-                    type = param.typeReference?.text ?: "Unknown",
-                    beskrivelse = param.getKDocOrEmpty()
-            )
-        }
-                ?: emptyList()
-
-private fun createPropertyDoc(property: KtProperty): PropertyDoc =
-        PropertyDoc(
-                navn = property.name ?: "",
-                type = property.typeReference?.text ?: "Unknown",
-                beskrivelse = property.docComment?.text ?: ""
-        )
-
-// Response fields analysis
-fun analyzeResponseFields(ktClass: KtClass, bindingContext: BindingContext): List<PropertyDoc> =
+fun getResponseFields(ktClass: KtClass, bindingContext: BindingContext): List<PropertyDoc> =
         ktClass.getServiceResponseClass(bindingContext)
-                .map { resolvedClass ->
-                    extractResponseProperties(resolvedClass, ktClass, bindingContext)
+                .map { serviceResponseClass ->
+                    buildList {
+                        add(
+                                PropertyDoc.new(
+                                        serviceResponseClass.name!!,
+                                        serviceResponseClass.name!!,
+                                        ""
+                                )
+                        )
+                        addAll(
+                                serviceResponseClass.primaryConstructor?.let {
+                                    PropertyDoc.fromPrimaryConstructor(it)
+                                }
+                                        ?: emptyList()
+                        )
+                    }
                 }
-                .getOrDefault(emptyList()) // or handle error case differently if needed
-
-private fun extractResponseProperties(
-        resolvedClass: KtClass,
-        ktClass: KtClass,
-        bindingContext: BindingContext
-): List<PropertyDoc> = buildList {
-    add(createResponseClassDoc(resolvedClass, ktClass))
-    addAll(extractTypeProperties(resolvedClass, bindingContext))
-}
-
-private fun createResponseClassDoc(resolvedClass: KtClass, ktClass: KtClass): PropertyDoc =
-        PropertyDoc(
-                navn = resolvedClass.name ?: "",
-                type = resolvedClass.name ?: "Unknown",
-                beskrivelse = resolvedClass.getKDocOrEmpty()
-        )
+                .getOrDefault(emptyList())
 
 // fun analyzeRuleServiceMethod(ktClass: KtClass, bindingContext: BindingContext): FlowElement.Flow
 // {

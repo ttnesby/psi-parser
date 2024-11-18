@@ -109,7 +109,7 @@ class PsiKtFunctionsTest {
     }
 
     @Test
-    @DisplayName("Should get ServiceRequest KtClass from RuleService KtClass")
+    @DisplayName("Should get ServiceRequestInfo data class from RuleService KtClass")
     fun testGetRequestClassFromRuleServiceClass() {
         val code =
                 SourceCode(
@@ -124,7 +124,7 @@ class PsiKtFunctionsTest {
                 ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
                         .map { ruleService ->
                             ruleService
-                                    .getServiceRequest(bindingContext)
+                                    .getServiceRequestInfo(bindingContext)
                                     .map { (param, requestClass) ->
                                         assertEquals("req", param.name)
                                         assertEquals("ARequest", requestClass.name)
