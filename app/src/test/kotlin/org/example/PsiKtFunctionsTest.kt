@@ -166,6 +166,34 @@ class PsiKtFunctionsTest {
     }
 
     @Test
+    @DisplayName("Should get ServiceResponse class from RuleService KtClass")
+    fun testGetResponseClassFromRuleServiceClass() {
+        val respType = "AResponse"
+        val code =
+                SourceCode(
+                        """
+            class $respType() : ServiceResponse() {}
+            class Test() : AbstractPensjonRuleService<$respType> {}
+        """.trimIndent()
+                )
+
+        analyzeKotlinCode(code).let { ktFile ->
+            getBindingContext(listOf(ktFile), context).map { bindingContext ->
+                ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+                        .map { ruleService ->
+                            ruleService
+                                    .getServiceResponseClass(bindingContext)
+                                    .map { responseClass ->
+                                        assertEquals(respType, responseClass.name)
+                                    }
+                                    .onFailure { assert(false) }
+                        }
+                        .onFailure { assert(false) }
+            }
+        }
+    }
+
+    @Test
     @DisplayName("Should extract KDoc from relevant KtClass")
     fun testExtractKDoc() {
         val doc1 = "Some documentation line 1"
