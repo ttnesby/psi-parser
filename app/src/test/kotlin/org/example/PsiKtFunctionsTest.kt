@@ -46,8 +46,8 @@ class PsiKtFunctionsTest {
     }
 
     @Test
-    @DisplayName("Should extract correct KtClass from KtFile")
-    fun testExtractKtClass() {
+    @DisplayName("Should extract RuleService KtClass from KtFile")
+    fun testExtractRuleServiceKtClass() {
         val code =
                 SourceCode(
                         """
@@ -57,6 +57,23 @@ class PsiKtFunctionsTest {
 
         analyzeKotlinCode(code).let { ktFile ->
             ktFile.getClassOfSuperType(KtClass::isRuleServiceClass).map { assert(true) }.onFailure {
+                assert(false)
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Should extract RuleFlow KtClass from KtFile")
+    fun testExtractRuleFlowKtClass() {
+        val code =
+                SourceCode(
+                        """
+            class Test() : AbstractPensjonRuleflow {}
+        """.trimIndent()
+                )
+
+        analyzeKotlinCode(code).let { ktFile ->
+            ktFile.getClassOfSuperType(KtClass::isRuleFlowClass).map { assert(true) }.onFailure {
                 assert(false)
             }
         }
@@ -92,7 +109,34 @@ class PsiKtFunctionsTest {
     }
 
     @Test
-    @DisplayName("Should extract KDoc from KtClass")
+    @DisplayName("Should get ServiceRequest KtClass from RuleService KtClass")
+    fun testGetRequestClassFromRuleServiceClass() {
+        val code =
+                SourceCode(
+                        """
+            class ARequest() : ServiceRequest {}
+            class Test(val req: ARequest) : AbstractPensjonRuleService {}
+        """.trimIndent()
+                )
+
+        analyzeKotlinCode(code).let { ktFile ->
+            getBindingContext(listOf(ktFile), context).map { bindingContext ->
+                ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+                        .map { ruleService ->
+                            ruleService
+                                    .getServiceRequest(bindingContext)
+                                    .map { requestClass ->
+                                        assertEquals("ARequest", requestClass.name)
+                                    }
+                                    .onFailure { assert(false) }
+                        }
+                        .onFailure { assert(false) }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("Should extract KDoc from relevant KtClass")
     fun testExtractKDoc() {
         val doc1 = "Some documentation line 1"
         val doc2 = "Some documentation line 2"
@@ -119,7 +163,7 @@ class PsiKtFunctionsTest {
     }
 
     @Test
-    @DisplayName("Should handle no KDoc for KtClass")
+    @DisplayName("Should handle no KDoc for relevant KtClass")
     fun testExtractKDocEmpty() {
         val code =
                 SourceCode(

@@ -1,6 +1,5 @@
 package org.example
 
-import java.util.Optional
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
@@ -37,6 +36,13 @@ private fun KtClass.isSubTypeOf(simpleName: String): Boolean =
 
 fun KtClass.getKDocOrEmpty(): String = docComment?.getOrEmpty() ?: ""
 
+fun KtClass.getServiceRequest(bindingContext: BindingContext): Result<KtClass> = runCatching {
+    primaryConstructor?.valueParameters?.firstNotNullOfOrNull { parameter ->
+        parameter.getServiceRequestClass(bindingContext).getOrNull()
+    }
+            ?: throw NoSuchElementException("No ServiceRequest type found")
+}
+
 fun KtClass.getServiceResponseClass(bindingContext: BindingContext): Result<KtClass> = runCatching {
     getSuperTypeListEntries()
             .find { it.typeReference?.text?.contains("AbstractPensjonRuleService") == true }
@@ -67,14 +73,17 @@ fun KDoc.getOrEmpty(): String =
 /** KtParameter extension functions */
 //
 
-fun KtParameter.getServiceRequestClass(bindingContext: BindingContext): Optional<KtClass> =
-        Optional.ofNullable(typeReference).flatMap { typeRef ->
-            typeRef.resolveToKtClass(bindingContext)
-                    .map { resolvedClass ->
-                        if (resolvedClass.isServiceRequestClass()) Optional.of(resolvedClass)
-                        else Optional.empty()
-                    }
-                    .getOrElse { Optional.empty() }
+fun KtParameter.getServiceRequestClass(bindingContext: BindingContext): Result<KtClass> =
+        runCatching {
+            typeReference?.let { typeRef ->
+                typeRef.resolveToKtClass(bindingContext)
+                        .map { resolvedClass ->
+                            if (resolvedClass.isServiceRequestClass()) resolvedClass
+                            else throw NoSuchElementException("Class is not a ServiceRequest")
+                        }
+                        .getOrThrow()
+            }
+                    ?: throw NoSuchElementException("No type reference found")
         }
 
 fun KtParameter.getKDocOrEmpty(): String = docComment?.getOrEmpty() ?: ""

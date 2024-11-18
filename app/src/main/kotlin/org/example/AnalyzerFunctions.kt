@@ -10,19 +10,19 @@ fun analyzeSourceFilesForRuleServices(
         bindingContext: BindingContext
 ): List<RuleServiceDoc> =
         sourceFiles.chunked(100).flatMap { batch ->
-            batch.flatMap { file ->
-                analyzeRuleService(file, bindingContext).also {
+            batch.mapNotNull { file ->
+                getRuleService(file, bindingContext).getOrNull().also {
                     (file as PsiFileImpl).clearCaches()
                 }
             }
         }
 
-fun analyzeRuleService(ktFile: KtFile, bindingContext: BindingContext): List<RuleServiceDoc> =
-        ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
-                .map { klass -> listOf(createRuleServiceDoc(klass, bindingContext, ktFile.name)) }
-                .getOrDefault(emptyList())
+fun getRuleService(ktFile: KtFile, bindingContext: BindingContext): Result<RuleServiceDoc> =
+        ktFile.getClassOfSuperType(KtClass::isRuleServiceClass).map { klass ->
+            newRuleServiceDoc(klass, bindingContext, ktFile.name)
+        }
 
-private fun createRuleServiceDoc(
+private fun newRuleServiceDoc(
         klass: KtClass,
         bindingContext: BindingContext,
         filePath: String
@@ -30,35 +30,28 @@ private fun createRuleServiceDoc(
         RuleServiceDoc(
                 navn = klass.name ?: "anonymous",
                 beskrivelse = klass.getKDocOrEmpty(),
-                inndata = analyzeRequestFields(klass, bindingContext),
+                inndata = getRequestFields(klass, bindingContext),
                 utdata = analyzeResponseFields(klass, bindingContext),
                 // flyt = analyzeRuleServiceMethod(klass, bindingContext),
                 gitHubUri = URI("$filePath")
         )
 
 // Request fields analysis
-fun analyzeRequestFields(ktClass: KtClass, bindingContext: BindingContext): List<PropertyDoc> =
+fun getRequestFields(ktClass: KtClass, bindingContext: BindingContext): List<PropertyDoc> =
         ktClass.primaryConstructor?.valueParameters
                 ?.mapNotNull { parameter ->
                     parameter
                             .getServiceRequestClass(bindingContext)
                             .map { resolvedClass -> parameter to resolvedClass }
-                            .orElse(null)
+                            .getOrNull()
                 }
                 ?.flatMap { (parameter, resolvedClass) ->
-                    extractParameterAndProperties(parameter, resolvedClass, ktClass, bindingContext)
+                    buildList {
+                        add(createParameterDoc(parameter, ktClass))
+                        addAll(extractTypeProperties(resolvedClass, bindingContext))
+                    }
                 }
                 ?: emptyList()
-
-private fun extractParameterAndProperties(
-        parameter: KtParameter,
-        resolvedClass: KtClass,
-        ktClass: KtClass,
-        bindingContext: BindingContext
-): List<PropertyDoc> = buildList {
-    add(createParameterDoc(parameter, ktClass))
-    addAll(extractTypeProperties(resolvedClass, bindingContext))
-}
 
 private fun createParameterDoc(parameter: KtParameter, ktClass: KtClass): PropertyDoc =
         PropertyDoc(
