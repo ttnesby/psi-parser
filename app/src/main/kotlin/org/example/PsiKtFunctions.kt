@@ -49,7 +49,7 @@ fun KtClass.getServiceRequestInfo(bindingContext: BindingContext): Result<Servic
             val parameter =
                     primaryConstructor?.valueParameters?.firstNotNullOfOrNull { parameter ->
                         parameter
-                                .getServiceRequestClass(bindingContext)
+                                .getClassOfSuperType(KtClass::isServiceRequestClass, bindingContext)
                                 .map { resolvedClass ->
                                     ServiceRequestInfo(parameter, resolvedClass)
                                 }
@@ -107,25 +107,27 @@ fun KDoc.getOrEmpty(): String =
 /** KtParameter extension functions */
 //
 
-fun KtParameter.getServiceRequestClass(bindingContext: BindingContext): Result<KtClass> =
-        runCatching {
-            typeReference?.let { typeRef ->
-                typeRef.resolveToKtClass(bindingContext)
-                        .map { resolvedClass ->
-                            if (resolvedClass.isServiceRequestClass()) resolvedClass
-                            else throw NoSuchElementException("Class is not a ServiceRequest")
-                        }
-                        .getOrThrow()
-            }
-                    ?: throw NoSuchElementException("No type reference found")
-        }
+private fun KtParameter.getClassOfSuperType(
+        superTypeRef: (KtClass) -> Boolean,
+        bindingContext: BindingContext
+): Result<KtClass> = runCatching {
+    typeReference?.let { typeRef ->
+        typeRef.resolveToKtClass(bindingContext)
+                .map { resolvedClass ->
+                    if (superTypeRef(resolvedClass)) resolvedClass
+                    else throw NoSuchElementException("Class is not a ServiceRequest")
+                }
+                .getOrThrow()
+    }
+            ?: throw NoSuchElementException("No type reference found")
+}
 
 fun KtParameter.getKDocOrEmpty(): String = docComment?.getOrEmpty() ?: ""
 
 /** KtTypeReference extension functions */
 //
 
-fun KtTypeReference.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> =
+private fun KtTypeReference.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> =
         runCatching {
             bindingContext.get(BindingContext.TYPE, this)?.constructor?.declarationDescriptor?.let {
                 DescriptorToSourceUtils.getSourceFromDescriptor(it) as? KtClass
