@@ -36,12 +36,26 @@ private fun KtClass.isSubTypeOf(simpleName: String): Boolean =
 
 fun KtClass.getKDocOrEmpty(): String = docComment?.getOrEmpty() ?: ""
 
-fun KtClass.getServiceRequest(bindingContext: BindingContext): Result<KtClass> = runCatching {
-    primaryConstructor?.valueParameters?.firstNotNullOfOrNull { parameter ->
-        parameter.getServiceRequestClass(bindingContext).getOrNull()
-    }
-            ?: throw NoSuchElementException("No ServiceRequest type found")
-}
+// ServiceRequestInfo is a data class that holds a parameter and its resolved class
+data class ServiceRequestInfo(val parameter: KtParameter, val resolvedClass: KtClass)
+
+fun KtClass.getServiceRequest(bindingContext: BindingContext): Result<ServiceRequestInfo> =
+        runCatching {
+            val parameter =
+                    primaryConstructor?.valueParameters?.firstNotNullOfOrNull { parameter ->
+                        parameter
+                                .getServiceRequestClass(bindingContext)
+                                .map { resolvedClass ->
+                                    ServiceRequestInfo(parameter, resolvedClass)
+                                }
+                                .getOrNull()
+                    }
+                            ?: throw NoSuchElementException(
+                                    "No ServiceRequest parameter found in primary constructor"
+                            )
+
+            parameter
+        }
 
 fun KtClass.getServiceResponseClass(bindingContext: BindingContext): Result<KtClass> = runCatching {
     getSuperTypeListEntries()

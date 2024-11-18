@@ -36,22 +36,15 @@ private fun newRuleServiceDoc(
                 gitHubUri = URI("$filePath")
         )
 
-// Request fields analysis
 fun getRequestFields(ktClass: KtClass, bindingContext: BindingContext): List<PropertyDoc> =
-        ktClass.primaryConstructor?.valueParameters
-                ?.mapNotNull { parameter ->
-                    parameter
-                            .getServiceRequestClass(bindingContext)
-                            .map { resolvedClass -> parameter to resolvedClass }
-                            .getOrNull()
-                }
-                ?.flatMap { (parameter, resolvedClass) ->
+        ktClass.getServiceRequest(bindingContext)
+                .map { (parameter, serviceRequestClass) ->
                     buildList {
                         add(createParameterDoc(parameter, ktClass))
-                        addAll(extractTypeProperties(resolvedClass, bindingContext))
+                        addAll(extractTypeProperties(serviceRequestClass, bindingContext))
                     }
                 }
-                ?: emptyList()
+                .getOrDefault(emptyList())
 
 private fun createParameterDoc(parameter: KtParameter, ktClass: KtClass): PropertyDoc =
         PropertyDoc(

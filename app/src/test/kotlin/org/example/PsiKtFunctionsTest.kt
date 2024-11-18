@@ -125,7 +125,8 @@ class PsiKtFunctionsTest {
                         .map { ruleService ->
                             ruleService
                                     .getServiceRequest(bindingContext)
-                                    .map { requestClass ->
+                                    .map { (param, requestClass) ->
+                                        assertEquals("req", param.name)
                                         assertEquals("ARequest", requestClass.name)
                                     }
                                     .onFailure { assert(false) }
