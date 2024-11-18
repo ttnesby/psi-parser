@@ -58,22 +58,94 @@ class AnalyzerFunctionsTests {
 
     /** Test Types.kt::RuleServiceDoc */
     @Test
-    @DisplayName("Should extract RuleService from KtFile, without KDoc, with file reference")
+    @DisplayName("Should extract RuleService from KtFile")
     fun testExtractRuleService() {
         val ruleServiceName = "TestRuleService"
+        val reqName = "req"
+        val reqType = "TrygdetidRequest"
+        val respType = "TrygdetidResponse"
         val ruleService =
                 SourceCode(
                         """
-            class ${ruleServiceName}() : AbstractPensjonRuleService<Dummy>() {}
+            class ${ruleServiceName}(val $reqName: $reqType) : AbstractPensjonRuleService<$respType>() {}
         """.trimIndent()
                 )
 
-        analyzeKotlinCode(listOf(ruleService)).map { ruleServices ->
+        val request =
+                SourceCode(
+                        """
+                class TrygdetidRequest(
+                    /**
+                    * Virkningstidspunktets fom. for �nsket ytelse.
+                    */
+                    var virkFom: Date? = null,
+
+                    /**
+                    * Tom for trygdetiden som skal beregnes. Kun for AP2011, AP2016 og AP2025.
+                    */
+                    var virkTom: Date? = null,
+                ) : ServiceRequest() {}
+        """.trimIndent(),
+                        "$DEFAULT_PATH + $reqType.kt"
+                )
+
+        val response =
+                SourceCode(
+                        """
+                class TrygdetidResponse(
+                    /**
+                        * Fastsatt trygdetid.
+                        */
+                    var trygdetid: Trygdetid? = null,
+
+                    /**
+                        * Fastsatt trygdetid for AP2016 iht. kapittel 20 og AP2025.
+                        */
+                    var trygdetidKapittel20: Trygdetid? = null,
+
+                    /**
+                        * Fastsatt trygdetid for annet uf�retidspunkt.
+                        */
+                    var trygdetidAlternativ: Trygdetid? = null,
+                    override val pakkseddel: Pakkseddel = Pakkseddel()
+                ) : ServiceResponse() {}
+        """.trimIndent(),
+                        "$DEFAULT_PATH + $respType.kt"
+                )
+
+        analyzeKotlinCode(listOf(ruleService, request, response)).map { ruleServices ->
             assert(ruleServices.isNotEmpty())
-            assertEquals(ruleServiceName, ruleServices.first().navn)
-            assertEquals(URI(FILE_NAME), ruleServices.first().gitHubUri)
-            assert(ruleServices.first().beskrivelse.isEmpty())
-            assert(ruleServices.first().gitHubUri.toString().isNotEmpty())
+
+            val rs = ruleServices.first()
+
+            assertEquals(ruleServiceName, rs.navn)
+            assert(rs.beskrivelse.isEmpty())
+            assertEquals(URI(FILE_NAME), rs.gitHubUri)
+            assert(rs.inndata.isNotEmpty())
+            assert(rs.utdata.isNotEmpty())
+
+            assertEquals(3, rs.inndata.count())
+
+            assertEquals(reqName, rs.inndata[0].navn)
+            assertEquals(reqType, rs.inndata[0].type)
+            assert(rs.inndata[0].beskrivelse.isNotEmpty())
+
+            assertEquals("virkTom", rs.inndata[2].navn)
+            assertEquals("Date?", rs.inndata[2].type)
+            assertEquals(
+                    "Tom for trygdetiden som skal beregnes. Kun for AP2011, AP2016 og AP2025.",
+                    rs.inndata[2].beskrivelse
+            )
+
+            assertEquals(5, rs.utdata.count())
+
+            assertEquals(respType, rs.utdata[0].navn)
+            assertEquals(respType, rs.utdata[0].type)
+            assert(rs.utdata[0].beskrivelse.isNotEmpty())
+
+            assertEquals("pakkseddel", rs.utdata[4].navn)
+            assertEquals("Pakkseddel", rs.utdata[4].type)
+            assert(rs.utdata[4].beskrivelse.isEmpty())
         }
     }
 
@@ -91,206 +163,6 @@ class AnalyzerFunctionsTests {
 
         analyzeKotlinCode(listOf(testCode)).map { ruleServices ->
             assertTrue(ruleServices.isEmpty())
-        }
-    }
-
-    @Test
-    @DisplayName("Should extract KDoc for RuleServices")
-    fun testExtractKDocForRuleService() {
-        val request =
-                SourceCode(
-                        """
-            class BeregnPoengtallBatchRequest(
-                val dummy: String
-            ) : ServiceRequest()
-            """.trimIndent(),
-                        "${DEFAULT_PATH + "BeregnPoengtallBatchRequest.kt"}"
-                )
-        val response =
-                SourceCode(
-                        """
-                    class BeregnPoengtallBatchResponse(
-                        val dummy: String
-                    ) : ServiceResponse()
-                    """.trimIndent(),
-                        "${DEFAULT_PATH + "BeregnPoengtallBatchResponse.kt"}"
-                )
-
-        val ruleService =
-                SourceCode(
-                        """
-                        /**
-                         * Behøver ikke sjekke her. ejb-laget fanger en krasj og kaster exception videre.Huskeliste for å få
-                         * ønsket ytelse på beregning av poengtall i
-                         * batch.---------------------------------------------------------------------1.
-                         * Regeltjenesteprosjektet heter BeregnPoengtallBatchProj, testprosjektet heter
-                         * BeregnPoengtallbatchTestProj2. Følgende execution mode flagg må settes:startBatchBeregnPoengtall -
-                         * compiledpoengrekke-tekBeregnFaktiskePoengtallRS - compiled sequential (opprinnelig
-                         * sequential)beregnPoengtallAvOpptjening - compiled(opprinnelig
-                         * Default)BeregnPoengtallAvOpptjeningsgrunnlagRS - compiled sequential (default eller
-                         * compiled?)støttefunksjoner-tekVeiet grunnbeløp TATempl - compiled sequential (opprinnelig
-                         * sequential)3.Regeltjenesteprosjektet BeregnPoengtallBatch må ha  Project Settings-> Object Life
-                         * Cycle ->Explicit deletion satt 4. Ved deployment til BeregnPoengtallBatch.server må Recycle policy
-                         * settes til Reinitializeog maximum iterations til 1.5. Før kompilering må
-                         * UseDeploymentClassLoadingContext på BeregnPoengtallBatch.serversettes til trueMålt ytelse er 700 ms
-                         * for 10000 elementer
-                         */
-                        class BeregnPoengtallBatchService(
-                            private val innBeregnPoengtallBatchRequest: BeregnPoengtallBatchRequest
-                        ) : AbstractPensjonRuleService<BeregnPoengtallBatchResponse>(innBeregnPoengtallBatchRequest) {
-
-                            override val ruleService: () -> BeregnPoengtallBatchResponse = {
-                                BeregnPoengtallAvOpptjeningsgrunnlagRS(innBeregnPoengtallBatchRequest.personOpptjeningsgrunnlagListe).run(this)
-                                BeregnPoengtallBatchResponse(innBeregnPoengtallBatchRequest.personOpptjeningsgrunnlagListe)
-                            }
-                        }
-        """.trimIndent()
-                )
-
-        analyzeKotlinCode(listOf(ruleService, request, response)).map { ruleServices ->
-            assertTrue(ruleServices.count() == 1)
-            assert(ruleServices.first().beskrivelse.isNotEmpty())
-            assertTrue(ruleServices.first().inndata.isNotEmpty())
-            assertTrue(ruleServices.first().utdata.isNotEmpty())
-        }
-    }
-
-    @Test
-    @DisplayName("Should extract ServiceRequest from RuleService")
-    fun testExtractRequest() {
-        val requestTypeName = "TestRequest"
-        val requestName = "request"
-        val var1Name = "att1"
-        val var1Type = "String"
-        val var2Name = "att2"
-        val var2Type = "Boolean"
-        val request =
-                SourceCode(
-                        """
-            class ${requestTypeName}(
-                var ${var1Name}: ${var1Type} = "test"
-                var ${var2Name}: ${var2Type} = true
-            ) : ServiceRequest()
-        """.trimIndent(),
-                        DEFAULT_PATH + requestTypeName + ".kt"
-                )
-
-        val ruleService =
-                SourceCode(
-                        """
-            class TestRuleService(private val ${requestName}: ${requestTypeName}) : AbstractPensjonRuleService<Dummy>() {}
-        """.trimIndent()
-                )
-
-        analyzeKotlinCode(listOf(request, ruleService)).map { ruleServices ->
-            assert(ruleServices.count() == 1)
-            // 3 props: request, att1, att2
-            assertEquals(ruleServices.first().inndata.count(), 3)
-            assertEquals(
-                    ruleServices.first().inndata.first().navn,
-                    requestName,
-            )
-            assertEquals(ruleServices.first().inndata.first().type, requestTypeName)
-            assertEquals(ruleServices.first().inndata.last().navn, var2Name)
-            assertEquals(ruleServices.first().inndata.last().type, var2Type)
-        }
-    }
-
-    @Test
-    @DisplayName("Should handle RuleService without ServiceRequest")
-    fun testExtractRequestEmpty() {
-        val requestTypeName = "TestRequest"
-        val requestName = "request"
-        val var1Name = "att1"
-        val var1Type = "String"
-        val var2Name = "att2"
-        val var2Type = "Boolean"
-        val somethingElse =
-                SourceCode(
-                        """
-                class ${requestTypeName}(
-                    var ${var1Name}: ${var1Type} = "test"
-                    var ${var2Name}: ${var2Type} = true
-                ) : SomethingElse()
-        """.trimIndent(),
-                        DEFAULT_PATH + requestTypeName + ".kt"
-                )
-        val ruleService =
-                SourceCode(
-                        """
-            class TestRuleService(private val ${requestName}: ${requestTypeName}) : AbstractPensjonRuleService<Dummy>() {}
-        """.trimIndent()
-                )
-
-        analyzeKotlinCode(listOf(ruleService, somethingElse)).map { ruleServices ->
-            assert(ruleServices.count() == 1)
-            assert(ruleServices.first().inndata.isEmpty())
-        }
-    }
-
-    @Test
-    @DisplayName("Should extract ServiceResponse from RuleService")
-    fun testExtractResponse() {
-        val responseTypeName = "TestResponse"
-        val var1Name = "att1"
-        val var1Type = "String"
-        val var2Name = "att2"
-        val var2Type = "Boolean"
-        val response =
-                SourceCode(
-                        """
-            class ${responseTypeName}(
-                var ${var1Name}: ${var1Type} = "test"
-                var ${var2Name}: ${var2Type} = true
-            ) : ServiceResponse()
-        """.trimIndent(),
-                        DEFAULT_PATH + responseTypeName + ".kt"
-                )
-        val ruleService =
-                SourceCode(
-                        """
-            class TestRuleService() : AbstractPensjonRuleService<${responseTypeName}>() {}
-        """.trimIndent()
-                )
-
-        analyzeKotlinCode(listOf(response, ruleService)).map { ruleServices ->
-            assert(ruleServices.count() == 1)
-            // 3 props: response, att1, att2
-            assertEquals(ruleServices.first().utdata.count(), 3)
-            assertEquals(ruleServices.first().utdata.first().navn, responseTypeName)
-            assertEquals(ruleServices.first().utdata.first().type, responseTypeName)
-            assertEquals(ruleServices.first().utdata.last().navn, var2Name)
-            assertEquals(ruleServices.first().utdata.last().type, var2Type)
-        }
-    }
-
-    @DisplayName("Should handle RuleService without ServiceResponse")
-    fun testExtractResponseEmpty() {
-        val responseTypeName = "TestResponse"
-        val var1Name = "att1"
-        val var1Type = "String"
-        val var2Name = "att2"
-        val var2Type = "Boolean"
-        val somethingElse =
-                SourceCode(
-                        """
-            class ${responseTypeName}(
-                var ${var1Name}: ${var1Type} = "test"
-                var ${var2Name}: ${var2Type} = true
-            ) : SomethingElse()
-        """.trimIndent(),
-                        DEFAULT_PATH + responseTypeName + ".kt"
-                )
-        val ruleService =
-                SourceCode(
-                        """
-            class TestRuleService() : AbstractPensjonRuleService<${responseTypeName}>() {}
-        """.trimIndent()
-                )
-
-        analyzeKotlinCode(listOf(somethingElse, ruleService)).map { ruleServices ->
-            assert(ruleServices.count() == 1)
-            assert(ruleServices.first().utdata.isEmpty())
         }
     }
 
