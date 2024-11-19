@@ -395,8 +395,7 @@ class PsiKtFunctionsTest {
                                 log_debug("[FUN] startFastsettTrygdetid")
 
                                 /**
-                                * Test, KDoc under property (val definisjon).
-                                *
+                                * Test1
                                 */
 
                                 val trygdetidParametere = TrygdetidParameterType(
@@ -416,8 +415,7 @@ class PsiKtFunctionsTest {
                                 )
 
                                 /**
-                                * Utled regelverkstype hvis ikke satt i request.
-                                * Default er G_REG.
+                                * Test2
                                 */
                                 if (trygdetidParametere.grunnlag?.regelverkType == null
                                     && trygdetidParametere.grunnlag?.bruker != null
@@ -452,10 +450,21 @@ class PsiKtFunctionsTest {
                             ruleService
                                     .getRuleServiceFlow(bindingContext)
                                     .map { seq ->
-                                        assertEquals(2, seq.count())
-                                        assert(seq.elementAt(0) is FlowReference.Documentation)
-                                        // assert(seq.elementAt(1) is FlowReference.Documentation)
-                                        assert(seq.elementAt(1) is FlowReference.RuleFlow)
+                                        assertEquals(3, seq.count())
+                                        assertEquals(
+                                                "Test1",
+                                                (seq.elementAt(0) as FlowReference.Documentation)
+                                                        .beskrivelse
+                                        )
+                                        assertEquals(
+                                                "Test2",
+                                                (seq.elementAt(1) as FlowReference.Documentation)
+                                                        .beskrivelse
+                                        )
+                                        assertEquals(
+                                                "StartTrygdetidFlyt",
+                                                (seq.elementAt(2) as FlowReference.RuleFlow).navn
+                                        )
                                     }
                                     .onFailure { assert(false) }
                         }

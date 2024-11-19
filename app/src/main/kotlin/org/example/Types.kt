@@ -14,7 +14,7 @@ data class RuleServiceDoc(
         val beskrivelse: String,
         val inndata: List<PropertyDoc>,
         val utdata: List<PropertyDoc>,
-        // val flyt: FlowElement.Flow,
+        val flyt: FlowElement.Flow,
         val gitHubUri: URI,
 ) {
     companion object {
@@ -23,8 +23,9 @@ data class RuleServiceDoc(
                 beskrivelse: String,
                 inndata: List<PropertyDoc>,
                 utdata: List<PropertyDoc>,
+                flyt: FlowElement.Flow,
                 gitHubUri: URI
-        ): RuleServiceDoc = RuleServiceDoc(navn, beskrivelse, inndata, utdata, gitHubUri)
+        ): RuleServiceDoc = RuleServiceDoc(navn, beskrivelse, inndata, utdata, flyt, gitHubUri)
     }
 
     override fun toString(): String {
@@ -34,7 +35,7 @@ data class RuleServiceDoc(
             |   beskrivelse = $beskrivelse
             |   inndata = $inndata
             |   utdata = $utdata
-            |   flyt = flyt
+            |   flyt = $flyt
             |   gitHubUri = ${gitHubUri.toString()}
             |)
         """.trimMargin()

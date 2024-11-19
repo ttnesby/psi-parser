@@ -6,7 +6,6 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtBlockExpression
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
-import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtLambdaExpression
 import org.jetbrains.kotlin.psi.KtParameter
@@ -198,37 +197,46 @@ private fun KtProperty.streamRuleElements(
 ): Result<Sequence<FlowReference>> = runCatching {
     getLambdaBlock()
             .map { block ->
-                block.children.asSequence().filterIsInstance<KtElement>().flatMap { element ->
+                block.children.asSequence().flatMap { element ->
                     sequence {
                         when (element) {
                             is KtProperty -> {
-                                // Yield KDoc from property
                                 element.children.filterIsInstance<KDoc>().forEach {
                                     yield(FlowReference.Documentation(it.getOrEmpty()))
                                 }
                             }
                             is KDoc -> yield(FlowReference.Documentation(element.getOrEmpty()))
                             is KtDotQualifiedExpression -> {
-                                (element.receiverExpression as? KtReferenceExpression)
-                                        ?.resolveToKtClass(bindingContext)
-                                        ?.map { resolvedClass ->
-                                            if (resolvedClass.isSubTypeOf(superType)) {
-                                                element.receiverExpression
-                                            } else null
-                                        }
-                                        ?.getOrNull()
-                                        ?.let {
-                                            yield(
-                                                    FlowReference.RuleFlow(
-                                                            it.name ?: "Unknown",
-                                                            File(it.containingKtFile.name)
-                                                    )
+                                element.resolveReceiverClass(superType, bindingContext)
+                                        .map { resolvedClass ->
+                                            FlowReference.RuleFlow(
+                                                    resolvedClass.name ?: "Unknown",
+                                                    File(resolvedClass.containingKtFile.name)
                                             )
                                         }
+                                        .getOrNull()
+                                        ?.let { yield(it) }
                             }
                         }
                     }
                 }
             }
             .getOrThrow()
+}
+
+/** KtDotQualifiedExpression extension functions */
+//
+
+private fun KtDotQualifiedExpression.resolveReceiverClass(
+        superType: RuleSuperType,
+        bindingContext: BindingContext
+): Result<KtClass> = runCatching {
+    (receiverExpression as? KtReferenceExpression)
+            ?.resolveToKtClass(bindingContext)
+            ?.map { resolvedClass ->
+                if (resolvedClass.isSubTypeOf(superType)) resolvedClass
+                else throw NoSuchElementException("Class is not of type ${superType.className}")
+            }
+            ?.getOrThrow()
+            ?: throw NoSuchElementException("Could not resolve receiver expression")
 }

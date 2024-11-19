@@ -24,6 +24,7 @@ fun getRuleService(ktFile: KtFile, bindingContext: BindingContext): Result<RuleS
                     beskrivelse = ktClass.getKDocOrEmpty(),
                     inndata = getRequestFields(ktClass, bindingContext),
                     utdata = getResponseFields(ktClass, bindingContext),
+                    flyt = getFlow(ktClass, bindingContext),
                     gitHubUri = URI("${ktFile.name}")
             )
         }
@@ -64,82 +65,11 @@ fun getResponseFields(ktClass: KtClass, bindingContext: BindingContext): List<Pr
                 }
                 .getOrDefault(emptyList())
 
-// fun analyzeRuleServiceMethod(ktClass: KtClass, bindingContext: BindingContext): FlowElement.Flow
-// {
-//     val ruleServiceLambda =
-//             ktClass.body
-//                     ?.declarations
-//                     ?.filterIsInstance<KtProperty>()
-//                     ?.find { it.name == "ruleService" }
-//                     ?.initializer as?
-//                     KtLambdaExpression
-//                     ?: return FlowElement.Flow(emptyList())
-
-//     val references =
-//             ruleServiceLambda.bodyExpression?.children?.mapNotNull { child ->
-//                 when (child) {
-//                     is KtProperty -> {
-//                         // Get KDoc from property, return null if no KDoc exists
-//                         val kdocText =
-//                                 child.children
-//                                         .filterIsInstance<KDoc>()
-//                                         .map { it.text.trimIndent() }
-//                                         .takeIf { it.isNotEmpty() } // Only process if KDoc
-// exists
-//                                         ?.joinToString()
-
-//                         // Only create Documentation reference if KDoc exists
-//                         kdocText?.let { FlowReference.Documentation(it) }
-//                     }
-//                     is KDoc -> {
-//
-// FlowReference.Documentation(child.getDefaultSection().getContent().trim())
-//                     }
-//                     is KtDotQualifiedExpression -> {
-//                         processFlowExpression(child, bindingContext)
-//                     }
-//                     else -> null
-//                 }
-//             }
-//                     ?: emptyList()
-
-//     val safeReferences = references.map { ref -> FlowElement.Reference(ref) }
-
-//     return FlowElement.Flow(safeReferences)
-// }
-
-// private fun processFlowExpression(
-//         expression: KtDotQualifiedExpression,
-//         bindingContext: BindingContext
-// ): FlowReference? {
-//     val referenceExpression = expression.receiverExpression as? KtReferenceExpression ?: return
-// null
-
-//     // Get the KotlinType of the expression
-//     val type = bindingContext.getType(referenceExpression) ?: return null
-
-//     // Access the declaration descriptor from the type's constructor
-//     val descriptor = type.constructor.declarationDescriptor ?: return null
-
-//     // Convert the descriptor to a KtClass
-//     val typeDeclaration =
-//             DescriptorToSourceUtils.getSourceFromDescriptor(descriptor) as? KtClass ?: return
-// null
-
-//     // Check if the class has 'AbstractPensjonRuleflow' as a superclass
-//     val isRuleflow =
-//             typeDeclaration.superTypeListEntries
-//                     .mapNotNull { it.typeReference?.resolveToKtClass(bindingContext) }
-//                     .any { it.isRuleflowClass() }
-
-//     if (!isRuleflow) return null
-
-//     val name = referenceExpression.text
-//     val file =
-//             File(
-//                     typeDeclaration.containingFile.virtualFile?.path
-//                             ?: typeDeclaration.containingFile.name
-//             )
-
-//     return FlowReference.RuleFlow(name, file)
-// }
+fun getFlow(ktClass: KtClass, bindingContext: BindingContext): FlowElement.Flow =
+        ktClass.getRuleServiceFlow(bindingContext)
+                .map { sequence ->
+                    FlowElement.Flow(
+                            sequence.map { flowRef -> FlowElement.Reference(flowRef) }.toList()
+                    )
+                }
+                .getOrDefault(FlowElement.Flow(emptyList()))
