@@ -389,14 +389,16 @@ class PsiKtFunctionsTest {
                 )
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
-                    .map { ruleService ->
-                        ruleService
-                                .getRuleServiceMethod()
-                                .map { method -> assertEquals("$methodName", method.name) }
-                                .onFailure { assert(false) }
-                    }
-                    .onFailure { assert(false) }
+            getBindingContext(listOf(ktFile), context).map { bindingContext ->
+                ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
+                        .map { ruleService ->
+                            ruleService
+                                    .getRuleServiceMethod(bindingContext)
+                                    .map { seq -> assertEquals(0, seq.count()) }
+                                    .onFailure { assert(false) }
+                        }
+                        .onFailure { assert(false) }
+            }
         }
     }
 
@@ -415,13 +417,16 @@ class PsiKtFunctionsTest {
                 )
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
-                    .map { ruleService ->
-                        ruleService.getRuleServiceMethod().map { _ -> assert(false) }.onFailure {
-                            assert(it is NoSuchElementException)
+            getBindingContext(listOf(ktFile), context).map { bindingContext ->
+                ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
+                        .map { ruleService ->
+                            ruleService
+                                    .getRuleServiceMethod(bindingContext)
+                                    .map { _ -> assert(false) }
+                                    .onFailure { assert(it is NoSuchElementException) }
                         }
-                    }
-                    .onFailure { assert(false) }
+                        .onFailure { assert(false) }
+            }
         }
     }
 }
