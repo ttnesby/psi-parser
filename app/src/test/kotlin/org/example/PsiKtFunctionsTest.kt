@@ -375,8 +375,8 @@ class PsiKtFunctionsTest {
     }
 
     @Test
-    @DisplayName("Should extract named KtProperty from RuleService KtClass")
-    fun testExtractOverridenProperty() {
+    @DisplayName("Should extract sequence of flow KtElements from RuleService KtClass")
+    fun testExtractSequenceFlowKtElements() {
         val methodName = "ruleService"
         val code =
                 SourceCode(
@@ -404,7 +404,7 @@ class PsiKtFunctionsTest {
 
     @Test
     @DisplayName("Should handle no named KtProperty in RuleService KtClass")
-    fun testExtractOverridenPropertyError() {
+    fun testExtractSequenceFlowKtElementsError() {
         val methodName = "someOtherMethod"
         val code =
                 SourceCode(
