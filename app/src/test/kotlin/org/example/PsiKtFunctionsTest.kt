@@ -381,8 +381,65 @@ class PsiKtFunctionsTest {
         val code =
                 SourceCode(
                         """
+                        class StartTrygdetidFlyt(
+                            private val trygdetidParametere: TrygdetidParameterType
+                        ) : AbstractPensjonRuleflow() {
+                            private var førsteVirk: Date? = null
+                            private var kapittel20: Boolean? = null
+
+                            override var ruleflow: () -> Unit = {}
+                        }
+
                         class FastsettTrygdetidService() : AbstractPensjonRuleService {
-                            override val $methodName: () -> TrygdetidResponse = {}
+                            override val $methodName: () -> TrygdetidResponse = {
+                                log_debug("[FUN] startFastsettTrygdetid")
+
+                                /**
+                                * Test, KDoc under property (val definisjon).
+                                *
+                                */
+
+                                val trygdetidParametere = TrygdetidParameterType(
+                                    grunnlag = TrygdetidGrunnlag(
+                                        bruker = innTrygdetidRequest.persongrunnlag,
+                                        boddEllerArbeidetIUtlandet = innTrygdetidRequest.boddEllerArbeidetIUtlandet,
+                                        førsteVirk = innTrygdetidRequest.brukerForsteVirk,
+                                        virkFom = innTrygdetidRequest.virkFom,
+                                        virkTom = innTrygdetidRequest.virkTom,
+                                        ytelseType = innTrygdetidRequest.hovedKravlinjeType,
+                                        regelverkType = innTrygdetidRequest.regelverkType,
+                                        uttaksgradListe = innTrygdetidRequest.uttaksgradListe,
+                                        beregningsvilkarsPeriodeListe = innTrygdetidRequest.sortedBeregningssvilkarPeriodeListe(),
+                                        redusertFTTUT = innTrygdetidRequest.redusertFTTUT,
+                                        beregning = null
+                                    )
+                                )
+
+                                /**
+                                * Utled regelverkstype hvis ikke satt i request.
+                                * Default er G_REG.
+                                */
+                                if (trygdetidParametere.grunnlag?.regelverkType == null
+                                    && trygdetidParametere.grunnlag?.bruker != null
+                                    && trygdetidParametere.grunnlag?.ytelseType != null) {
+                                    trygdetidParametere.grunnlag!!.regelverkType = utledRegelverkstype(
+                                        trygdetidParametere.grunnlag?.bruker!!,
+                                        trygdetidParametere.grunnlag?.ytelseType!!
+                                    )
+                                }
+
+                                trygdetidParametere.resultat = TrygdetidResultat(pakkseddel = Pakkseddel())
+
+                                // Kjør reglene
+                                StartTrygdetidFlyt(trygdetidParametere).run(this)
+
+                                TrygdetidResponse(
+                                    trygdetid = trygdetidParametere.resultat?.trygdetid,
+                                    trygdetidAlternativ = trygdetidParametere.resultat?.trygdetidAlternativ,
+                                    trygdetidKapittel20 = trygdetidParametere.resultat?.trygdetidKapittel20,
+                                    pakkseddel = trygdetidParametere.resultat?.pakkseddel!!
+                                )
+                            }
                         }
 
         """.trimIndent()
@@ -393,8 +450,13 @@ class PsiKtFunctionsTest {
                 ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
                         .map { ruleService ->
                             ruleService
-                                    .getRuleServiceMethod(bindingContext)
-                                    .map { seq -> assertEquals(0, seq.count()) }
+                                    .getRuleServiceFlow(bindingContext)
+                                    .map { seq ->
+                                        assertEquals(2, seq.count())
+                                        assert(seq.elementAt(0) is FlowReference.Documentation)
+                                        // assert(seq.elementAt(1) is FlowReference.Documentation)
+                                        assert(seq.elementAt(1) is FlowReference.RuleFlow)
+                                    }
                                     .onFailure { assert(false) }
                         }
                         .onFailure { assert(false) }
@@ -421,7 +483,7 @@ class PsiKtFunctionsTest {
                 ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
                         .map { ruleService ->
                             ruleService
-                                    .getRuleServiceMethod(bindingContext)
+                                    .getRuleServiceFlow(bindingContext)
                                     .map { _ -> assert(false) }
                                     .onFailure { assert(it is NoSuchElementException) }
                         }

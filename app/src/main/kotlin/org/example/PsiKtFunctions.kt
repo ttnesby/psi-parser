@@ -1,5 +1,6 @@
 package org.example
 
+import java.io.File
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtBlockExpression
@@ -113,7 +114,7 @@ private fun KtClass.getClassOfSuperTypeParam(
             ?: throw NoSuchElementException("No type parameter found for $supertype")
 }
 
-fun KtClass.getRuleServiceMethod(bindingContext: BindingContext): Result<Sequence<KtElement>> =
+fun KtClass.getRuleServiceFlow(bindingContext: BindingContext): Result<Sequence<FlowReference>> =
         getOverriddenProperty(RuleMethod.RULE_SERVICE).mapCatching { property ->
             property.streamRuleElements(RuleSuperType.RULE_FLOW, bindingContext).getOrThrow()
         }
@@ -194,7 +195,7 @@ private fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> = runCatching
 private fun KtProperty.streamRuleElements(
         superType: RuleSuperType,
         bindingContext: BindingContext
-): Result<Sequence<KtElement>> = runCatching {
+): Result<Sequence<FlowReference>> = runCatching {
     getLambdaBlock()
             .map { block ->
                 block.children.asSequence().filterIsInstance<KtElement>().flatMap { element ->
@@ -203,10 +204,10 @@ private fun KtProperty.streamRuleElements(
                             is KtProperty -> {
                                 // Yield KDoc from property
                                 element.children.filterIsInstance<KDoc>().forEach {
-                                    yield(it as KtElement)
+                                    yield(FlowReference.Documentation(it.getOrEmpty()))
                                 }
                             }
-                            is KDoc -> yield(element)
+                            is KDoc -> yield(FlowReference.Documentation(element.getOrEmpty()))
                             is KtDotQualifiedExpression -> {
                                 (element.receiverExpression as? KtReferenceExpression)
                                         ?.resolveToKtClass(bindingContext)
@@ -216,7 +217,14 @@ private fun KtProperty.streamRuleElements(
                                             } else null
                                         }
                                         ?.getOrNull()
-                                        ?.let { yield(it) }
+                                        ?.let {
+                                            yield(
+                                                    FlowReference.RuleFlow(
+                                                            it.name ?: "Unknown",
+                                                            File(it.containingKtFile.name)
+                                                    )
+                                            )
+                                        }
                             }
                         }
                     }
