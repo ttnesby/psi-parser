@@ -373,4 +373,55 @@ class PsiKtFunctionsTest {
             }
         }
     }
+
+    @Test
+    @DisplayName("Should extract named KtProperty from RuleService KtClass")
+    fun testExtractOverridenProperty() {
+        val methodName = "ruleService"
+        val code =
+                SourceCode(
+                        """
+                        class FastsettTrygdetidService() : AbstractPensjonRuleService {
+                            override val $methodName: () -> TrygdetidResponse = {}
+                        }
+
+        """.trimIndent()
+                )
+
+        analyzeKotlinCode(code).let { ktFile ->
+            ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+                    .map { ruleService ->
+                        ruleService
+                                .getRuleServiceMethod()
+                                .map { method -> assertEquals("$methodName", method.name) }
+                                .onFailure { assert(false) }
+                    }
+                    .onFailure { assert(false) }
+        }
+    }
+
+    @Test
+    @DisplayName("Should handle no named KtProperty in RuleService KtClass")
+    fun testExtractOverridenPropertyError() {
+        val methodName = "someOtherMethod"
+        val code =
+                SourceCode(
+                        """
+                        class FastsettTrygdetidService() : AbstractPensjonRuleService {
+                            override val $methodName: () -> TrygdetidResponse = {}
+                        }
+
+        """.trimIndent()
+                )
+
+        analyzeKotlinCode(code).let { ktFile ->
+            ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+                    .map { ruleService ->
+                        ruleService.getRuleServiceMethod().map { _ -> assert(false) }.onFailure {
+                            assert(it is NoSuchElementException)
+                        }
+                    }
+                    .onFailure { assert(false) }
+        }
+    }
 }

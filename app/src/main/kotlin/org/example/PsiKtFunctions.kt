@@ -1,9 +1,11 @@
 package org.example
 
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtParameter
+import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtTypeReference
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
@@ -21,6 +23,18 @@ enum class RuleSuperType(val className: String) {
     }
 
     override fun toString(): String = className
+}
+
+enum class RuleMethod(val methodName: String) {
+    RULE_SERVICE("ruleService"),
+    RULE_FLOW("ruleFlow");
+
+    companion object {
+        fun fromClassName(methodName: String): RuleMethod? =
+                values().find { it.methodName == methodName }
+    }
+
+    override fun toString(): String = methodName
 }
 
 /** KtFile extension functions */
@@ -55,20 +69,15 @@ data class ServiceRequestInfo(val parameter: KtParameter, val resolvedClass: KtC
 
 fun KtClass.getServiceRequestInfo(bindingContext: BindingContext): Result<ServiceRequestInfo> =
         runCatching {
-            val parameter =
-                    primaryConstructor?.valueParameters?.firstNotNullOfOrNull { parameter ->
-                        parameter
-                                .getClassOfSuperType(KtClass::isServiceRequestClass, bindingContext)
-                                .map { resolvedClass ->
-                                    ServiceRequestInfo(parameter, resolvedClass)
-                                }
-                                .getOrNull()
-                    }
-                            ?: throw NoSuchElementException(
-                                    "No ServiceRequest parameter found in primary constructor"
-                            )
-
-            parameter
+            primaryConstructor?.valueParameters?.firstNotNullOfOrNull { parameter ->
+                parameter
+                        .getClassOfSuperType(KtClass::isServiceRequestClass, bindingContext)
+                        .map { resolvedClass -> ServiceRequestInfo(parameter, resolvedClass) }
+                        .getOrNull()
+            }
+                    ?: throw NoSuchElementException(
+                            "No ServiceRequest parameter found in primary constructor"
+                    )
         }
 
 fun KtClass.getServiceResponseClass(bindingContext: BindingContext): Result<KtClass> =
@@ -96,6 +105,16 @@ private fun KtClass.getClassOfSuperTypeParam(
             }
             ?.getOrThrow()
             ?: throw NoSuchElementException("No type parameter found for $supertype")
+}
+
+fun KtClass.getRuleServiceMethod(): Result<KtProperty> =
+        getOverriddenProperty(RuleMethod.RULE_SERVICE)
+
+private fun KtClass.getOverriddenProperty(method: RuleMethod): Result<KtProperty> = runCatching {
+    body?.properties?.filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }?.find {
+        it.name == method.methodName
+    }
+            ?: throw NoSuchElementException("No overridden property '$name' found")
 }
 
 /** KDoc extension functions */
