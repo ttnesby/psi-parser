@@ -18,23 +18,15 @@ fun analyzeSourceFilesForRuleServices(
         }
 
 fun getRuleService(ktFile: KtFile, bindingContext: BindingContext): Result<RuleServiceDoc> =
-        ktFile.getClassWithSuperType(KtClass::isRuleServiceClass).map { klass ->
-            newRuleServiceDoc(klass, bindingContext, ktFile.name)
+        ktFile.getClassWithSuperType(KtClass::isRuleServiceClass).map { ktClass ->
+            RuleServiceDoc.new(
+                    navn = ktClass.name!!,
+                    beskrivelse = ktClass.getKDocOrEmpty(),
+                    inndata = getRequestFields(ktClass, bindingContext),
+                    utdata = getResponseFields(ktClass, bindingContext),
+                    gitHubUri = URI("${ktFile.name}")
+            )
         }
-
-private fun newRuleServiceDoc(
-        klass: KtClass,
-        bindingContext: BindingContext,
-        filePath: String
-): RuleServiceDoc =
-        RuleServiceDoc(
-                navn = klass.name ?: "anonymous",
-                beskrivelse = klass.getKDocOrEmpty(),
-                inndata = getRequestFields(klass, bindingContext),
-                utdata = getResponseFields(klass, bindingContext),
-                // flyt = analyzeRuleServiceMethod(klass, bindingContext),
-                gitHubUri = URI("$filePath")
-        )
 
 fun getRequestFields(ktClass: KtClass, bindingContext: BindingContext): List<PropertyDoc> =
         ktClass.getServiceRequestInfo(bindingContext)

@@ -17,6 +17,16 @@ data class RuleServiceDoc(
         // val flyt: FlowElement.Flow,
         val gitHubUri: URI,
 ) {
+    companion object {
+        fun new(
+                navn: String,
+                beskrivelse: String,
+                inndata: List<PropertyDoc>,
+                utdata: List<PropertyDoc>,
+                gitHubUri: URI
+        ): RuleServiceDoc = RuleServiceDoc(navn, beskrivelse, inndata, utdata, gitHubUri)
+    }
+
     override fun toString(): String {
         return """
             |RuleServiceDoc(
