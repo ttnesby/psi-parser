@@ -2,10 +2,15 @@ package org.example
 
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.lexer.KtTokens
+import org.jetbrains.kotlin.psi.KtBlockExpression
 import org.jetbrains.kotlin.psi.KtClass
+import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
+import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.KtLambdaExpression
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.psi.KtReferenceExpression
 import org.jetbrains.kotlin.psi.KtTypeReference
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
@@ -108,8 +113,10 @@ private fun KtClass.getClassOfSuperTypeParam(
             ?: throw NoSuchElementException("No type parameter found for $supertype")
 }
 
-fun KtClass.getRuleServiceMethod(): Result<KtProperty> =
-        getOverriddenProperty(RuleMethod.RULE_SERVICE)
+fun KtClass.getRuleServiceMethod(bindingContext: BindingContext): Result<Sequence<KtElement>> =
+        getOverriddenProperty(RuleMethod.RULE_SERVICE).mapCatching { property ->
+            property.streamRuleElements(RuleSuperType.RULE_FLOW, bindingContext).getOrThrow()
+        }
 
 private fun KtClass.getOverriddenProperty(method: RuleMethod): Result<KtProperty> = runCatching {
     body?.properties?.filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }?.find {
@@ -163,3 +170,57 @@ private fun KtTypeReference.resolveToKtClass(bindingContext: BindingContext): Re
             }
                     ?: throw NoSuchElementException("Could not resolve type reference to KtClass")
         }
+
+/** KtReferenceExpression extension functions */
+//
+
+private fun KtReferenceExpression.resolveToKtClass(
+        bindingContext: BindingContext
+): Result<KtClass> = runCatching {
+    bindingContext.getType(this)?.constructor?.declarationDescriptor?.let {
+        DescriptorToSourceUtils.getSourceFromDescriptor(it) as? KtClass
+    }
+            ?: throw NoSuchElementException("Could not resolve reference expression to KtClass")
+}
+
+/** KtProperty extension functions */
+//
+
+private fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> = runCatching {
+    (initializer as? KtLambdaExpression)?.bodyExpression
+            ?: throw NoSuchElementException("No lambda block found in property")
+}
+
+private fun KtProperty.streamRuleElements(
+        superType: RuleSuperType,
+        bindingContext: BindingContext
+): Result<Sequence<KtElement>> = runCatching {
+    getLambdaBlock()
+            .map { block ->
+                block.children.asSequence().filterIsInstance<KtElement>().flatMap { element ->
+                    sequence {
+                        when (element) {
+                            is KtProperty -> {
+                                // Yield KDoc from property
+                                element.children.filterIsInstance<KDoc>().forEach {
+                                    yield(it as KtElement)
+                                }
+                            }
+                            is KDoc -> yield(element)
+                            is KtDotQualifiedExpression -> {
+                                (element.receiverExpression as? KtReferenceExpression)
+                                        ?.resolveToKtClass(bindingContext)
+                                        ?.map { resolvedClass ->
+                                            if (resolvedClass.isSubTypeOf(superType)) {
+                                                element.receiverExpression
+                                            } else null
+                                        }
+                                        ?.getOrNull()
+                                        ?.let { yield(it) }
+                            }
+                        }
+                    }
+                }
+            }
+            .getOrThrow()
+}
