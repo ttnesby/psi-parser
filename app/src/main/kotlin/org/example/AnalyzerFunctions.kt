@@ -18,7 +18,7 @@ fun analyzeSourceFilesForRuleServices(
         }
 
 fun getRuleService(ktFile: KtFile, bindingContext: BindingContext): Result<RuleServiceDoc> =
-        ktFile.getClassOfSuperType(KtClass::isRuleServiceClass).map { klass ->
+        ktFile.getClassWithSuperType(KtClass::isRuleServiceClass).map { klass ->
             newRuleServiceDoc(klass, bindingContext, ktFile.name)
         }
 

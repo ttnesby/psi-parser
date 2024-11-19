@@ -56,9 +56,9 @@ class PsiKtFunctionsTest {
                 )
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassOfSuperType(KtClass::isRuleServiceClass).map { assert(true) }.onFailure {
-                assert(false)
-            }
+            ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
+                    .map { assert(true) }
+                    .onFailure { assert(false) }
         }
     }
 
@@ -73,7 +73,7 @@ class PsiKtFunctionsTest {
                 )
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassOfSuperType(KtClass::isRuleFlowClass).map { assert(true) }.onFailure {
+            ktFile.getClassWithSuperType(KtClass::isRuleFlowClass).map { assert(true) }.onFailure {
                 assert(false)
             }
         }
@@ -88,7 +88,7 @@ class PsiKtFunctionsTest {
         """.trimIndent())
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+            ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
                     .map { assert(false) }
                     .onFailure { assert(it is NoSuchElementException) }
         }
@@ -102,7 +102,7 @@ class PsiKtFunctionsTest {
         """.trimIndent())
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+            ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
                     .map { assert(false) }
                     .onFailure { assert(it is NoSuchElementException) }
         }
@@ -123,7 +123,7 @@ class PsiKtFunctionsTest {
 
         analyzeKotlinCode(code).let { ktFile ->
             getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+                ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
                         .map { ruleService ->
                             ruleService
                                     .getServiceRequestInfo(bindingContext)
@@ -153,7 +153,7 @@ class PsiKtFunctionsTest {
 
         analyzeKotlinCode(code).let { ktFile ->
             getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+                ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
                         .map { ruleService ->
                             ruleService
                                     .getServiceRequestInfo(bindingContext)
@@ -179,7 +179,7 @@ class PsiKtFunctionsTest {
 
         analyzeKotlinCode(code).let { ktFile ->
             getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+                ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
                         .map { ruleService ->
                             ruleService
                                     .getServiceResponseClass(bindingContext)
@@ -207,7 +207,7 @@ class PsiKtFunctionsTest {
 
         analyzeKotlinCode(code).let { ktFile ->
             getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+                ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
                         .map { ruleService ->
                             ruleService
                                     .getServiceResponseClass(bindingContext)
@@ -237,7 +237,7 @@ class PsiKtFunctionsTest {
                 )
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+            ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
                     .map {
                         val expected = listOf(doc1, doc2).joinToString("\n").trim()
                         assertEquals(expected, it.getKDocOrEmpty())
@@ -257,7 +257,7 @@ class PsiKtFunctionsTest {
                 )
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+            ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
                     .map { it.getKDocOrEmpty().isEmpty() }
                     .onFailure { assert(false) }
         }
@@ -289,7 +289,7 @@ class PsiKtFunctionsTest {
 
         analyzeKotlinCode(code).let { ktFile ->
             getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+                ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
                         .map { ruleService ->
                             ruleService
                                     .getServiceRequestInfo(bindingContext)
@@ -345,7 +345,7 @@ class PsiKtFunctionsTest {
 
         analyzeKotlinCode(code).let { ktFile ->
             getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+                ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
                         .map { ruleService ->
                             ruleService
                                     .getServiceRequestInfo(bindingContext)
@@ -389,7 +389,7 @@ class PsiKtFunctionsTest {
                 )
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+            ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
                     .map { ruleService ->
                         ruleService
                                 .getRuleServiceMethod()
@@ -415,7 +415,7 @@ class PsiKtFunctionsTest {
                 )
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassOfSuperType(KtClass::isRuleServiceClass)
+            ktFile.getClassWithSuperType(KtClass::isRuleServiceClass)
                     .map { ruleService ->
                         ruleService.getRuleServiceMethod().map { _ -> assert(false) }.onFailure {
                             assert(it is NoSuchElementException)

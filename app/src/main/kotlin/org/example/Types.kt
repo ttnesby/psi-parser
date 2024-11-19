@@ -56,13 +56,6 @@ data class PropertyDoc(
                             beskrivelse = param.getKDocOrEmpty()
                     )
                 }
-
-        // fun fromProperty(property: KtProperty): PropertyDoc =
-        //         PropertyDoc(
-        //                 navn = property.name ?: "",
-        //                 type = property.typeReference?.text ?: "Unknown",
-        //                 beskrivelse = property.docComment?.text ?: ""
-        //         )
     }
 
     override fun toString(): String {
