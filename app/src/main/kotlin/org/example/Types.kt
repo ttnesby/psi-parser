@@ -8,7 +8,11 @@ import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtParameter
 
-data class AnalysisResult(val services: List<RuleServiceDoc>, val flows: List<RuleFlowDoc>)
+data class AnalysisResult(
+        val services: List<RuleServiceDoc>,
+        val flows: List<RuleFlowDoc>,
+        val sets: List<RuleSetDoc>
+)
 
 // data class for rule service documentation, see AbstractPensjonRuleService
 data class RuleServiceDoc(
@@ -74,6 +78,36 @@ data class RuleFlowDoc(
     }
 }
 
+data class RuleSetDoc(
+        val navn: String,
+        val beskrivelse: String,
+        val inndata: List<PropertyDoc>,
+        val flyt: FlowElement.Flow,
+        val gitHubUri: URI,
+) {
+    companion object {
+        fun new(
+                navn: String,
+                beskrivelse: String,
+                inndata: List<PropertyDoc>,
+                flyt: FlowElement.Flow,
+                gitHubUri: URI
+        ): RuleSetDoc = RuleSetDoc(navn, beskrivelse, inndata, flyt, gitHubUri)
+    }
+
+    override fun toString(): String {
+        return """
+            |RuleSetDoc(
+            |   navn = $navn
+            |   beskrivelse = $beskrivelse
+            |   inndata = $inndata
+            |   flyt = $flyt
+            |   gitHubUri = ${gitHubUri.toString()}
+            |)
+        """.trimMargin()
+    }
+}
+
 data class PropertyDoc(
         val navn: String,
         val type: String,
@@ -127,14 +161,14 @@ data class PropertyDoc(
  * Reference: reference to another flow element, avoiding containment
  */
 sealed class FlowElement {
-    // Rule flow or rule set flow documentation
-    data class RuleEntityDoc(
-            val navn: String,
-            val beskrivelse: String,
-            val inndata: List<PropertyDoc>,
-            val flyt: Flow,
-            val gitHubUrl: URI,
-    ) : FlowElement()
+    // // Rule flow or rule set flow documentation
+    // data class RuleEntityDoc(
+    //         val navn: String,
+    //         val beskrivelse: String,
+    //         val inndata: List<PropertyDoc>,
+    //         val flyt: Flow,
+    //         val gitHubUrl: URI,
+    // ) : FlowElement()
     data class Flow(val elementer: List<FlowElement>) : FlowElement()
     data class Forgrening(val beskrivelse: String, val navn: String, val gren: List<Gren>) :
             FlowElement()

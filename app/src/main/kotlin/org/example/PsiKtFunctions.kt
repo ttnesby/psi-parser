@@ -25,7 +25,7 @@ enum class RuleSuperClass(val className: String) {
     SERVICE_RESPONSE("ServiceResponse"),
     RULE_SERVICE("AbstractPensjonRuleService"),
     RULE_FLOW("AbstractPensjonRuleflow"),
-    RULE_SET("AbstractPensjonRuleSet");
+    RULE_SET("AbstractPensjonRuleset");
 
     companion object {
         fun fromClassName(className: String): RuleSuperClass? =

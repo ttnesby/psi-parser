@@ -80,7 +80,8 @@ fun analyzeRepository(
                     processRepo(context, repoPath, libsPath).getOrThrow().let { result ->
                         AnalysisResult(
                                 services = result.services.sortedBy { it.navn },
-                                flows = result.flows.sortedBy { it.navn }
+                                flows = result.flows.sortedBy { it.navn },
+                                sets = result.sets.sortedBy { it.navn }
                         )
                     }
                 }
@@ -101,9 +102,12 @@ fun main(args: Array<String>) {
                     result.services.forEach(::println)
                     println("\nRule Flows:")
                     result.flows.forEach(::println)
+                    println("\nRule Sets:")
+                    result.sets.forEach(::println)
                     println("\nSummary:")
                     println("Found ${result.services.size} rule services")
                     println("Found ${result.flows.size} rule flows")
+                    println("Found ${result.sets.size} rule sets")
                 }
     } finally {
         disposable.dispose()
