@@ -194,6 +194,10 @@ fun KtParameter.getKDocOrEmpty(): String = docComment?.getOrEmpty() ?: ""
 /** KtElement extension functions */
 ///////////////////////////////////////////////////
 
+// HIGHLY IMPORTANT: eventually resolve different types to PsiElement
+// This includes a `warp` to whatever sourcefile declaring the PsiElement,
+// Key point - DescriptorToSourceUtils.getSourceFromDescriptor, thanks to BindingContext
+//
 private fun KtElement.resolveToDeclaration(bindingContext: BindingContext): Result<PsiElement> =
         runCatching {
             when (val descriptor =
@@ -220,11 +224,15 @@ private fun KtElement.resolveToDeclaration(bindingContext: BindingContext): Resu
             }
         }
 
+// HIGHLY IMPORTANT: eventually resolve (KtTypeReference, KtReferenceExpression) to KtClass
+//
 private fun KtElement.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> =
         resolveToDeclaration(bindingContext).map {
             it as? KtClass ?: throw NoSuchElementException("Declaration is not a KtClass")
         }
 
+// HIGHLY IMPORTANT: eventually KtNameReferenceExpression resolve to function declaration
+//
 private fun KtCallExpression.resolveFunctionDeclaration(
         bindingContext: BindingContext
 ): Result<Pair<String, File>> = runCatching {
@@ -239,26 +247,6 @@ private fun KtCallExpression.resolveFunctionDeclaration(
             .map { declaration -> Pair(namedReference.text, File(declaration.containingFile.name)) }
             .getOrThrow()
 }
-
-// // HIGHLY IMPORTANT: eventually resolve KtReferenceExpression|KtTypeReference to a KtClass
-// // This includes a `warp` to whatever sourcefile declaring the KtClass,
-// // DescriptorToSourceUtils.getSourceFromDescriptor, thanks to BindingContext
-// //
-// private fun KtElement.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> =
-//         runCatching {
-//             when (this) {
-//                         is KtTypeReference -> bindingContext.get(BindingContext.TYPE, this)
-//                         is KtReferenceExpression -> bindingContext.getType(this)
-//                         else ->
-//                                 throw IllegalArgumentException(
-//                                         "Unsupported element type: ${this.javaClass.simpleName}"
-//                                 )
-//                     }
-//                     ?.constructor?.declarationDescriptor?.let {
-//                 DescriptorToSourceUtils.getSourceFromDescriptor(it) as? KtClass
-//             }
-//                     ?: throw NoSuchElementException("Could not resolve to KtClass")
-//         }
 
 /** KtProperty extension functions */
 //
