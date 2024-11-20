@@ -47,7 +47,9 @@ enum class RuleMethod(val methodName: String) {
 /** KtFile extension functions */
 //
 
-// filter and eventually get class as subclass of given super class from KtFile
+// filter and eventually get subclass of given super class from KtFile
+// see test `testExtractRuleServiceKtClass` and `testExtractRuleFlowKtClass`
+//
 fun KtFile.getSubClassOfSuperClass(superClassRef: (KtClass) -> Boolean): Result<KtClass> =
         runCatching {
             declarations.asSequence().filterIsInstance<KtClass>().firstOrNull(superClassRef)
@@ -57,7 +59,6 @@ fun KtFile.getSubClassOfSuperClass(superClassRef: (KtClass) -> Boolean): Result<
 /** KtClass extension functions */
 //
 
-// functions to be superClassRef parameter in KtFile.getClassWithSuperType
 fun KtClass.isSubClassOfRuleServiceClass(): Boolean = isSubClassOf(RuleSuperClass.RULE_SERVICE)
 
 fun KtClass.isSubClassOfRuleFlowClass(): Boolean = isSubClassOf(RuleSuperClass.RULE_FLOW)
@@ -73,10 +74,17 @@ fun KtClass.isSubClassOfServiceResponseClass(): Boolean =
 private fun KtClass.isSubClassOf(type: RuleSuperClass): Boolean =
         getSuperTypeListEntries().any { it.typeReference?.text?.contains(type.className) == true }
 
+// get KDoc for a KtClass, or empty string
+// see test `testExtractKDoc`
+// see ext. function `getOrEmpty` for KDoc
+//
 fun KtClass.getKDocOrEmpty(): String = docComment?.getOrEmpty() ?: ""
 
 data class ServiceRequestInfo(val parameter: KtParameter, val resolvedClass: KtClass)
 
+// eventually, get 1th param of a subclass of ServiceRequest
+// see test `testGetRequestClassFromRuleServiceClass`
+//
 fun KtClass.getServiceRequestInfo(bindingContext: BindingContext): Result<ServiceRequestInfo> =
         runCatching {
             primaryConstructor?.valueParameters?.firstNotNullOfOrNull { parameter ->
@@ -93,6 +101,10 @@ fun KtClass.getServiceRequestInfo(bindingContext: BindingContext): Result<Servic
                     )
         }
 
+// eventually, get the class of the generic param to AbstractPensjonRuleService, which is a subclass
+// of ServiceResponse
+// see test `testGetResponseClassFromRuleServiceClass`
+//
 fun KtClass.getServiceResponseClass(bindingContext: BindingContext): Result<KtClass> =
         getClassOfSuperClassParam(
                 superClassRef = RuleSuperClass.RULE_SERVICE,
@@ -101,8 +113,8 @@ fun KtClass.getServiceResponseClass(bindingContext: BindingContext): Result<KtCl
         )
 
 private fun KtClass.getClassOfSuperClassParam(
-        superClassRef: RuleSuperClass, // e.g., "AbstractPensjonRuleService"
-        paramSubClassOf: (KtClass) -> Boolean, // e.g., KtClass::isServiceResponseClass
+        superClassRef: RuleSuperClass,
+        paramSubClassOf: (KtClass) -> Boolean,
         bindingContext: BindingContext
 ): Result<KtClass> = runCatching {
     getSuperTypeListEntries()
@@ -165,6 +177,10 @@ private fun KtParameter.getSubClassOfSuperClass(
             ?: throw NoSuchElementException("No type reference found")
 }
 
+// get KDoc for a KtParameter, or empty string
+// see test `testParameterKDocFromRequestPrimaryConstructor`
+// see ext. function `getOrEmpty` for KDoc
+//
 fun KtParameter.getKDocOrEmpty(): String = docComment?.getOrEmpty() ?: ""
 
 /** KtTypeReference extension functions */
