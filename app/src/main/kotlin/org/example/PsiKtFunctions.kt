@@ -1,14 +1,17 @@
 package org.example
 
 import java.io.File
+import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtBlockExpression
+import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtLambdaExpression
+import org.jetbrains.kotlin.psi.KtNameReferenceExpression
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.KtReferenceExpression
@@ -191,25 +194,71 @@ fun KtParameter.getKDocOrEmpty(): String = docComment?.getOrEmpty() ?: ""
 /** KtElement extension functions */
 ///////////////////////////////////////////////////
 
-// HIGHLY IMPORTANT: eventually resolve KtReferenceExpression|KtTypeReference to a KtClass
-// This includes a `warp` to whatever sourcefile declaring the KtClass,
-// DescriptorToSourceUtils.getSourceFromDescriptor, thanks to BindingContext
-//
-private fun KtElement.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> =
+private fun KtElement.resolveToDeclaration(bindingContext: BindingContext): Result<PsiElement> =
         runCatching {
-            when (this) {
-                        is KtTypeReference -> bindingContext.get(BindingContext.TYPE, this)
-                        is KtReferenceExpression -> bindingContext.getType(this)
-                        else ->
-                                throw IllegalArgumentException(
-                                        "Unsupported element type: ${this.javaClass.simpleName}"
-                                )
-                    }
-                    ?.constructor?.declarationDescriptor?.let {
-                DescriptorToSourceUtils.getSourceFromDescriptor(it) as? KtClass
+            when (val descriptor =
+                            when (this) {
+                                is KtNameReferenceExpression ->
+                                        bindingContext[BindingContext.REFERENCE_TARGET, this]
+                                is KtTypeReference ->
+                                        bindingContext.get(BindingContext.TYPE, this)
+                                                ?.constructor
+                                                ?.declarationDescriptor
+                                is KtReferenceExpression ->
+                                        bindingContext.getType(this)
+                                                ?.constructor
+                                                ?.declarationDescriptor
+                                else ->
+                                        throw IllegalArgumentException(
+                                                "Unsupported element type: ${this.javaClass.simpleName}"
+                                        )
+                            }
+            ) {
+                null -> throw NoSuchElementException("Could not resolve descriptor")
+                else -> DescriptorToSourceUtils.getSourceFromDescriptor(descriptor)
+                                ?: throw NoSuchElementException("Could not resolve to declaration")
             }
-                    ?: throw NoSuchElementException("Could not resolve to KtClass")
         }
+
+private fun KtElement.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> =
+        resolveToDeclaration(bindingContext).map {
+            it as? KtClass ?: throw NoSuchElementException("Declaration is not a KtClass")
+        }
+
+private fun KtCallExpression.resolveFunctionDeclaration(
+        bindingContext: BindingContext
+): Result<Pair<String, File>> = runCatching {
+    val namedReference =
+            calleeExpression as? KtNameReferenceExpression
+                    ?: throw NoSuchElementException(
+                            "Call expression does not have a named reference"
+                    )
+
+    namedReference
+            .resolveToDeclaration(bindingContext)
+            .map { declaration -> Pair(namedReference.text, File(declaration.containingFile.name)) }
+            .getOrThrow()
+}
+
+// // HIGHLY IMPORTANT: eventually resolve KtReferenceExpression|KtTypeReference to a KtClass
+// // This includes a `warp` to whatever sourcefile declaring the KtClass,
+// // DescriptorToSourceUtils.getSourceFromDescriptor, thanks to BindingContext
+// //
+// private fun KtElement.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> =
+//         runCatching {
+//             when (this) {
+//                         is KtTypeReference -> bindingContext.get(BindingContext.TYPE, this)
+//                         is KtReferenceExpression -> bindingContext.getType(this)
+//                         else ->
+//                                 throw IllegalArgumentException(
+//                                         "Unsupported element type: ${this.javaClass.simpleName}"
+//                                 )
+//                     }
+//                     ?.constructor?.declarationDescriptor?.let {
+//                 DescriptorToSourceUtils.getSourceFromDescriptor(it) as? KtClass
+//             }
+//                     ?: throw NoSuchElementException("Could not resolve to KtClass")
+//         }
 
 /** KtProperty extension functions */
 //
@@ -232,6 +281,12 @@ private fun KtProperty.streamRuleElements(
                 block.children.asSequence().flatMap { element ->
                     sequence {
                         when (element) {
+                            is KtCallExpression -> {
+                                element.resolveFunctionDeclaration(bindingContext)
+                                        .map { (name, file) -> FlowReference.Function(name, file) }
+                                        .getOrNull()
+                                        ?.let { yield(it) }
+                            }
                             is KtProperty -> {
                                 element.children.filterIsInstance<KDoc>().forEach {
                                     yield(FlowReference.Documentation(it.getOrEmpty()))

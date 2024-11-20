@@ -67,6 +67,8 @@ class AnalyzerFunctionsTests {
         val ruleService =
                 SourceCode(
                         """
+            fun log_debug(message: String) = println(message)
+
             class ${ruleServiceName}(val $reqName: $reqType) : AbstractPensjonRuleService<$respType>() {
                 override val ruleService: () -> TrygdetidResponse = {
                     log_debug("[FUN] startFastsettTrygdetid")
@@ -209,9 +211,9 @@ class AnalyzerFunctionsTests {
             assertEquals("Pakkseddel", rs.utdata[4].type)
             assert(rs.utdata[4].beskrivelse.isEmpty())
 
-            assertEquals(3, rs.flyt.elementer.count())
+            assertEquals(5, rs.flyt.elementer.count())
 
-            val element = rs.flyt.elementer[2] as FlowElement.Reference
+            val element = rs.flyt.elementer[3] as FlowElement.Reference
             val aRuleFlow = element.reference as FlowReference.RuleFlow
             assertEquals("StartTrygdetidFlyt", aRuleFlow.navn)
         }
