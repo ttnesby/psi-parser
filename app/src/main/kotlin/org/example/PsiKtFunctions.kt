@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtBlockExpression
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
+import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtLambdaExpression
 import org.jetbrains.kotlin.psi.KtParameter
@@ -44,8 +45,9 @@ enum class RuleMethod(val methodName: String) {
     override fun toString(): String = methodName
 }
 
+///////////////////////////////////////////////////
 /** KtFile extension functions */
-//
+///////////////////////////////////////////////////
 
 // filter and eventually get subclass of given super class from KtFile
 // see test `testExtractRuleServiceKtClass` and `testExtractRuleFlowKtClass`
@@ -56,8 +58,9 @@ fun KtFile.getSubClassOfSuperClass(superClassRef: (KtClass) -> Boolean): Result<
                     ?: throw NoSuchElementException("No class found with specified superClassRef")
         }
 
+///////////////////////////////////////////////////
 /** KtClass extension functions */
-//
+///////////////////////////////////////////////////
 
 fun KtClass.isSubClassOfRuleServiceClass(): Boolean = isSubClassOf(RuleSuperClass.RULE_SERVICE)
 
@@ -159,8 +162,9 @@ fun KDoc.getOrEmpty(): String =
         }
                 ?: ""
 
+///////////////////////////////////////////////////
 /** KtParameter extension functions */
-//
+///////////////////////////////////////////////////
 
 private fun KtParameter.getSubClassOfSuperClass(
         superClassRef: (KtClass) -> Boolean,
@@ -183,28 +187,29 @@ private fun KtParameter.getSubClassOfSuperClass(
 //
 fun KtParameter.getKDocOrEmpty(): String = docComment?.getOrEmpty() ?: ""
 
-/** KtTypeReference extension functions */
-//
+///////////////////////////////////////////////////
+/** KtElement extension functions */
+///////////////////////////////////////////////////
 
-private fun KtTypeReference.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> =
+// HIGHLY IMPORTANT: eventually resolve KtReferenceExpression|KtTypeReference to a KtClass
+// This includes a `warp` to whatever sourcefile declaring the KtClass,
+// DescriptorToSourceUtils.getSourceFromDescriptor, thanks to BindingContext
+//
+private fun KtElement.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> =
         runCatching {
-            bindingContext.get(BindingContext.TYPE, this)?.constructor?.declarationDescriptor?.let {
+            when (this) {
+                        is KtTypeReference -> bindingContext.get(BindingContext.TYPE, this)
+                        is KtReferenceExpression -> bindingContext.getType(this)
+                        else ->
+                                throw IllegalArgumentException(
+                                        "Unsupported element type: ${this.javaClass.simpleName}"
+                                )
+                    }
+                    ?.constructor?.declarationDescriptor?.let {
                 DescriptorToSourceUtils.getSourceFromDescriptor(it) as? KtClass
             }
-                    ?: throw NoSuchElementException("Could not resolve type reference to KtClass")
+                    ?: throw NoSuchElementException("Could not resolve to KtClass")
         }
-
-/** KtReferenceExpression extension functions */
-//
-
-private fun KtReferenceExpression.resolveToKtClass(
-        bindingContext: BindingContext
-): Result<KtClass> = runCatching {
-    bindingContext.getType(this)?.constructor?.declarationDescriptor?.let {
-        DescriptorToSourceUtils.getSourceFromDescriptor(it) as? KtClass
-    }
-            ?: throw NoSuchElementException("Could not resolve reference expression to KtClass")
-}
 
 /** KtProperty extension functions */
 //
@@ -214,6 +219,10 @@ private fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> = runCatching
             ?: throw NoSuchElementException("No lambda block found in property")
 }
 
+// eventually, get a sequence of FlowReference from a lambda block
+// see data class `FlowReference`
+// see test `testExtractSequenceFlowKtElements`
+//
 private fun KtProperty.streamRuleElements(
         superType: RuleSuperClass,
         bindingContext: BindingContext
@@ -247,9 +256,12 @@ private fun KtProperty.streamRuleElements(
             .getOrThrow()
 }
 
+///////////////////////////////////////////////////
 /** KtDotQualifiedExpression extension functions */
-//
+///////////////////////////////////////////////////
 
+// eventually resolve a KtDotQualifiedExpression to receiver KtClass
+//
 private fun KtDotQualifiedExpression.resolveReceiverClass(
         superType: RuleSuperClass,
         bindingContext: BindingContext
