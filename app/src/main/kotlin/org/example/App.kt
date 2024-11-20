@@ -59,12 +59,12 @@ fun processRepo(
         context: CompilerContext,
         root: File,
         dependencies: File? = null
-): Result<List<RuleServiceDoc>> {
+): Result<AnalysisResult> {
     dependencies?.let { addDependenciesToClasspath(it, context) }
 
     return findKotlinSourceFiles(root, context).let { sourceFiles ->
         getBindingContext(sourceFiles, context).map { bindingContext ->
-            analyzeSourceFiles(sourceFiles, bindingContext)
+            analyzeSourceFiles2(sourceFiles, bindingContext)
         }
     }
 }
@@ -74,10 +74,15 @@ fun analyzeRepository(
         repoPath: File,
         libsPath: File,
         disposable: Disposable
-): Result<List<RuleServiceDoc>> =
+): Result<AnalysisResult> =
         createCompilerContext(jdkHome, disposable)
                 .map { context: CompilerContext ->
-                    processRepo(context, repoPath, libsPath).getOrThrow().sortedBy { it.navn }
+                    processRepo(context, repoPath, libsPath).getOrThrow().let { result ->
+                        AnalysisResult(
+                                services = result.services.sortedBy { it.navn },
+                                flows = result.flows.sortedBy { it.navn }
+                        )
+                    }
                 }
                 .onFailurePrint("Repository analysis failed")
 
@@ -91,9 +96,14 @@ fun main(args: Array<String>) {
                         disposable = disposable
                 )
                 .getOrNull()
-                ?.let { ruleServices ->
-                    ruleServices.forEach(::println)
-                    println("Found ${ruleServices.size} rule services")
+                ?.let { result ->
+                    println("Rule Services:")
+                    result.services.forEach(::println)
+                    println("\nRule Flows:")
+                    result.flows.forEach(::println)
+                    println("\nSummary:")
+                    println("Found ${result.services.size} rule services")
+                    println("Found ${result.flows.size} rule flows")
                 }
     } finally {
         disposable.dispose()

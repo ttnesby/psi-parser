@@ -8,6 +8,8 @@ import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtParameter
 
+data class AnalysisResult(val services: List<RuleServiceDoc>, val flows: List<RuleFlowDoc>)
+
 // data class for rule service documentation, see AbstractPensjonRuleService
 data class RuleServiceDoc(
         val navn: String,
@@ -35,6 +37,36 @@ data class RuleServiceDoc(
             |   beskrivelse = $beskrivelse
             |   inndata = $inndata
             |   utdata = $utdata
+            |   flyt = $flyt
+            |   gitHubUri = ${gitHubUri.toString()}
+            |)
+        """.trimMargin()
+    }
+}
+
+data class RuleFlowDoc(
+        val navn: String,
+        val beskrivelse: String,
+        val inndata: List<PropertyDoc>,
+        val flyt: FlowElement.Flow,
+        val gitHubUri: URI,
+) {
+    companion object {
+        fun new(
+                navn: String,
+                beskrivelse: String,
+                inndata: List<PropertyDoc>,
+                flyt: FlowElement.Flow,
+                gitHubUri: URI
+        ): RuleFlowDoc = RuleFlowDoc(navn, beskrivelse, inndata, flyt, gitHubUri)
+    }
+
+    override fun toString(): String {
+        return """
+            |RuleFlowDoc(
+            |   navn = $navn
+            |   beskrivelse = $beskrivelse
+            |   inndata = $inndata
             |   flyt = $flyt
             |   gitHubUri = ${gitHubUri.toString()}
             |)

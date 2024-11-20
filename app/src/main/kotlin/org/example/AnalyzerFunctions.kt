@@ -1,6 +1,7 @@
 package org.example
 
 import java.net.URI
+import kotlin.collections.emptyList
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
@@ -8,6 +9,26 @@ import org.jetbrains.kotlin.resolve.BindingContext
 // TODO
 // - Add support for RuleFlow and RuleSet, included into analyzeSourceFiles
 //
+
+fun analyzeSourceFiles2(sourceFiles: List<KtFile>, bindingContext: BindingContext): AnalysisResult =
+        sourceFiles.chunked(100).fold(AnalysisResult(emptyList(), emptyList())) { acc, batch ->
+            val batchResults =
+                    batch.mapNotNull { file ->
+                        (getRuleService(file, bindingContext).getOrNull()?.let { service ->
+                                    AnalysisResult(listOf(service), emptyList())
+                                }
+                                        ?: getRuleFlow(file, bindingContext).getOrNull()?.let { flow
+                                            ->
+                                            AnalysisResult(emptyList(), listOf(flow))
+                                        })
+                                .also { (file as PsiFileImpl).clearCaches() }
+                    }
+
+            AnalysisResult(
+                    services = acc.services + batchResults.flatMap { it.services },
+                    flows = acc.flows + batchResults.flatMap { it.flows }
+            )
+        }
 
 fun analyzeSourceFiles(
         sourceFiles: List<KtFile>,
@@ -87,3 +108,14 @@ fun getFlow(ktClass: KtClass, bindingContext: BindingContext): FlowElement.Flow 
                     )
                 }
                 .getOrDefault(FlowElement.Flow(emptyList()))
+
+fun getRuleFlow(ktFile: KtFile, bindingContext: BindingContext): Result<RuleFlowDoc> =
+        ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleFlowClass).map { ktClass ->
+            RuleFlowDoc.new(
+                    navn = ktClass.name!!,
+                    beskrivelse = ktClass.getKDocOrEmpty(),
+                    inndata = emptyList(),
+                    flyt = FlowElement.Flow(emptyList()),
+                    gitHubUri = URI("${ktFile.name}")
+            )
+        }
