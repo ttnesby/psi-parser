@@ -56,7 +56,7 @@ class PsiKtFunctionsTest {
                 )
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleServiceClass)
+            ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
                     .map { assert(true) }
                     .onFailure { assert(false) }
         }
@@ -73,7 +73,7 @@ class PsiKtFunctionsTest {
                 )
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleFlowClass)
+            ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleFlowClass)
                     .map { assert(true) }
                     .onFailure { assert(false) }
         }
@@ -88,7 +88,7 @@ class PsiKtFunctionsTest {
         """.trimIndent())
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleServiceClass)
+            ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
                     .map { assert(false) }
                     .onFailure { assert(it is NoSuchElementException) }
         }
@@ -102,7 +102,7 @@ class PsiKtFunctionsTest {
         """.trimIndent())
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleServiceClass)
+            ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
                     .map { assert(false) }
                     .onFailure { assert(it is NoSuchElementException) }
         }
@@ -123,7 +123,7 @@ class PsiKtFunctionsTest {
 
         analyzeKotlinCode(code).let { ktFile ->
             getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
                         .map { ruleService ->
                             ruleService
                                     .getServiceRequestInfo(bindingContext)
@@ -153,7 +153,7 @@ class PsiKtFunctionsTest {
 
         analyzeKotlinCode(code).let { ktFile ->
             getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
                         .map { ruleService ->
                             ruleService
                                     .getServiceRequestInfo(bindingContext)
@@ -179,7 +179,7 @@ class PsiKtFunctionsTest {
 
         analyzeKotlinCode(code).let { ktFile ->
             getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
                         .map { ruleService ->
                             ruleService
                                     .getServiceResponseClass(bindingContext)
@@ -207,7 +207,7 @@ class PsiKtFunctionsTest {
 
         analyzeKotlinCode(code).let { ktFile ->
             getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
                         .map { ruleService ->
                             ruleService
                                     .getServiceResponseClass(bindingContext)
@@ -237,7 +237,7 @@ class PsiKtFunctionsTest {
                 )
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleServiceClass)
+            ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
                     .map {
                         val expected = listOf(doc1, doc2).joinToString("\n").trim()
                         assertEquals(expected, it.getKDocOrEmpty())
@@ -257,7 +257,7 @@ class PsiKtFunctionsTest {
                 )
 
         analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleServiceClass)
+            ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
                     .map { it.getKDocOrEmpty().isEmpty() }
                     .onFailure { assert(false) }
         }
@@ -289,7 +289,7 @@ class PsiKtFunctionsTest {
 
         analyzeKotlinCode(code).let { ktFile ->
             getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
                         .map { ruleService ->
                             ruleService
                                     .getServiceRequestInfo(bindingContext)
@@ -345,7 +345,7 @@ class PsiKtFunctionsTest {
 
         analyzeKotlinCode(code).let { ktFile ->
             getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
                         .map { ruleService ->
                             ruleService
                                     .getServiceRequestInfo(bindingContext)
@@ -445,7 +445,7 @@ class PsiKtFunctionsTest {
 
         analyzeKotlinCode(code).let { ktFile ->
             getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
                         .map { ruleService ->
                             ruleService
                                     .getRuleServiceFlow(bindingContext)
@@ -489,7 +489,7 @@ class PsiKtFunctionsTest {
 
         analyzeKotlinCode(code).let { ktFile ->
             getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
                         .map { ruleService ->
                             ruleService
                                     .getRuleServiceFlow(bindingContext)

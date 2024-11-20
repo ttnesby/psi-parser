@@ -32,7 +32,7 @@ fun analyzeSourceFiles(
  * ```
  */
 fun getRuleService(ktFile: KtFile, bindingContext: BindingContext): Result<RuleServiceDoc> =
-        ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleServiceClass).map { ktClass ->
+        ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass).map { ktClass ->
             RuleServiceDoc.new(
                     navn = ktClass.name!!,
                     beskrivelse = ktClass.getKDocOrEmpty(),
