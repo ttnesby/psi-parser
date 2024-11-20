@@ -10,6 +10,11 @@ import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.*
 
+// TODO:
+// - logging
+// - parameter for repo root
+// - automatic extract of pensjon-regler dependencies to temp folder
+
 fun <T> Result<T>.onFailurePrint(message: String): Result<T> = onFailure {
     println("$message: ${it.message}")
 }
@@ -59,7 +64,7 @@ fun processRepo(
 
     return findKotlinSourceFiles(root, context).let { sourceFiles ->
         getBindingContext(sourceFiles, context).map { bindingContext ->
-            analyzeSourceFilesForRuleServices(sourceFiles, bindingContext)
+            analyzeSourceFiles(sourceFiles, bindingContext)
         }
     }
 }

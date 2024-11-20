@@ -15,7 +15,8 @@ import org.jetbrains.kotlin.psi.KtTypeReference
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 
-enum class RuleSuperType(val className: String) {
+// type safe way of representing rule super classes
+enum class RuleSuperClass(val className: String) {
     SERVICE_REQUEST("ServiceRequest"),
     SERVICE_RESPONSE("ServiceResponse"),
     RULE_SERVICE("AbstractPensjonRuleService"),
@@ -23,13 +24,14 @@ enum class RuleSuperType(val className: String) {
     RULE_SET("AbstractPensjonRuleSet");
 
     companion object {
-        fun fromClassName(className: String): RuleSuperType? =
+        fun fromClassName(className: String): RuleSuperClass? =
                 values().find { it.className == className }
     }
 
     override fun toString(): String = className
 }
 
+// type safe way of representing rule methods
 enum class RuleMethod(val methodName: String) {
     RULE_SERVICE("ruleService"),
     RULE_FLOW("ruleFlow");
@@ -45,28 +47,30 @@ enum class RuleMethod(val methodName: String) {
 /** KtFile extension functions */
 //
 
-// filter and eventually get class of given super type from KtFile
-fun KtFile.getClassWithSuperType(superTypeRef: (KtClass) -> Boolean): Result<KtClass> =
+// filter and eventually get class as subclass of given super class from KtFile
+fun KtFile.getClassWithSuperClass(superClassRef: (KtClass) -> Boolean): Result<KtClass> =
         runCatching {
-            declarations.asSequence().filterIsInstance<KtClass>().firstOrNull(superTypeRef)
+            declarations.asSequence().filterIsInstance<KtClass>().firstOrNull(superClassRef)
                     ?: throw NoSuchElementException("No class found with specified supertype")
         }
 
 /** KtClass extension functions */
 //
 
-// functions to be superTypeRef parameter in KtFile.getClassWithSuperType
-fun KtClass.isRuleServiceClass(): Boolean = isSubTypeOf(RuleSuperType.RULE_SERVICE)
+// functions to be superClassRef parameter in KtFile.getClassWithSuperType
+fun KtClass.isSubClassOfRuleServiceClass(): Boolean = isSubClassOf(RuleSuperClass.RULE_SERVICE)
 
-fun KtClass.isRuleFlowClass(): Boolean = isSubTypeOf(RuleSuperType.RULE_FLOW)
+fun KtClass.isSubClassOfRuleFlowClass(): Boolean = isSubClassOf(RuleSuperClass.RULE_FLOW)
 
-fun KtClass.isRuleSetClass(): Boolean = isSubTypeOf(RuleSuperType.RULE_SET)
+fun KtClass.isSubClassOfRuleSetClass(): Boolean = isSubClassOf(RuleSuperClass.RULE_SET)
 
-fun KtClass.isServiceRequestClass(): Boolean = isSubTypeOf(RuleSuperType.SERVICE_REQUEST)
+fun KtClass.isSubClassOfServiceRequestClass(): Boolean =
+        isSubClassOf(RuleSuperClass.SERVICE_REQUEST)
 
-fun KtClass.isServiceResponseClass(): Boolean = isSubTypeOf(RuleSuperType.SERVICE_RESPONSE)
+fun KtClass.isSubClassOfServiceResponseClass(): Boolean =
+        isSubClassOf(RuleSuperClass.SERVICE_RESPONSE)
 
-private fun KtClass.isSubTypeOf(type: RuleSuperType): Boolean =
+private fun KtClass.isSubClassOf(type: RuleSuperClass): Boolean =
         getSuperTypeListEntries().any { it.typeReference?.text?.contains(type.className) == true }
 
 fun KtClass.getKDocOrEmpty(): String = docComment?.getOrEmpty() ?: ""
@@ -77,7 +81,10 @@ fun KtClass.getServiceRequestInfo(bindingContext: BindingContext): Result<Servic
         runCatching {
             primaryConstructor?.valueParameters?.firstNotNullOfOrNull { parameter ->
                 parameter
-                        .getClassWithSuperType(KtClass::isServiceRequestClass, bindingContext)
+                        .getClassWithSuperClass(
+                                KtClass::isSubClassOfServiceRequestClass,
+                                bindingContext
+                        )
                         .map { resolvedClass -> ServiceRequestInfo(parameter, resolvedClass) }
                         .getOrNull()
             }
@@ -88,13 +95,13 @@ fun KtClass.getServiceRequestInfo(bindingContext: BindingContext): Result<Servic
 
 fun KtClass.getServiceResponseClass(bindingContext: BindingContext): Result<KtClass> =
         getClassOfSuperTypeParam(
-                supertype = RuleSuperType.RULE_SERVICE,
-                classTypeRef = KtClass::isServiceResponseClass,
+                supertype = RuleSuperClass.RULE_SERVICE,
+                classTypeRef = KtClass::isSubClassOfServiceResponseClass,
                 bindingContext = bindingContext
         )
 
 private fun KtClass.getClassOfSuperTypeParam(
-        supertype: RuleSuperType, // e.g., "AbstractPensjonRuleService"
+        supertype: RuleSuperClass, // e.g., "AbstractPensjonRuleService"
         classTypeRef: (KtClass) -> Boolean, // e.g., KtClass::isServiceResponseClass
         bindingContext: BindingContext
 ): Result<KtClass> = runCatching {
@@ -115,7 +122,7 @@ private fun KtClass.getClassOfSuperTypeParam(
 
 fun KtClass.getRuleServiceFlow(bindingContext: BindingContext): Result<Sequence<FlowReference>> =
         getOverriddenProperty(RuleMethod.RULE_SERVICE).mapCatching { property ->
-            property.streamRuleElements(RuleSuperType.RULE_FLOW, bindingContext).getOrThrow()
+            property.streamRuleElements(RuleSuperClass.RULE_FLOW, bindingContext).getOrThrow()
         }
 
 private fun KtClass.getOverriddenProperty(method: RuleMethod): Result<KtProperty> = runCatching {
@@ -143,14 +150,14 @@ fun KDoc.getOrEmpty(): String =
 /** KtParameter extension functions */
 //
 
-private fun KtParameter.getClassWithSuperType(
-        superTypeRef: (KtClass) -> Boolean,
+private fun KtParameter.getClassWithSuperClass(
+        superClassRef: (KtClass) -> Boolean,
         bindingContext: BindingContext
 ): Result<KtClass> = runCatching {
     typeReference?.let { typeRef ->
         typeRef.resolveToKtClass(bindingContext)
                 .map { resolvedClass ->
-                    if (superTypeRef(resolvedClass)) resolvedClass
+                    if (superClassRef(resolvedClass)) resolvedClass
                     else throw NoSuchElementException("Class is not a ServiceRequest")
                 }
                 .getOrThrow()
@@ -192,7 +199,7 @@ private fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> = runCatching
 }
 
 private fun KtProperty.streamRuleElements(
-        superType: RuleSuperType,
+        superType: RuleSuperClass,
         bindingContext: BindingContext
 ): Result<Sequence<FlowReference>> = runCatching {
     getLambdaBlock()
@@ -228,13 +235,13 @@ private fun KtProperty.streamRuleElements(
 //
 
 private fun KtDotQualifiedExpression.resolveReceiverClass(
-        superType: RuleSuperType,
+        superType: RuleSuperClass,
         bindingContext: BindingContext
 ): Result<KtClass> = runCatching {
     (receiverExpression as? KtReferenceExpression)
             ?.resolveToKtClass(bindingContext)
             ?.map { resolvedClass ->
-                if (resolvedClass.isSubTypeOf(superType)) resolvedClass
+                if (resolvedClass.isSubClassOf(superType)) resolvedClass
                 else throw NoSuchElementException("Class is not of type ${superType.className}")
             }
             ?.getOrThrow()

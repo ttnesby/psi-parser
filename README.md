@@ -40,8 +40,10 @@ En `god nok` bindingContext forutsetter færrest mulig feil. Per nå er antall f
 
 ### Program Structure Interface (PSI)
 
-PSI tilbyr ulike mekanismer for finne relevante elementer gjennom PSUtil mange `visitor pattern` metoder.
-Se [Program Structure Interface (PSI)](https://plugins.jetbrains.com/docs/intellij/psi.html).
+PSI tilbyr ulike mekanismer for finne relevante elementer med PSUtil og `visitor pattern` metoder.
+Se
+- [Program Structure Interface (PSI)](https://plugins.jetbrains.com/docs/intellij/psi.html).
+- [PSI og kotlin typer](https://github.com/JetBrains/kotlin/tree/master/compiler/psi/src/org/jetbrains/kotlin/psi)
 
 Det er også greit å ta en titt på [intellij Platform API](https://plugins.jetbrains.com/docs/intellij/explore-api.html).
 

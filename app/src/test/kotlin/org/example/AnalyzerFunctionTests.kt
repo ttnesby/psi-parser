@@ -41,7 +41,7 @@ class AnalyzerFunctionsTests {
                     }
                     .let { ktFiles ->
                         getBindingContext(ktFiles, context).map { bctx ->
-                            analyzeSourceFilesForRuleServices(ktFiles, bctx)
+                            analyzeSourceFiles(ktFiles, bctx)
                         }
                     }
 

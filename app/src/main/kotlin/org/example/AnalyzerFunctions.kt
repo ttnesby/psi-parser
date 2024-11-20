@@ -5,7 +5,11 @@ import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
 
-fun analyzeSourceFilesForRuleServices(
+// TODO
+// - Add support for RuleFlow and RuleSet, included into analyzeSourceFiles
+//
+
+fun analyzeSourceFiles(
         sourceFiles: List<KtFile>,
         bindingContext: BindingContext
 ): List<RuleServiceDoc> =
@@ -17,8 +21,18 @@ fun analyzeSourceFilesForRuleServices(
             }
         }
 
+/**
+ * Extract rule service documentation from a Kotlin file
+ *
+ * @param ktFile Kotlin file to analyze
+ * @param bindingContext Binding context for type resolution
+ * @return Result containing RuleServiceDoc if a rule service class is found,
+ * ```
+ *         or failure if no rule service class exists in the file
+ * ```
+ */
 fun getRuleService(ktFile: KtFile, bindingContext: BindingContext): Result<RuleServiceDoc> =
-        ktFile.getClassWithSuperType(KtClass::isRuleServiceClass).map { ktClass ->
+        ktFile.getClassWithSuperClass(KtClass::isSubClassOfRuleServiceClass).map { ktClass ->
             RuleServiceDoc.new(
                     navn = ktClass.name!!,
                     beskrivelse = ktClass.getKDocOrEmpty(),
