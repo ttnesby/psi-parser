@@ -3,12 +3,17 @@
  */
 package org.example
 
+import org.jetbrains.kotlin.cli.jvm.compiler.*
+import org.jetbrains.kotlin.config.*
+import org.jetbrains.kotlin.psi.*
+import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.assertNotNull
 
 class AppTest {
+
     @Test
-    fun dummy() {
+    @DisplayName("To be done")
+    fun testToBeDone() {
         assert(true)
     }
 }
