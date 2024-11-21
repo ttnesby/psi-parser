@@ -453,17 +453,17 @@ class PsiKtFunctionsTest {
                                         assertEquals(3, seq.count())
                                         assertEquals(
                                                 "Test1",
-                                                (seq.elementAt(0) as FlowReference.Documentation)
+                                                (seq.elementAt(0) as FlowElement.Documentation)
                                                         .beskrivelse
                                         )
                                         assertEquals(
                                                 "Test2",
-                                                (seq.elementAt(1) as FlowReference.Documentation)
+                                                (seq.elementAt(1) as FlowElement.Documentation)
                                                         .beskrivelse
                                         )
                                         assertEquals(
                                                 "StartTrygdetidFlyt",
-                                                (seq.elementAt(2) as FlowReference.RuleFlow).navn
+                                                (seq.elementAt(2) as FlowElement.RuleFlow).navn
                                         )
                                     }
                                     .onFailure { assert(false) }
