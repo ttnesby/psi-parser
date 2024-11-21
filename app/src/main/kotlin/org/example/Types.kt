@@ -169,12 +169,10 @@ sealed class FlowElement {
             FlowElement()
     data class Gren(val beskrivelse: String, val betingelse: String, val flyt: Flow) :
             FlowElement()
-    data class Reference(val reference: FlowReference) : FlowElement()
-}
+    data class Documentation(val beskrivelse: String) : FlowElement()
 
-sealed class FlowReference {
-    data class Documentation(val beskrivelse: String) : FlowReference()
-    data class RuleFlow(val navn: String, val fil: File) : FlowReference()
-    data class RuleSet(val navn: String, val fil: File) : FlowReference()
-    data class Function(val navn: String, val fil: File) : FlowReference()
+    // reference to flow element in other files
+    data class RuleFlow(val navn: String, val fil: File) : FlowElement()
+    data class RuleSet(val navn: String, val fil: File) : FlowElement()
+    data class Function(val navn: String, val fil: File) : FlowElement()
 }

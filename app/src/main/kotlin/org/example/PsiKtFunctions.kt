@@ -138,7 +138,7 @@ private fun KtClass.getClassOfSuperClassParam(
             ?: throw NoSuchElementException("No type parameter found for $superClassRef")
 }
 
-fun KtClass.getRuleServiceFlow(bindingContext: BindingContext): Result<Sequence<FlowReference>> =
+fun KtClass.getRuleServiceFlow(bindingContext: BindingContext): Result<Sequence<FlowElement>> =
         getOverriddenProperty(RuleMethod.RULE_SERVICE).mapCatching { property ->
             property.streamRuleElements(RuleSuperClass.RULE_FLOW, bindingContext).getOrThrow()
         }
@@ -263,7 +263,7 @@ private fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> = runCatching
 private fun KtProperty.streamRuleElements(
         superType: RuleSuperClass,
         bindingContext: BindingContext
-): Result<Sequence<FlowReference>> = runCatching {
+): Result<Sequence<FlowElement>> = runCatching {
     getLambdaBlock()
             .map { block ->
                 block.children.asSequence().flatMap { element ->
@@ -271,20 +271,20 @@ private fun KtProperty.streamRuleElements(
                         when (element) {
                             is KtCallExpression -> {
                                 element.resolveFunctionDeclaration(bindingContext)
-                                        .map { (name, file) -> FlowReference.Function(name, file) }
+                                        .map { (name, file) -> FlowElement.Function(name, file) }
                                         .getOrNull()
                                         ?.let { yield(it) }
                             }
                             is KtProperty -> {
                                 element.children.filterIsInstance<KDoc>().forEach {
-                                    yield(FlowReference.Documentation(it.getOrEmpty()))
+                                    yield(FlowElement.Documentation(it.getOrEmpty()))
                                 }
                             }
-                            is KDoc -> yield(FlowReference.Documentation(element.getOrEmpty()))
+                            is KDoc -> yield(FlowElement.Documentation(element.getOrEmpty()))
                             is KtDotQualifiedExpression -> {
                                 element.resolveReceiverClass(superType, bindingContext)
                                         .map { resolvedClass ->
-                                            FlowReference.RuleFlow(
+                                            FlowElement.RuleFlow(
                                                     resolvedClass.name ?: "Unknown",
                                                     File(resolvedClass.containingKtFile.name)
                                             )

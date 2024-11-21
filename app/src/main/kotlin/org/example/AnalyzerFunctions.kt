@@ -2,6 +2,7 @@ package org.example
 
 import java.net.URI
 import kotlin.collections.emptyList
+import kotlin.sequences.sequence
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
@@ -114,11 +115,7 @@ fun getResponseFields(ktClass: KtClass, bindingContext: BindingContext): List<Pr
 
 fun getFlow(ktClass: KtClass, bindingContext: BindingContext): FlowElement.Flow =
         ktClass.getRuleServiceFlow(bindingContext)
-                .map { sequence ->
-                    FlowElement.Flow(
-                            sequence.map { flowRef -> FlowElement.Reference(flowRef) }.toList()
-                    )
-                }
+                .map { sequence -> FlowElement.Flow(sequence.toList()) }
                 .getOrDefault(FlowElement.Flow(emptyList()))
 
 fun getRuleFlow(ktFile: KtFile, bindingContext: BindingContext): Result<RuleFlowDoc> =

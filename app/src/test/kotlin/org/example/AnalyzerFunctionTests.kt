@@ -213,8 +213,7 @@ class AnalyzerFunctionsTests {
 
             assertEquals(5, rs.flyt.elementer.count())
 
-            val element = rs.flyt.elementer[3] as FlowElement.Reference
-            val aRuleFlow = element.reference as FlowReference.RuleFlow
+            val aRuleFlow = rs.flyt.elementer[3] as FlowElement.RuleFlow
             assertEquals("StartTrygdetidFlyt", aRuleFlow.navn)
         }
     }
