@@ -48,6 +48,7 @@ data class RuleServiceDoc(
     }
 }
 
+// data class for rule flow documentation, see AbstractPensjonRuleFlow
 data class RuleFlowDoc(
         val navn: String,
         val beskrivelse: String,
@@ -78,6 +79,7 @@ data class RuleFlowDoc(
     }
 }
 
+// data class for rule set documentation, see AbstractPensjonRuleSet
 data class RuleSetDoc(
         val navn: String,
         val beskrivelse: String,
@@ -146,29 +148,22 @@ data class PropertyDoc(
     }
 }
 
-/**
- * Sealed class for flow elements RuleEntityDoc: Rule flow or rule set flow, see
- * AbstractPensjonRuleFlow/AbstractPensjonRuleSet
- *
- * Rule flow is invoked from a rule service, but also from other rule flows, and even rule sets For
- * the latter case, see BestemGunstigsteTTAvdødRS, line 74
- *
- * Rule set flow is invoked from a rule flow, but also from other rule sets
- *
- * Forgrening: branching a flow into multiple branches, each with condition Gren: a branch in a
- * branching flow
- *
- * Reference: reference to another flow element, avoiding containment
- */
+// TODO
+// - Simplify by integratin FlowReference into FlowElement
+// - Implement this
+//
+
+// Sealed class for flow elements
+//
+// The starting point for a rule flow is a rule service. The rule service will invoke a rule flow,
+// which in turn will invoke other rule flows or rule sets. A rule set may invoke other rule sets
+// and
+// even rule flows (see BestemGunstigsteTTAvdødRS, line 74)
+//
+// Within a rule flow, there may be branching where the flow is split into multiple branches,
+// each with a condition. Each branch is called a "gren" (branch), and the branching element is
+// called "forgrening"
 sealed class FlowElement {
-    // // Rule flow or rule set flow documentation
-    // data class RuleEntityDoc(
-    //         val navn: String,
-    //         val beskrivelse: String,
-    //         val inndata: List<PropertyDoc>,
-    //         val flyt: Flow,
-    //         val gitHubUrl: URI,
-    // ) : FlowElement()
     data class Flow(val elementer: List<FlowElement>) : FlowElement()
     data class Forgrening(val beskrivelse: String, val navn: String, val gren: List<Gren>) :
             FlowElement()
