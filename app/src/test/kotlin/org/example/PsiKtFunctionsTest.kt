@@ -500,4 +500,182 @@ class PsiKtFunctionsTest {
             }
         }
     }
+
+    @Test
+    @DisplayName("Should extract sequence of flow KtElements from RuleFlow KtClass")
+    fun testExtractRuleFlowSequenceFlowKtElements() {
+        val methodName = "ruleflow"
+        val code =
+                SourceCode(
+                        """
+
+                        class StartTrygdetidFlyt(
+                            private val trygdetidParametere: TrygdetidParameterType
+                        ) : AbstractPensjonRuleflow() {
+                            private var førsteVirk: Date? = null
+                            private var kapittel20: Boolean? = null
+
+                            override var $methodName: () -> Unit = {
+
+                                /**
+                                 * Task: Kontroller informasjonsgrunnlag
+                                 */
+                                KontrollerTrygdetidInformasjonsgrunnlagFlyt(trygdetidParametere).run(this)
+                                /**
+                                 * Task: Input ok?
+                                 * EPS skal beregnes som SOKER når ytelsen er AP. CR 165527
+                                 */
+                                forgrening("Input ok?") {
+                                    gren {
+                                        betingelse { trygdetidParametere.resultat?.pakkseddel!!.merknadListe.isEmpty() }
+                                        flyt {
+                                            /**
+                                             * Task: Init Trygdetidberegning
+                                             */
+                                            settPregVariableUtenGlobals(
+                                                trygdetidParametere.grunnlag?.bruker,
+                                                trygdetidParametere.grunnlag?.virkFom
+                                            )
+                                            trygdetidParametere.grunnlag?.bruker?.vilkarsVedtak = VilkarsVedtak(
+                                                kravlinjeType = trygdetidParametere.grunnlag?.ytelseType,
+                                                virkFom = trygdetidParametere.grunnlag?.virkFom,
+                                                forsteVirk = trygdetidParametere.grunnlag?.førsteVirk,
+                                                vilkarsvedtakResultat = VedtakResultatEnum.INNV
+                                            )
+                                            trygdetidParametere.grunnlag?.beregning = Beregning()
+
+                                            /**
+                                             * Task: AP og bruker er EPS?
+                                             * EPS skal beregnes som SOKER når ytelsen er AP. CR 165527
+                                             */
+                                            forgrening("AP og bruker er EPS?") {
+                                                gren {
+                                                    betingelse {
+                                                        trygdetidParametere.grunnlag?.ytelseType == KravlinjeTypeEnum.AP &&
+                                                                trygdetidParametere.grunnlag?.bruker?.grunnlagsrolle in listOf(
+                                                                    EKTEF,
+                                                                    PARTNER,
+                                                                    SAMBO
+                                                                )
+                                                    }
+                                                    flyt {
+                                                        /**
+                                                         * Task: Gjør om EPS til soker
+                                                         * Gjør om EPS til soker
+                                                         */
+                                                        settEPStilSøker(trygdetidParametere)
+                                                    }
+                                                }
+                                                gren {
+                                                    betingelse { false }
+                                                    flyt {
+                                                    }
+                                                }
+                                            }
+                                            /**
+                                             * Task: Finn første virkningsdato i trygden
+                                             */
+                                            førsteVirk = FinnPersonensFørsteVirkRS(
+                                                trygdetidParametere.grunnlag?.bruker!!,
+                                                trygdetidParametere.grunnlag?.førsteVirk,
+                                                trygdetidParametere.grunnlag?.virkFom!!,
+                                                trygdetidParametere.grunnlag?.ytelseType!!,
+                                                trygdetidParametere.grunnlag?.uttaksgradListe!!
+                                            ).run(this)
+                                            /**
+                                             * Task: Bestem kapittel 20
+                                             */
+                                            kapittel20 = BestemTTKapittel20RS(
+                                                trygdetidParametere.grunnlag?.ytelseType!!,
+                                                trygdetidParametere.grunnlag?.regelverkType
+                                            ).run(this)
+                                            /**
+                                             * Task: Init Variable
+                                             */
+                                            InitTrygdetidVariableRS(trygdetidParametere, førsteVirk, kapittel20).run(this)
+                                            /**
+                                             * Task: Init resultat
+                                             */
+                                            InitTrygdetidResultatRS(trygdetidParametere, kapittel20).run(this)
+                                            /**
+                                             * Task: Kontroller bostedLand
+                                             */
+                                            BestemBosattLandRS(trygdetidParametere.grunnlag?.bruker!!).run(this)
+                                            /**
+                                             * Task: Overgangskull?
+                                             */
+                                            forgrening("Overgangskull?") {
+                                                gren {
+                                                    betingelse {
+                                                        (trygdetidParametere.variable?.kapittel20 == true
+                                                                && trygdetidParametere.variable?.regelverkType == RegelverkTypeEnum.N_REG_G_N_OPPTJ)
+                                                    }
+                                                    flyt {
+                                                        /**
+                                                         * Task: Fastsett Trygdetid overgangskull
+                                                         */
+                                                        TrygdetidOvergangskullFlyt(trygdetidParametere).run(this)
+                                                    }
+                                                }
+                                                gren {
+                                                    betingelse {
+                                                        !(trygdetidParametere.variable?.kapittel20 == true
+                                                                && trygdetidParametere.variable?.regelverkType == RegelverkTypeEnum.N_REG_G_N_OPPTJ)
+                                                    }
+                                                    flyt {
+                                                        /**
+                                                         * Task: Fastsett Trygdetid
+                                                         */
+                                                        FastsettTrygdetidFlyt(trygdetidParametere).run(this)
+                                                    }
+                                                }
+                                            }
+                                            /**
+                                             * Task: Sett virkFom og virkTom på alle returnerte trygdetider
+                                             */
+                                            SettVirkFomOgTomPåTrygdetidResultatRS(trygdetidParametere).run(this)
+                                        }
+                                    }
+                                    gren {
+                                        betingelse { trygdetidParametere.resultat?.pakkseddel!!.merknadListe.isNotEmpty() }
+                                        flyt {
+                                        }
+                                    }
+                                }
+
+                            }
+
+                        }
+
+        """.trimIndent()
+                )
+
+        analyzeKotlinCode(code).let { ktFile ->
+            getBindingContext(listOf(ktFile), context).map { bindingContext ->
+                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleFlowClass)
+                        .map { ruleFlow ->
+                            ruleFlow.getRuleFlowFlow(bindingContext)
+                                    .map { seq ->
+                                        assertEquals(3, seq.size)
+                                        assertEquals(
+                                                "Task: Kontroller informasjonsgrunnlag",
+                                                (seq.elementAt(0) as FlowElement.Documentation)
+                                                        .beskrivelse
+                                        )
+                                        // assertEquals(
+                                        //         "Test2",
+                                        //         (seq.elementAt(1) as FlowElement.Documentation)
+                                        //                 .beskrivelse
+                                        // )
+                                        // assertEquals(
+                                        //         "StartTrygdetidFlyt",
+                                        //         (seq.elementAt(2) as FlowElement.RuleFlow).navn
+                                        // )
+                                    }
+                                    .onFailure { assert(false) }
+                        }
+                        .onFailure { assert(false) }
+            }
+        }
+    }
 }

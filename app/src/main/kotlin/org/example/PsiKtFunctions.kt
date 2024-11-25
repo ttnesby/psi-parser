@@ -18,6 +18,7 @@ import org.jetbrains.kotlin.psi.KtReferenceExpression
 import org.jetbrains.kotlin.psi.KtTypeReference
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
+import kotlin.collections.listOf
 
 // type safe way of representing rule super classes
 enum class RuleSuperClass(val className: String) {
@@ -38,7 +39,7 @@ enum class RuleSuperClass(val className: String) {
 // type safe way of representing rule methods
 enum class RuleMethod(val methodName: String) {
     RULE_SERVICE("ruleService"),
-    RULE_FLOW("ruleFlow");
+    RULE_FLOW("ruleflow");
 
     companion object {
         fun fromClassName(methodName: String): RuleMethod? =
@@ -141,6 +142,11 @@ private fun KtClass.getClassOfSuperClassParam(
 fun KtClass.getRuleServiceFlow(bindingContext: BindingContext): Result<Sequence<FlowElement>> =
         getOverriddenProperty(RuleMethod.RULE_SERVICE).mapCatching { property ->
             property.streamRuleElements(RuleSuperClass.RULE_FLOW, bindingContext).getOrThrow()
+        }
+
+fun KtClass.getRuleFlowFlow(bindingContext: BindingContext): Result<List<FlowElement>> =
+        getOverriddenProperty(RuleMethod.RULE_FLOW).mapCatching { property ->
+            property.streamRuleFlowElements(RuleSuperClass.RULE_FLOW, bindingContext).getOrThrow()
         }
 
 private fun KtClass.getOverriddenProperty(method: RuleMethod): Result<KtProperty> = runCatching {
@@ -291,6 +297,103 @@ private fun KtProperty.streamRuleElements(
                                         }
                                         .getOrNull()
                                         ?.let { yield(it) }
+                            }
+                        }
+                    }
+                }
+            }
+            .getOrThrow()
+}
+
+// private fun KtProperty.streamRuleFlowElements(
+//         superType: RuleSuperClass,
+//         bindingContext: BindingContext
+// ): Result<Sequence<FlowElement>> = runCatching {
+//     getLambdaBlock()
+//             .map { block ->
+//                 block.children.asSequence().flatMap { element ->
+//                     sequence {
+//                         when (element) {
+//                             // is KtCallExpression -> {
+//                             //     element.resolveFunctionDeclaration(bindingContext)
+//                             //             .map { (name, file) -> FlowElement.Function(name,
+// file) }
+//                             //             .getOrNull()
+//                             //             ?.let { yield(it) }
+//                             // }
+//                             is KtProperty -> {
+//                                 element.children.filterIsInstance<KDoc>().forEach {
+//                                     yield(FlowElement.Documentation(it.getOrEmpty()))
+//                                 }
+//                             }
+//                             is KDoc -> yield(FlowElement.Documentation(element.getOrEmpty()))
+//                             is KtDotQualifiedExpression -> {
+//                                 element.resolveReceiverClass(superType, bindingContext)
+//                                         .map { resolvedClass ->
+//                                             FlowElement.RuleFlow(
+//                                                     resolvedClass.name ?: "Unknown",
+//                                                     File(resolvedClass.containingKtFile.name)
+//                                             )
+//                                         }
+//                                         .getOrNull()
+//                                         ?.let { yield(it) }
+//                             }
+//                         }
+//                     }
+//                 }
+//             }
+//             .getOrThrow()
+// }
+
+private fun KtProperty.streamRuleFlowElements(
+        superType: RuleSuperClass,
+        bindingContext: BindingContext
+): Result<List<FlowElement>> = runCatching {
+    getLambdaBlock()
+            .map { block ->
+                block.children.flatMap { element ->
+                    buildList {
+                        when (element) {
+                            // is KtCallExpression -> {
+                            //     element.resolveFunctionDeclaration(bindingContext)
+                            //         .map { (name, file) -> FlowElement.Function(name, file) }
+                            //         .getOrNull()
+                            //         ?.let { add(it) }
+                            // }
+                            is KtProperty -> {
+                                element.children
+                                        .filterIsInstance<KDoc>()
+                                        .map { FlowElement.Documentation(it.getOrEmpty()) }
+                                        .forEach { add(it) }
+                            }
+                            is KDoc -> add(FlowElement.Documentation(element.getOrEmpty()))
+                            is KtDotQualifiedExpression -> {
+                                val superClass = element.resolveReceiverClass(superType, bindingContext)
+                                if (superClass in listOf("${RuleSuperClass.RULE_FLOW}", "AbstractPensjonRuleSet) {
+                                    add
+                                    }
+                                // else - we don't care about non-relevant ktdotexpression,
+
+                                element.resolveReceiverClass(superType, bindingContext)
+                                        .onSuccess { resolvedClass ->
+                                            add(
+                                                    FlowElement.RuleFlow(
+                                                            resolvedClass.name ?: "Unknown",
+                                                            File(
+                                                                    resolvedClass
+                                                                            .containingKtFile
+                                                                            .name
+                                                            )
+                                                    )
+                                            )
+                                        }
+                                        .onFailure {
+                                            throw NoSuchElementException(
+                                                    "Could not resolve receiver expression"
+                                            )
+                                        }
+                                // .getOrNull()
+                                // ?.let { add(it) }
                             }
                         }
                     }
