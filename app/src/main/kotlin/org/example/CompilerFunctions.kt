@@ -60,12 +60,13 @@ fun createCompilerContext(jdkHome: File, disposable: Disposable): Result<Compile
             val configuration = createConfiguration(jdkHome)
             val environment = createEnvironment(configuration, disposable)
             val psiFactory = PsiFileFactory.getInstance(environment.project) as PsiFileFactoryImpl
-
             CompilerContext(
                     configuration = configuration,
                     environment = environment,
                     psiFactory = psiFactory
-            )
+            ).also {
+                println("Created Compiler Context")
+            }
         }
 
 // easy navigation between source files is done via binding context, which is a map of all symbols
@@ -88,9 +89,8 @@ fun getBindingContext(files: List<KtFile>, context: CompilerContext): Result<Bin
                         context.environment::createPackagePartProvider
                 )
             }
-
             analyzer.analysisResult.bindingContext
-        }
+        }.onFailurePrint("getBindingContext failed")
 
 private fun createConfiguration(jdkHome: File): CompilerConfiguration =
         CompilerConfiguration().apply {
@@ -109,7 +109,7 @@ private fun createConfiguration(jdkHome: File): CompilerConfiguration =
             addJvmClasspathRoots(
                     listOf(
                             File(
-                                    kotlin.Unit::class.java.protectionDomain.codeSource.location
+                                    Unit::class.java.protectionDomain.codeSource.location
                                             .toURI()
                             ),
                             File(
