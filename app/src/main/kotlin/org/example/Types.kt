@@ -42,7 +42,7 @@ data class RuleServiceDoc(
             |   inndata = $inndata
             |   utdata = $utdata
             |   flyt = $flyt
-            |   gitHubUri = ${gitHubUri.toString()}
+            |   gitHubUri = $gitHubUri
             |)
         """.trimMargin()
     }
@@ -73,7 +73,7 @@ data class RuleFlowDoc(
             |   beskrivelse = $beskrivelse
             |   inndata = $inndata
             |   flyt = $flyt
-            |   gitHubUri = ${gitHubUri.toString()}
+            |   gitHubUri = $gitHubUri
             |)
         """.trimMargin()
     }
