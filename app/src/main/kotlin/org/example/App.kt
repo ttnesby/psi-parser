@@ -92,8 +92,8 @@ fun main(args: Array<String>) {
     try {
         analyzeRepository(
                         jdkHome = File(System.getProperty("java.home")),
-                        repoPath = File("/Users/torsteinnesby/gitHub/navikt/pensjon-regler"),
-                        libsPath = File("/Users/torsteinnesby/tmp/Libs"),
+                        repoPath = File("/Users/tordbjorn.wang.eriksen/repos/pensjon-regler"),
+                        libsPath = File("/Users/tordbjorn.wang.eriksen/tmp/Libs"),
                         disposable = disposable
                 )
                 .getOrNull()
