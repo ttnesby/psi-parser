@@ -369,7 +369,7 @@ private fun KtProperty.streamRuleFlowElements(
                             is KDoc -> add(FlowElement.Documentation(element.getOrEmpty()))
                             is KtDotQualifiedExpression -> {
                                 val superClass = element.resolveReceiverClass(superType, bindingContext)
-                                if (superClass in listOf("${RuleSuperClass.RULE_FLOW}", "AbstractPensjonRuleSet) {
+                                if (superClass in listOf("${RuleSuperClass.RULE_FLOW}", "AbstractPensjonRuleSet") {
                                     add
                                     }
                                 // else - we don't care about non-relevant ktdotexpression,
