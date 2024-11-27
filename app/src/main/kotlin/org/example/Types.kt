@@ -164,6 +164,7 @@ data class PropertyDoc(
 // each with a condition. Each branch is called a "gren" (branch), and the branching element is
 // called "forgrening"
 sealed class FlowElement {
+
     data class Flow(val elementer: List<FlowElement>) : FlowElement()
     data class Forgrening(val beskrivelse: String, val navn: String, val gren: List<Gren>) :
             FlowElement()

@@ -1,5 +1,6 @@
 package org.example
 
+import org.jetbrains.kotlin.com.google.common.base.Optional
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.lexer.KtTokens
@@ -298,6 +299,12 @@ private fun KtProperty.streamRuleElements(
         .getOrThrow()
 }
 
+/**
+ * TODO: Metode som henter ut KDoc fra et PsiElement.
+ * KDoc er enten et barn a PsiElementet eller ligger som et søsken-element umiddelbart før dette elementet.
+ */
+private fun PsiElement.getKDoc() = "TODO KDoc"
+
 private fun KtProperty.streamRuleFlowElements(
     superType: RuleSuperClass,
     bindingContext: BindingContext
@@ -307,12 +314,11 @@ private fun KtProperty.streamRuleFlowElements(
             block.children.asSequence().flatMap { element ->
                 sequence {
                     when (element) {
-                        // is KtCallExpression -> {
-                        //     element.resolveFunctionDeclaration(bindingContext)
-                        //             .map { (name, file) -> FlowElement.Function(name, file) }
-                        //             .getOrNull()
-                        //             ?.let { yield(it) }
-                        // }
+                         is KtCallExpression -> {
+                             when (val calleeName = (element.calleeExpression as KtNameReferenceExpression).getReferencedName()) {
+                                 "forgrening" -> yield(FlowElement.Forgrening(getKDoc(), calleeName, emptyList()))
+                             }
+                         }
                         is KtProperty -> {
                             element.children.filterIsInstance<KDoc>().forEach {
                                 yield(FlowElement.Documentation(it.getOrEmpty()))
