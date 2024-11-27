@@ -5,6 +5,7 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.psi.KtCallExpression
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 
@@ -318,6 +319,26 @@ private fun KtCallExpression.isGren(): Boolean =
         (calleeExpression as? KtNameReferenceExpression)?.getReferencedName() ==
                 DSLType.GREN.typeName
 
+private fun KtCallExpression.getLambdaBlock(): Result<KtBlockExpression> = runCatching {
+    // Look for lambda arguments
+    val lambdaArguments = lambdaArguments
+    if (lambdaArguments.isEmpty()) {
+        throw IllegalStateException("No lambda arguments found in call expression")
+    }
+
+    // Get the first lambda argument
+    val lambdaArg = lambdaArguments.first()
+
+    // Get the function literal (lambda) expression
+    val functionLiteral =
+            lambdaArg.getLambdaExpression()
+                    ?: throw IllegalStateException("Lambda expression not found")
+
+    // Get the body block
+    functionLiteral.bodyExpression
+            ?: throw IllegalStateException("Lambda body is not a block expression")
+}
+
 private fun KtProperty.streamRuleFlowElements(
         superType: RuleSuperClass,
         bindingContext: BindingContext
@@ -330,6 +351,20 @@ private fun KtProperty.streamRuleFlowElements(
                             is KtCallExpression -> {
                                 when {
                                     element.isForgrening() -> {
+                                        val grener =
+                                                element.getLambdaBlock()
+                                                        .map { block ->
+                                                            block.statements.map { _ ->
+                                                                FlowElement.Gren(
+                                                                        "",
+                                                                        "",
+                                                                        FlowElement.Flow(
+                                                                                emptyList()
+                                                                        )
+                                                                )
+                                                            }
+                                                        }
+                                                        .getOrDefault(emptyList())
                                         yield(
                                                 FlowElement.Forgrening(
                                                         getKDoc(),
@@ -337,7 +372,7 @@ private fun KtProperty.streamRuleFlowElements(
                                                                 .first()
                                                                 .text
                                                                 .removeSurrounding("\""),
-                                                        emptyList()
+                                                        grener
                                                 )
                                         )
                                     }

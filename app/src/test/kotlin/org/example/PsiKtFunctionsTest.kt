@@ -717,8 +717,10 @@ class PsiKtFunctionsTest {
                                             }
                                             when (val flowElement = flowElementSequence.elementAt(3)
                                             ) {
-                                                is FlowElement.Forgrening ->
-                                                        assertEquals("Input ok?", flowElement.navn)
+                                                is FlowElement.Forgrening -> {
+                                                    assertEquals("Input ok?", flowElement.navn)
+                                                    assertEquals(2, flowElement.gren.size)
+                                                }
                                                 else -> assert(false)
                                             }
                                         }
