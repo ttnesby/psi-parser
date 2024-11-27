@@ -351,6 +351,7 @@ private fun KtProperty.streamRuleFlowElements(
                             is KtCallExpression -> {
                                 when {
                                     element.isForgrening() -> {
+                                        // TODO: Implementer grener som en funksjon
                                         val grener =
                                                 element.getLambdaBlock()
                                                         .map { block ->
