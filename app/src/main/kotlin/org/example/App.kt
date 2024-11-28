@@ -1,8 +1,5 @@
 package org.example
 
-import org.example.FlowElement.Documentation
-import org.example.FlowElement.RuleFlow
-import org.example.FlowElement.RuleSet
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoots
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
@@ -93,8 +90,7 @@ fun analyzeRepository(
 
 /**
  * arg[0] - sti til repository (C:\\data\\pensjon-regler)
- * arg[1] - sti til bibliotek med avhengigheter. Kan bruke m2, eller så les README for å opprette fra pensjon-regler.
- * arg[2] - true/false for generering av AsciiDoc
+ * arg[1] - sti til bibliotek med avhengigheter. Kan bruke m2 (C:\\.m2), eller så les README for å opprette  et mindre bibliotek fra pensjon-regler.
  */
 fun main(args: Array<String>) {
     val disposable = Disposer.newDisposable()
@@ -118,7 +114,7 @@ fun main(args: Array<String>) {
                     println("Found ${result.services.size} rule services")
                     println("Found ${result.flows.size} rule flows")
                     println("Found ${result.sets.size} rule sets")
-                    if(args[2] == "true") generateAsciiDoc(result.services, "C:\\data\\psi-parser")
+                    generateAsciiDoc(result.services, "C:\\data\\psi-parser")
                 }
         } finally {
             disposable.dispose()
