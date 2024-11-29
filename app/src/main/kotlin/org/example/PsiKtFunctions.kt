@@ -1,8 +1,5 @@
 package org.example
 
-import org.example.DSLType.values
-import org.example.RuleMethod.values
-import org.example.RuleSuperClass.values
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiWhiteSpace
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
@@ -412,43 +409,39 @@ private fun KtProperty.streamRuleFlowElements(
 }
 
 // TODO - Usikker på om det her blir korrekt
-private fun PsiElement.extractFlow(): FlowElement.Flow {
-    return (this as KtCallExpression).getLambdaBlock()
-        .map { block ->
-            val flowElements = block.statements.mapNotNull { statement ->
-                when (statement) {
-                    is KtCallExpression -> {
-                        when {
-                            statement.isForgrening() -> {
-                                FlowElement.Forgrening(
-                                    statement.getKDoc(),
-                                    statement.valueArguments.first().text.removeSurrounding("\""),
-                                    statement.extractGrener()
-                                )
-                            }
+private fun KtBlockExpression.extractFlow(): FlowElement.Flow {
+    return FlowElement.Flow(this.statements.mapNotNull { statement ->
+        when (statement) {
+            is KtCallExpression -> {
+                when {
+                    statement.isForgrening() -> {
+                        FlowElement.Forgrening(
+                            statement.getKDoc(),
+                            statement.valueArguments.first().text.removeSurrounding("\""),
+                            statement.extractGrener()
+                        )
+                    }
 
-                            statement.isGren() -> {
-                                FlowElement.Gren(
-                                    statement.getKDoc(),
-                                    statement.extractBetingelse(),
-                                    statement.extractFlow()
-                                )
-                            }
+                    statement.isGren() -> {
+                        val block = runCatching { statement.getLambdaBlock() }
+                        FlowElement.Gren(
+                            statement.getKDoc(),
+                            statement.extractBetingelse(),
+                            block.
+                        )
+                    }
 
-                            statement.isFlyt() -> {
-                                statement.extractFlow()
-                            }
-
-                            else -> null
-                        }
+                    statement.isFlyt() -> {
+                        statement.getLambdaBlock().map { it.extractFlow() }.getOrNull()
                     }
 
                     else -> null
                 }
             }
-            FlowElement.Flow(flowElements)
+
+            else -> null
         }
-        .getOrDefault(FlowElement.Flow(emptyList()))
+    })
 }
 
 private fun KtCallExpression.extractGrener(): List<FlowElement.Gren> {
