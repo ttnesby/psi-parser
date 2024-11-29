@@ -9,6 +9,16 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 import java.io.File
 
+
+// TODO - hvordan splitte filen i ulike filer, basert på tema?
+// resolve/`warp`
+// extract
+// ...
+
+// TODO - i noen funksjoner kortsluttes det i enkelte funksjoner
+// function with Result som brukes med getOrThrow i en funksjon som ikke returnerer Result
+
+// TODO RuleSuperClass - legges inn i DSLType
 // type safe way of representing rule super classes
 enum class RuleSuperClass(val className: String) {
     SERVICE_REQUEST("ServiceRequest"),
@@ -25,6 +35,7 @@ enum class RuleSuperClass(val className: String) {
     override fun toString(): String = className
 }
 
+// TODO RuleMethod - legges inn i DSLType
 // type safe way of representing rule methods
 enum class RuleMethod(val methodName: String) {
     RULE_SERVICE("ruleService"),
@@ -354,67 +365,9 @@ private fun KtCallExpression.getLambdaBlock(): Result<KtBlockExpression> = runCa
         ?: throw IllegalStateException("Lambda body is not a block expression")
 }
 
-//private fun KtProperty.streamRuleFlowElements(
-//    superType: RuleSuperClass,
-//    bindingContext: BindingContext,
-//): Result<Sequence<FlowElement>> = runCatching {
-//    getLambdaBlock()
-//        .map { block ->
-//            block.children.asSequence().flatMap { element ->
-//                sequence {
-//                    when (element) {
-//                        is KtCallExpression -> {
-//                            when {
-//                                element.isForgrening() -> {
-//                                    yield(
-//                                        FlowElement.Forgrening(
-//                                            element.getKDoc(),
-//                                            element.valueArguments
-//                                                .first()
-//                                                .text
-//                                                .removeSurrounding("\""),
-//                                            element.extractGrener()
-//                                        )
-//                                    )
-//                                }
-//
-//                                element.isGren() -> {}
-//                                // else -> {
-//                                //     element.resolveFunctionDeclaration(bindingContext)
-//                                //             .map { (name, file) -> FlowElement.Function(name,
-//                                // file) }
-//                                //             .getOrNull()
-//                                //             ?.let { yield(it) }
-//                                // }
-//                            }
-//                        }
-//
-//                        is KtProperty -> {
-//                            element.children.filterIsInstance<KDoc>().forEach {
-//                                yield(FlowElement.Documentation(it.getOrEmpty()))
-//                            }
-//                        }
-//
-//                        is KDoc -> yield(FlowElement.Documentation(element.getOrEmpty()))
-//                        is KtDotQualifiedExpression -> {
-//                            element.resolveReceiverClass(superType, bindingContext)
-//                                .map { resolvedClass ->
-//                                    FlowElement.RuleFlow(
-//                                        resolvedClass.name ?: "Unknown",
-//                                        File(resolvedClass.containingKtFile.name)
-//                                    )
-//                                }
-//                                .getOrNull()
-//                                ?.let { yield(it) }
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//        .getOrThrow()
-//}
+// TODO - hvordan håndtere flyt/regelsett (KtDotQualifiedExpression) som er høyresiden på en property
+// TODO - NB! når KDoc er relatert til flow/ruleset/function - this.children -> this.statements
 
-// TODO - Usikker på om det her blir korrekt
 private fun KtBlockExpression.extractFlow(bctx: BindingContext): FlowElement.Flow {
     return FlowElement.Flow(
         this.children.mapNotNull { child ->
@@ -486,6 +439,7 @@ private fun KtBlockExpression.extractGrener(bctx : BindingContext): List<FlowEle
     }
 }
 
+// TODO - sjekk om man kan extende en spesifik type versus generell PsiElement
 private fun PsiElement.extractBetingelse(): String {
     return (this as? KtCallExpression)
         ?.lambdaArguments
@@ -499,62 +453,6 @@ private fun PsiElement.extractBetingelse(): String {
         }
         ?: ""
 }
-/*private fun KtProperty.streamRuleFlowElements(
-        superType: RuleSuperClass,
-        bindingContext: BindingContext
-): Result<List<FlowElement>> = runCatching {
-    getLambdaBlock()
-            .map { block ->
-                block.children.flatMap { element ->
-                    buildList {
-                        when (element) {
-                            // is KtCallExpression -> {
-                            //     element.resolveFunctionDeclaration(bindingContext)
-                            //         .map { (name, file) -> FlowElement.Function(name, file) }
-                            //         .getOrNull()
-                            //         ?.let { add(it) }
-                            // }
-                            is KtProperty -> {
-                                element.children
-                                        .filterIsInstance<KDoc>()
-                                        .map { FlowElement.Documentation(it.getOrEmpty()) }
-                                        .forEach { add(it) }
-                            }
-                            is KDoc -> add(FlowElement.Documentation(element.getOrEmpty()))
-                            is KtDotQualifiedExpression -> {
-                                val superClass = element.resolveReceiverClass(superType, bindingContext)
-                                if (superClass in listOf("${RuleSuperClass.RULE_FLOW}", "AbstractPensjonRuleSet") {
-                                    add
-                                    }
-                                // else - we don't care about non-relevant ktdotexpression,
-
-                                element.resolveReceiverClass(superType, bindingContext)
-                                        .onSuccess { resolvedClass ->
-                                            add(
-                                                    FlowElement.RuleFlow(
-                                                            resolvedClass.name ?: "Unknown",
-                                                            File(
-                                                                    resolvedClass
-                                                                            .containingKtFile
-                                                                            .name
-                                                            )
-                                                    )
-                                            )
-                                        }
-                                        .onFailure {
-                                            throw NoSuchElementException(
-                                                    "Could not resolve receiver expression"
-                                            )
-                                        }
-                                // .getOrNull()
-                                // ?.let { add(it) }
-                            }
-                        }
-                    }
-                }
-            }
-            .getOrThrow()
-}*/
 
 ///////////////////////////////////////////////////
 /** KtDotQualifiedExpression extension functions */

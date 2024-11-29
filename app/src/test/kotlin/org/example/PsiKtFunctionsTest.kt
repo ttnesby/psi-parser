@@ -13,6 +13,9 @@ import org.junit.jupiter.api.Test
 import java.io.File
 import javax.xml.transform.Source
 
+// TODO - hvordan strukturere test(er) som er store - ref. siste test som blir involverende
+//
+
 class PsiKtFunctionsTest {
 
     private lateinit var disposable: Disposable
@@ -124,6 +127,44 @@ class PsiKtFunctionsTest {
             }
             .onFailure { assert(it is NoSuchElementException) }
     }
+
+    // TODO - unngå dype/pyramide mønster som går innover i de ulike Result med success/failure
+    /**
+     * @Test
+     * fun `Should extract sequence of flow KtElements from RuleService KtClass`() {
+     *     val methodName = "ruleService"
+     *     val code = SourceCode("""
+     *         // ... your test code here ...
+     *     """.trimIndent())
+     *
+     *     runCatching {
+     *         val (ktFile, bindingContext) = analyzeKotlinCode(listOf(code)).getOrThrow()
+     *         val ruleService = ktFile.first()
+     *             .getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
+     *             .getOrThrow()
+     *
+     *         val flowElements = ruleService.getRuleServiceFlow(bindingContext).getOrThrow()
+     *             .toList()
+     *
+     *         // Assertions
+     *         assertEquals(3, flowElements.size)
+     *
+     *         with(flowElements[0] as FlowElement.Documentation) {
+     *             assertEquals("Test1", beskrivelse)
+     *         }
+     *
+     *         with(flowElements[1] as FlowElement.Documentation) {
+     *             assertEquals("Test2", beskrivelse)
+     *         }
+     *
+     *         with(flowElements[2] as FlowElement.RuleFlow) {
+     *             assertEquals("StartTrygdetidFlyt", navn)
+     *         }
+     *     }.onFailure {
+     *         fail("Test failed with exception: ${it.message}")
+     *     }
+     * }
+      */
 
     @Test
     fun `Should get ServiceRequestInfo data class from RuleService KtClass`() {
