@@ -10,7 +10,7 @@
 plugins {
     // Apply the application plugin to add support for building a CLI application in Java.
     application
-    kotlin("jvm") version "2.0.21"
+    kotlin("jvm") version "2.1.0"
     id("com.adarshr.test-logger") version "4.0.0"
 }
 
