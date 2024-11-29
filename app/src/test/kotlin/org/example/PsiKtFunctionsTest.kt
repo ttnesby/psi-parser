@@ -694,8 +694,8 @@ class PsiKtFunctionsTest {
                     .getSubClassOfSuperClass(KtClass::isSubClassOfRuleFlowClass)
                     .onSuccess { ruleFlow ->
                         ruleFlow.getRuleFlowFlow(bctx)
-                            .onSuccess { flowElementSequence ->
-                                when (val flowElement = flowElementSequence.elementAt(0)) {
+                            .onSuccess { flow ->
+                                when (val flowElement = flow.elementer[0]) {
                                     is FlowElement.Documentation ->
                                         assertEquals(
                                             "Task: Kontroller informasjonsgrunnlag",
@@ -704,7 +704,7 @@ class PsiKtFunctionsTest {
 
                                     else -> assert(false)
                                 }
-                                when (val flowElement = flowElementSequence.elementAt(1)) {
+                                when (val flowElement = flow.elementer[1]) {
                                     is FlowElement.RuleFlow ->
                                         assertEquals(
                                             "KontrollerTrygdetidInformasjonsgrunnlagFlyt",
@@ -713,7 +713,7 @@ class PsiKtFunctionsTest {
 
                                     else -> assert(false)
                                 }
-                                when (val flowElement = flowElementSequence.elementAt(2)) {
+                                when (val flowElement = flow.elementer[2]) {
                                     is FlowElement.Documentation ->
                                         assertEquals(
                                             "Task: Input ok?\nEPS skal beregnes som SOKER når ytelsen er AP. CR 165527",
@@ -722,7 +722,7 @@ class PsiKtFunctionsTest {
 
                                     else -> assert(false)
                                 }
-                                when (val flowElement = flowElementSequence.elementAt(3)) {
+                                when (val flowElement = flow.elementer[3]) {
                                     is FlowElement.Forgrening -> {
                                         assertEquals(
                                             "Task: Input ok?\nEPS skal beregnes som SOKER når ytelsen er AP. CR 165527",
