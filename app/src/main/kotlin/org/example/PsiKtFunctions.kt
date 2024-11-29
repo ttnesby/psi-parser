@@ -226,7 +226,7 @@ private fun KtElement.resolveToDeclaration(bindingContext: BindingContext): Resu
                     )
             }
         ) {
-            null -> throw NoSuchElementException("Could not resolve descriptor")
+            null -> throw NoSuchElementException("Could not resolve descriptor ${this.text}")
             else -> DescriptorToSourceUtils.getSourceFromDescriptor(descriptor)
                 ?: throw NoSuchElementException("Could not resolve to declaration")
         }
@@ -417,43 +417,43 @@ private fun KtCallExpression.getLambdaBlock(): Result<KtBlockExpression> = runCa
 // TODO - Usikker på om det her blir korrekt
 private fun KtBlockExpression.extractFlow(bctx: BindingContext): FlowElement.Flow {
     return FlowElement.Flow(
-        this.statements.mapNotNull { statement ->
-            when (statement) {
+        this.children.mapNotNull { child ->
+            when (child) {
                 is KtCallExpression -> {
                     when {
-                        statement.isForgrening() -> {
+                        child.isForgrening() -> {
                             FlowElement.Forgrening(
-                                statement.getKDoc(),
-                                statement
+                                child.getKDoc(),
+                                child
                                     .valueArguments
                                     .first()
                                     .text
                                     .removeSurrounding("\""),
-                                statement.getLambdaBlock().getOrThrow().extractGrener(bctx)
+                                child.getLambdaBlock().getOrThrow().extractGrener(bctx)
                             )
                         }
 
-                        statement.isGren() -> {
+                        child.isGren() -> {
                             FlowElement.Gren(
-                                statement.getKDoc(),
-                                statement.extractBetingelse(),
-                                statement.getLambdaBlock().getOrThrow().extractFlow(bctx)
+                                child.getKDoc(),
+                                child.extractBetingelse(),
+                                child.getLambdaBlock().getOrThrow().extractFlow(bctx)
                                 // block.extractFlow()
                             )
                         }
 
-                        statement.isFlyt() -> {
-                            statement.getLambdaBlock().map { it.extractFlow(bctx) }.getOrNull()
+                        child.isFlyt() -> {
+                            child.getLambdaBlock().map { it.extractFlow(bctx) }.getOrNull()
                         }
 
                         else -> null
                     }
                 }
 
-                is KtProperty -> FlowElement.Documentation(statement.children.filterIsInstance<KDoc>().first().getOrEmpty())
-                is KDoc -> FlowElement.Documentation(statement.getOrEmpty())
+                is KtProperty -> FlowElement.Documentation(child.children.filterIsInstance<KDoc>().first().getOrEmpty())
+                is KDoc -> FlowElement.Documentation(child.getOrEmpty())
                 is KtDotQualifiedExpression -> {
-                    val resolvedClass = statement.resolveReceiverClass2(bctx).getOrThrow()
+                    val resolvedClass = child.resolveReceiverClass2(bctx).getOrThrow()
                     when {
                         resolvedClass.isSubClassOfRuleFlowClass() -> FlowElement.RuleFlow(
                             resolvedClass.name ?: "Unknown",

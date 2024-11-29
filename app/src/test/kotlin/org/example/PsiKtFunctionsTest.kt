@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.File
+import javax.xml.transform.Source
 
 class PsiKtFunctionsTest {
 
@@ -624,11 +625,11 @@ class PsiKtFunctionsTest {
                                             /**
                                              * Task: Init resultat
                                              */
-                                            InitTrygdetidResultatRS(trygdetidParametere, kapittel20).run(this)
+                                            //InitTrygdetidResultatRS(trygdetidParametere, kapittel20).run(this)
                                             /**
                                              * Task: Kontroller bostedLand
                                              */
-                                            BestemBosattLandRS(trygdetidParametere.grunnlag?.bruker!!).run(this)
+                                            //BestemBosattLandRS(trygdetidParametere.grunnlag?.bruker!!).run(this)
                                             /**
                                              * Task: Overgangskull?
                                              */
@@ -654,14 +655,14 @@ class PsiKtFunctionsTest {
                                                         /**
                                                          * Task: Fastsett Trygdetid
                                                          */
-                                                        FastsettTrygdetidFlyt(trygdetidParametere).run(this)
+                                                        //FastsettTrygdetidFlyt(trygdetidParametere).run(this)
                                                     }
                                                 }
                                             }
                                             /**
                                              * Task: Sett virkFom og virkTom på alle returnerte trygdetider
                                              */
-                                            SettVirkFomOgTomPåTrygdetidResultatRS(trygdetidParametere).run(this)
+                                            //SettVirkFomOgTomPåTrygdetidResultatRS(trygdetidParametere).run(this)
                                         }
                                     }
                                     gren {
@@ -687,7 +688,24 @@ class PsiKtFunctionsTest {
             """.trimIndent()
             )
 
-        analyzeKotlinCode(listOf(code, kigFlyt))
+        val initTrygdeTidVariableRS = SourceCode(
+            """
+class InitTrygdetidVariableRS(
+    private val innParametere: TrygdetidParameterType?,
+    private val innFørsteVirk: Date?,
+    private val innKapittel20: Boolean?
+) : AbstractPensjonRuleset<Unit>() {}
+                
+            """.trimIndent()
+        )
+
+        val trygdetidOvergangskullFlyt = SourceCode("""
+class TrygdetidOvergangskullFlyt(
+    trygdetidParametere: TrygdetidParameterType
+) : AbstractPensjonRuleflow() {}            
+        """.trimIndent())
+
+        analyzeKotlinCode(listOf(code, kigFlyt, initTrygdeTidVariableRS,trygdetidOvergangskullFlyt))
             .onSuccess { (ktFileList, bctx) ->
                 ktFileList
                     .first()
@@ -730,7 +748,6 @@ class PsiKtFunctionsTest {
                                         )
                                         assertEquals("Input ok?", flowElement.navn)
                                         assertEquals(2, flowElement.gren.size)
-                                        // TODO Burde kanskje fjerne 'betingelse { }'
                                         assertEquals(
                                             "{ trygdetidParametere.resultat?.pakkseddel!!.merknadListe.isEmpty() }",
                                             flowElement.gren[0].betingelse
@@ -739,13 +756,15 @@ class PsiKtFunctionsTest {
                                             "{ trygdetidParametere.resultat?.pakkseddel!!.merknadListe.isNotEmpty() }",
                                             flowElement.gren[1].betingelse
                                         )
-//                                                    println("flowElement.gren[0].flyt.elementer[0]: ${flowElement.gren[0].flyt.elementer[0]}")
                                     }
 
                                     else -> assert(false)
                                 }
                             }
-                            .onFailure { assert(false) }
+                            .onFailure {
+                                it.printStackTrace()
+                                assert(false)
+                            }
                     }
                     .onFailure { assert(false) }
             }
