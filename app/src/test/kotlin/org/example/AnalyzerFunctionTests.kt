@@ -184,7 +184,7 @@ class AnalyzerFunctionsTests {
 
             assertEquals(ruleServiceName, rs.navn)
             assert(rs.beskrivelse.isEmpty())
-            assertEquals(URI(FILE_NAME), rs.gitHubUri)
+            assertEquals(URI("https://github.com/navikt/app/src/test/kotlin/org/example/Test.kt"), rs.gitHubUri)
             assert(rs.inndata.isNotEmpty())
             assert(rs.utdata.isNotEmpty())
 

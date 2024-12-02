@@ -326,7 +326,7 @@ private fun KtProperty.streamRuleServiceElements(
  * søsken-element for hver iterasjon. Filtrerer ut PsiWhiteSpace og KDoc-elementer og sekvensen
  * stopper når et element er hverken KDoc eller PsiWhiteSpace.
  */
-fun PsiElement.getKDoc(): String =
+fun KtCallExpression.extractKDocOrEmpty(): String =
     generateSequence(this.prevSibling) { it.prevSibling }
         .takeWhile { it is PsiWhiteSpace || it is KDoc }
         .firstOrNull { it is KDoc }
@@ -376,7 +376,7 @@ private fun KtBlockExpression.extractFlow(bctx: BindingContext): FlowElement.Flo
                     when {
                         child.isForgrening() -> {
                             FlowElement.Forgrening(
-                                child.getKDoc(),
+                                child.extractKDocOrEmpty(),
                                 child
                                     .valueArguments
                                     .first()
@@ -388,10 +388,9 @@ private fun KtBlockExpression.extractFlow(bctx: BindingContext): FlowElement.Flo
 
                         child.isGren() -> {
                             FlowElement.Gren(
-                                child.getKDoc(),
+                                child.extractKDocOrEmpty(),
                                 child.extractBetingelse(),
                                 child.getLambdaBlock().getOrThrow().extractFlow(bctx)
-                                // block.extractFlow()
                             )
                         }
 
@@ -429,21 +428,21 @@ private fun KtBlockExpression.extractFlow(bctx: BindingContext): FlowElement.Flo
 /**
  *
  */
-private fun KtBlockExpression.extractGrener(bctx : BindingContext): List<FlowElement.Gren> {
-    return this.statements.map { gren ->
-        FlowElement.Gren(
-            gren.getKDoc(),
-            gren.extractBetingelse(),
-            (gren as KtCallExpression).lambdaArguments.first().getLambdaExpression()?.bodyExpression?.extractFlow(bctx) ?: FlowElement.Flow(emptyList())
-        )
+private fun KtBlockExpression.extractGrener(bctx: BindingContext): List<FlowElement.Gren> {
+    return this.statements.mapNotNull { statement ->
+        (statement as? KtCallExpression)?.let { gren ->
+            FlowElement.Gren(
+                gren.extractKDocOrEmpty(),
+                gren.extractBetingelse(),
+                gren.lambdaArguments.first().getLambdaExpression()?.bodyExpression?.extractFlow(bctx) ?: FlowElement.Flow(emptyList())
+            )
+        }
     }
 }
 
-// TODO - sjekk om man kan extende en spesifik type versus generell PsiElement
-private fun PsiElement.extractBetingelse(): String {
-    return (this as? KtCallExpression)
-        ?.lambdaArguments
-        ?.firstOrNull()
+private fun KtCallExpression.extractBetingelse(): String {
+    return this.lambdaArguments
+        .firstOrNull()
         ?.getLambdaExpression()
         ?.bodyExpression
         ?.statements

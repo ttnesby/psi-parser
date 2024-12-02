@@ -141,7 +141,12 @@ fun getRuleSet(ktFile: KtFile, bindingContext: BindingContext): Result<RuleSetDo
         )
     }
 
+// TODO: Denne kan trolig skrives om. Må finne en god måte å håndtere GithubUrl for tester.
 fun String.convertToGitHubUrl(): String =
-    "https://github.com/navikt/" + this.substring(this.indexOf("pensjon-regler"))
-        .replace('\\', '/')
-        .replaceFirst("pensjon-regler/", "pensjon-regler/blob/master/")
+    this.indexOf("pensjon-regler")
+        .takeIf { it != -1 }
+        ?.let { index ->
+            "https://github.com/navikt/" + this.substring(index)
+                .replace('\\', '/')
+                .replaceFirst("pensjon-regler/", "pensjon-regler/blob/master/")
+        } ?: "https://github.com/navikt/$this"
