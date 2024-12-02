@@ -1,5 +1,8 @@
 package org.example
 
+import org.example.DSLType.values
+import org.example.RuleMethod.values
+import org.example.RuleSuperClass.values
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiWhiteSpace
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
@@ -136,19 +139,18 @@ private fun KtClass.getClassOfSuperClassParam(
     paramSubClassOf: (KtClass) -> Boolean,
     bindingContext: BindingContext,
 ): Result<KtClass> = runCatching {
-    getSuperTypeListEntries()
+    val resolvedClass = getSuperTypeListEntries()
         .find { it.typeReference?.text?.contains(superClassRef.className) == true }
         ?.typeReference
         ?.typeElement
         ?.typeArgumentsAsTypes
         ?.getOrNull(0)
         ?.resolveToKtClass(bindingContext)
-        ?.map { resolvedClass ->
-            if (paramSubClassOf(resolvedClass)) resolvedClass
-            else throw NoSuchElementException("Class is not of expected type")
-        }
-        ?.getOrThrow()
+        ?.getOrThrow()  // Since we're in runCatching, exceptions will be handled
         ?: throw NoSuchElementException("No type parameter found for $superClassRef")
+
+    if (paramSubClassOf(resolvedClass)) resolvedClass
+    else throw NoSuchElementException("Class is not of expected type")
 }
 
 fun KtClass.getRuleServiceFlow(bindingContext: BindingContext): Result<Sequence<FlowElement>> =
@@ -158,10 +160,9 @@ fun KtClass.getRuleServiceFlow(bindingContext: BindingContext): Result<Sequence<
     }
 
 fun KtClass.getRuleFlowFlow(bindingContext: BindingContext): Result<FlowElement.Flow> =
-    getOverriddenProperty(RuleMethod.RULE_FLOW).mapCatching { property ->
-//        property.streamRuleFlowElements(RuleSuperClass.RULE_FLOW, bindingContext).getOrThrow()
-        property.getLambdaBlock().getOrThrow().extractFlow(bindingContext)
-    }
+    getOverriddenProperty(RuleMethod.RULE_FLOW)
+        .flatMap { it.getLambdaBlock() }
+        .flatMap { it.extractFlow(bindingContext) }
 
 private fun KtClass.getOverriddenProperty(method: RuleMethod): Result<KtProperty> = runCatching {
     body?.properties?.filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }?.find {
@@ -190,14 +191,15 @@ private fun KtParameter.getSubClassOfSuperClass(
     superClassRef: (KtClass) -> Boolean,
     bindingContext: BindingContext,
 ): Result<KtClass> = runCatching {
-    typeReference
-        ?.resolveToKtClass(bindingContext)
-        ?.map { resolvedClass ->
-            if (superClassRef(resolvedClass)) resolvedClass
-            else throw NoSuchElementException("Class is not a ServiceRequest")
-        }
-        ?.getOrThrow()
-        ?: throw NoSuchElementException("No type reference found")
+
+    val resolvedClass =
+        typeReference
+            ?.resolveToKtClass(bindingContext)
+            ?.getOrThrow()
+            ?: throw NoSuchElementException("No type reference found")
+
+    if (superClassRef(resolvedClass)) resolvedClass
+    else throw NoSuchElementException("Class is not a ServiceRequest")
 }
 
 // get KDoc for a KtParameter, or empty string
@@ -233,7 +235,7 @@ private fun KtElement.resolveToDeclaration(bindingContext: BindingContext): Resu
 
                 else ->
                     throw IllegalArgumentException(
-                        "Unsupported element type: ${this.javaClass.simpleName}"
+                        "Unsupported element type: ${this.javaClass.simpleName} for binding context resolution"
                     )
             }
         ) {
@@ -368,9 +370,16 @@ private fun KtCallExpression.getLambdaBlock(): Result<KtBlockExpression> = runCa
 // TODO - hvordan håndtere flyt/regelsett (KtDotQualifiedExpression) som er høyresiden på en property
 // TODO - NB! når KDoc er relatert til flow/ruleset/function - this.children -> this.statements
 
-private fun KtBlockExpression.extractFlow(bctx: BindingContext): FlowElement.Flow {
-    return FlowElement.Flow(
-        this.children.mapNotNull { child ->
+fun <T, R> Result<T>.flatMap(transform: (T) -> Result<R>): Result<R> {
+    return fold(
+        onSuccess = { value -> transform(value) },
+        onFailure = { exception -> Result.failure(exception) }
+    )
+}
+
+private fun KtBlockExpression.extractFlow(bctx: BindingContext): Result<FlowElement.Flow> = runCatching {
+    FlowElement.Flow(
+        children.mapNotNull { child ->
             when (child) {
                 is KtCallExpression -> {
                     when {
@@ -382,7 +391,7 @@ private fun KtBlockExpression.extractFlow(bctx: BindingContext): FlowElement.Flo
                                     .first()
                                     .text
                                     .removeSurrounding("\""),
-                                child.getLambdaBlock().getOrThrow().extractGrener(bctx)
+                                child.getLambdaBlock().flatMap { it.extractGrener(bctx) }.getOrThrow()
                             )
                         }
 
@@ -390,12 +399,12 @@ private fun KtBlockExpression.extractFlow(bctx: BindingContext): FlowElement.Flo
                             FlowElement.Gren(
                                 child.extractKDocOrEmpty(),
                                 child.extractBetingelse(),
-                                child.getLambdaBlock().getOrThrow().extractFlow(bctx)
+                                child.getLambdaBlock().flatMap { it.extractFlow(bctx) }.getOrThrow()
                             )
                         }
 
                         child.isFlyt() -> {
-                            child.getLambdaBlock().map { it.extractFlow(bctx) }.getOrNull()
+                            child.getLambdaBlock().flatMap { it.extractFlow(bctx) }.getOrThrow()
                         }
 
                         else -> null
@@ -411,10 +420,12 @@ private fun KtBlockExpression.extractFlow(bctx: BindingContext): FlowElement.Flo
                             resolvedClass.name ?: "Unknown",
                             File(resolvedClass.containingKtFile.name)
                         )
+
                         resolvedClass.isSubClassOfRuleSetClass() -> FlowElement.RuleSet(
                             resolvedClass.name ?: "Unknown",
                             File(resolvedClass.containingKtFile.name)
                         )
+
                         else -> null
                     }
                 }
@@ -423,18 +434,19 @@ private fun KtBlockExpression.extractFlow(bctx: BindingContext): FlowElement.Flo
             }
         }
     )
+
 }
 
 /**
  *
  */
-private fun KtBlockExpression.extractGrener(bctx: BindingContext): List<FlowElement.Gren> {
-    return this.statements.mapNotNull { statement ->
+private fun KtBlockExpression.extractGrener(bctx: BindingContext): Result<List<FlowElement.Gren>> = runCatching {
+    this.statements.mapNotNull { statement ->
         (statement as? KtCallExpression)?.let { gren ->
             FlowElement.Gren(
                 gren.extractKDocOrEmpty(),
                 gren.extractBetingelse(),
-                gren.lambdaArguments.first().getLambdaExpression()?.bodyExpression?.extractFlow(bctx) ?: FlowElement.Flow(emptyList())
+                gren.getLambdaBlock().flatMap { it.extractFlow(bctx) }.getOrThrow()
             )
         }
     }
