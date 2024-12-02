@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.File
-import javax.xml.transform.Source
 
 // TODO - hvordan strukturere test(er) som er store - ref. siste test som blir involverende
 //
@@ -164,7 +163,7 @@ class PsiKtFunctionsTest {
      *         fail("Test failed with exception: ${it.message}")
      *     }
      * }
-      */
+     */
 
     @Test
     fun `Should get ServiceRequestInfo data class from RuleService KtClass`() {
@@ -740,13 +739,15 @@ class InitTrygdetidVariableRS(
             """.trimIndent()
         )
 
-        val trygdetidOvergangskullFlyt = SourceCode("""
+        val trygdetidOvergangskullFlyt = SourceCode(
+            """
 class TrygdetidOvergangskullFlyt(
     trygdetidParametere: TrygdetidParameterType
 ) : AbstractPensjonRuleflow() {}            
-        """.trimIndent())
+        """.trimIndent()
+        )
 
-        analyzeKotlinCode(listOf(code, kigFlyt, initTrygdeTidVariableRS,trygdetidOvergangskullFlyt))
+        analyzeKotlinCode(listOf(code, kigFlyt, initTrygdeTidVariableRS, trygdetidOvergangskullFlyt))
             .onSuccess { (ktFileList, bctx) ->
                 ktFileList
                     .first()
@@ -790,11 +791,11 @@ class TrygdetidOvergangskullFlyt(
                                         assertEquals("Input ok?", flowElement.navn)
                                         assertEquals(2, flowElement.gren.size)
                                         assertEquals(
-                                            "{ trygdetidParametere.resultat?.pakkseddel!!.merknadListe.isEmpty() }",
+                                            "trygdetidParametere.resultat?.pakkseddel!!.merknadListe.isEmpty()",
                                             flowElement.gren[0].betingelse
                                         )
                                         assertEquals(
-                                            "{ trygdetidParametere.resultat?.pakkseddel!!.merknadListe.isNotEmpty() }",
+                                            "trygdetidParametere.resultat?.pakkseddel!!.merknadListe.isNotEmpty()",
                                             flowElement.gren[1].betingelse
                                         )
                                     }

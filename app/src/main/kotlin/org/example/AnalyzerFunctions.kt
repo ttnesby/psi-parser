@@ -1,50 +1,65 @@
 package org.example
 
+import org.example.PropertyDoc.Companion.fromParameter
+import org.jetbrains.annotations.TestOnly
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.BindingContext
 import java.net.URI
 
+data class AnalysisResult(
+    val services: List<RuleServiceDoc>,
+    val flows: List<RuleFlowDoc>,
+    val sets: List<RuleSetDoc>
+)
+
 // TODO
 // - Add support for RuleFlow and RuleSet, included into analyzeSourceFiles
 //
-fun analyzeSourceFiles2(sourceFiles: List<KtFile>, bindingContext: BindingContext): AnalysisResult =
-    sourceFiles.chunked(100).fold(AnalysisResult(emptyList(), emptyList(), emptyList())) {
-            acc,
-            batch,
-        ->
-        val batchResults =
-            batch.mapNotNull { file ->
-                (getRuleService(file, bindingContext).getOrNull()?.let { service ->
-                    AnalysisResult(listOf(service), emptyList(), emptyList())
-                }
-                    ?: getRuleFlow(file, bindingContext).getOrNull()?.let {
-                            flow,
-                        ->
-                        AnalysisResult(emptyList(), listOf(flow), emptyList())
+fun analyzeSourceFiles(sourceFiles: List<KtFile>, bindingContext: BindingContext): Result<AnalysisResult> =
+    runCatching {
+        sourceFiles
+            .chunked(100)
+            .fold(AnalysisResult(emptyList(), emptyList(), emptyList())) { acc, batch ->
+                val batchResults = batch.mapNotNull { file ->
+                    // TODO - Vurder om å kategorisere en fil ihht. dsl types er en god idé
+                    when {
+                        file.isRuleService() -> {
+                            getRuleService(file, bindingContext).map { service ->
+                                AnalysisResult(listOf(service), emptyList(), emptyList())
+                            }.getOrThrow()
+                        }
+
+                        file.isRuleflow() -> {
+                            getRuleFlow(file, bindingContext).map { flow ->
+                                AnalysisResult(emptyList(), listOf(flow), emptyList())
+                            }.getOrThrow()
+                        }
+
+                        file.isRuleset() -> {
+                            getRuleSet(file, bindingContext).map { set ->
+                                AnalysisResult(emptyList(), emptyList(), listOf(set))
+                            }.getOrThrow()
+                        }
+
+                        else -> null
+                    }.also {
+                        (file as PsiFileImpl).clearCaches()
                     }
-                    ?: getRuleSet(file, bindingContext)
-                        .getOrNull()
-                        ?.let { set ->
-                            AnalysisResult(
-                                emptyList(),
-                                emptyList(),
-                                listOf(set)
-                            )
-                        })
-                    .also { (file as PsiFileImpl).clearCaches() }
+                }
+                AnalysisResult(
+                    services = acc.services + batchResults.flatMap { it.services },
+                    flows = acc.flows + batchResults.flatMap { it.flows },
+                    sets = acc.sets + batchResults.flatMap { it.sets }
+                )
+            }.also {
+                println("Analyzed Source Files")
             }
-        AnalysisResult(
-            services = acc.services + batchResults.flatMap { it.services },
-            flows = acc.flows + batchResults.flatMap { it.flows },
-            sets = acc.sets + batchResults.flatMap { it.sets }
-        )
-    }.also {
-        println("Analyzed Source Files")
     }
 
-fun analyzeSourceFiles(
+@TestOnly
+fun analyzeSourceFilesTest(
     sourceFiles: List<KtFile>,
     bindingContext: BindingContext,
 ): List<RuleServiceDoc> =
@@ -71,29 +86,28 @@ fun getRuleService(ktFile: KtFile, bindingContext: BindingContext): Result<RuleS
         RuleServiceDoc(
             navn = ktClass.name!!,
             beskrivelse = ktClass.getKDocOrEmpty(),
-            inndata = getRequestFields(ktClass, bindingContext),
-            utdata = getResponseFields(ktClass, bindingContext),
-            flyt = getFlow(ktClass, bindingContext),
+            inndata = getRequestFields(ktClass, bindingContext).getOrThrow(),
+            utdata = getResponseFields(ktClass, bindingContext).getOrThrow(),
+            flyt = getRuleService(ktClass, bindingContext).getOrThrow(),
             gitHubUri = URI(ktFile.name.convertToGitHubUrl())
         )
     }
 
-fun getRequestFields(ktClass: KtClass, bindingContext: BindingContext): List<PropertyDoc> =
+fun getRequestFields(ktClass: KtClass, bindingContext: BindingContext): Result<List<PropertyDoc>> = runCatching {
     ktClass.getServiceRequestInfo(bindingContext)
         .map { (parameter, serviceRequestClass) ->
             buildList {
-                add(PropertyDoc.fromParameter(parameter, ktClass))
+                add(fromParameter(parameter, ktClass))
                 addAll(
                     serviceRequestClass.primaryConstructor?.let {
                         PropertyDoc.fromPrimaryConstructor(it)
-                    }
-                        ?: emptyList()
+                    } ?: throw IllegalStateException("No primary constructor found for ${serviceRequestClass.name}")
                 )
             }
-        }
-        .getOrDefault(emptyList())
+        }.getOrThrow()
+}
 
-fun getResponseFields(ktClass: KtClass, bindingContext: BindingContext): List<PropertyDoc> =
+fun getResponseFields(ktClass: KtClass, bindingContext: BindingContext): Result<List<PropertyDoc>> = runCatching {
     ktClass.getServiceResponseClass(bindingContext)
         .map { serviceResponseClass ->
             buildList {
@@ -107,17 +121,17 @@ fun getResponseFields(ktClass: KtClass, bindingContext: BindingContext): List<Pr
                 addAll(
                     serviceResponseClass.primaryConstructor?.let {
                         PropertyDoc.fromPrimaryConstructor(it)
-                    }
-                        ?: emptyList()
+                    } ?: throw IllegalArgumentException("No primary constructor found for ${serviceResponseClass.name}")
                 )
             }
-        }
-        .getOrDefault(emptyList())
+        }.getOrThrow()
+}
 
-fun getFlow(ktClass: KtClass, bindingContext: BindingContext): FlowElement.Flow =
+fun getRuleService(ktClass: KtClass, bindingContext: BindingContext): Result<FlowElement.Flow> = runCatching {
     ktClass.getRuleServiceFlow(bindingContext)
         .map { sequence -> FlowElement.Flow(sequence.toList()) }
-        .getOrDefault(FlowElement.Flow(emptyList()))
+        .getOrThrow()
+}
 
 fun getRuleFlow(ktFile: KtFile, bindingContext: BindingContext): Result<RuleFlowDoc> =
     ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleFlowClass).map { ktClass ->

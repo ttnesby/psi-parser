@@ -3,20 +3,18 @@
  */
 package org.example
 
-import java.io.File
-import java.net.URI
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
-import org.jetbrains.kotlin.cli.jvm.compiler.*
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
-import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.idea.KotlinFileType
-import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.psi.KtFile
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import java.io.File
+import java.net.URI
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class AnalyzerFunctionsTests {
 
@@ -28,22 +26,22 @@ class AnalyzerFunctionsTests {
     }
 
     private fun analyzeKotlinCode(
-            code: List<SourceCode>,
+        code: List<SourceCode>,
     ): Result<List<RuleServiceDoc>> =
-            code
-                    .map { (sourceCode, fileName) ->
-                        context.psiFactory.createFileFromText(
-                                fileName,
-                                KotlinFileType.INSTANCE,
-                                sourceCode
-                        ) as
-                                KtFile
-                    }
-                    .let { ktFiles ->
-                        getBindingContext(ktFiles, context).map { bctx ->
-                            analyzeSourceFiles(ktFiles, bctx)
-                        }
-                    }
+        code
+            .map { (sourceCode, fileName) ->
+                context.psiFactory.createFileFromText(
+                    fileName,
+                    KotlinFileType.INSTANCE,
+                    sourceCode
+                ) as
+                        KtFile
+            }
+            .let { ktFiles ->
+                getBindingContext(ktFiles, context).map { bctx ->
+                    analyzeSourceFilesTest(ktFiles, bctx)
+                }
+            }
 
     @BeforeEach
     fun setUp() {
@@ -65,8 +63,8 @@ class AnalyzerFunctionsTests {
         val reqType = "TrygdetidRequest"
         val respType = "TrygdetidResponse"
         val ruleService =
-                SourceCode(
-                        """
+            SourceCode(
+                """
             fun log_debug(message: String) = println(message)
 
             class ${ruleServiceName}(val $reqName: $reqType) : AbstractPensjonRuleService<$respType>() {
@@ -119,11 +117,11 @@ class AnalyzerFunctionsTests {
                 }
             }
         """.trimIndent()
-                )
+            )
 
         val request =
-                SourceCode(
-                        """
+            SourceCode(
+                """
                 class TrygdetidRequest(
                     /**
                     * Virkningstidspunktets fom. for �nsket ytelse.
@@ -136,12 +134,12 @@ class AnalyzerFunctionsTests {
                     var virkTom: Date? = null,
                 ) : ServiceRequest() {}
         """.trimIndent(),
-                        "$DEFAULT_PATH + $reqType.kt"
-                )
+                "$DEFAULT_PATH + $reqType.kt"
+            )
 
         val response =
-                SourceCode(
-                        """
+            SourceCode(
+                """
                 class TrygdetidResponse(
                     /**
                         * Fastsatt trygdetid.
@@ -160,11 +158,11 @@ class AnalyzerFunctionsTests {
                     override val pakkseddel: Pakkseddel = Pakkseddel()
                 ) : ServiceResponse() {}
         """.trimIndent(),
-                        "$DEFAULT_PATH + $respType.kt"
-                )
+                "$DEFAULT_PATH + $respType.kt"
+            )
         val ruleFlow =
-                SourceCode(
-                        """
+            SourceCode(
+                """
                 class StartTrygdetidFlyt(
                     private val trygdetidParametere: TrygdetidParameterType
                 ) : AbstractPensjonRuleflow() {
@@ -174,8 +172,8 @@ class AnalyzerFunctionsTests {
                     override var ruleflow: () -> Unit = {}
                 }
         """.trimIndent(),
-                        "$DEFAULT_PATH + StartTrygdetidFlyt.kt"
-                )
+                "$DEFAULT_PATH + StartTrygdetidFlyt.kt"
+            )
 
         analyzeKotlinCode(listOf(ruleService, request, response, ruleFlow)).map { ruleServices ->
             assert(ruleServices.isNotEmpty())
@@ -197,8 +195,8 @@ class AnalyzerFunctionsTests {
             assertEquals("virkTom", rs.inndata[2].navn)
             assertEquals("Date?", rs.inndata[2].type)
             assertEquals(
-                    "Tom for trygdetiden som skal beregnes. Kun for AP2011, AP2016 og AP2025.",
-                    rs.inndata[2].beskrivelse
+                "Tom for trygdetiden som skal beregnes. Kun for AP2011, AP2016 og AP2025.",
+                rs.inndata[2].beskrivelse
             )
 
             assertEquals(5, rs.utdata.count())
@@ -222,13 +220,13 @@ class AnalyzerFunctionsTests {
     @DisplayName("Should handle KtFile with no RuleServices")
     fun testExtractRuleServiceEmpty() {
         val testCode =
-                SourceCode(
-                        """
+            SourceCode(
+                """
             class RegularClass() {
                 fun someFunction() {}
             }
         """.trimIndent()
-                )
+            )
 
         analyzeKotlinCode(listOf(testCode)).map { ruleServices ->
             assertTrue(ruleServices.isEmpty())
