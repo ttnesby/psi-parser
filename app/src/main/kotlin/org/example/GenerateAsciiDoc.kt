@@ -52,7 +52,6 @@ fun StringBuilder.appendFlowElement(elementer: List<FlowElement>) {
     elementer.forEach { element ->
         when (element) {
             // TODO burde kanskje ha pakkereferanse om vi skal referere til .adoc filer. Dette er nå kun sti for filen.
-
             is FlowElement.Function -> {
                 this.appendLine("link:${element.fil.canonicalPath.replace(".kt", ".adoc")}[${element.navn}]")
             }

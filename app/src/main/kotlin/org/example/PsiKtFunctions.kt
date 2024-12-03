@@ -34,7 +34,7 @@ enum class DSLType(val typeName: String) {
     RULE_FLOW("ruleflow");
 
     companion object {
-        fun fromClassName(className: String): DSLType? = values().find { it.typeName == className }
+        fun fromClassName(className: String): DSLType? = entries.find { it.typeName == className }
     }
 
     override fun toString(): String = typeName
@@ -141,10 +141,9 @@ private fun KtClass.getOverriddenProperty(method: DSLType): Result<KtProperty> =
     } ?: throw NoSuchElementException("No overridden property '$name' found")
 }
 
-//fun get
-
-/** KDoc extension functions */
-//
+/**
+ * KDoc extension functions
+ */
 fun KDoc.formatOrEmpty(): String =
     text?.lines()?.map { it.trim().removePrefix("*").trim() }?.filter { it.isNotEmpty() && it != "/" }
         ?.joinToString("\n")?.removePrefix("/**")?.removeSuffix("*/")?.trim() ?: ""
@@ -218,8 +217,6 @@ private fun KtCallExpression.resolveFunctionDeclaration(
 }
 
 /** KtProperty extension functions */
-//
-
 private fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> = runCatching {
     (initializer as? KtLambdaExpression)?.bodyExpression
         ?: throw NoSuchElementException("No lambda block found in property")
@@ -248,13 +245,6 @@ private fun KtProperty.streamRuleServiceElements(
                             }.getOrNull()?.let { yield(it) }
                     }
 
-//                    is KtProperty -> {
-//                        element.children.filterIsInstance<KDoc>().forEach {
-//                            yield(FlowElement.Documentation(it.formatOrEmpty()))
-//                        }
-//                    }
-
-//                    is KDoc -> yield(FlowElement.Documentation(element.formatOrEmpty()))
                     is KtDotQualifiedExpression -> {
                         element.resolveReceiverClass(superType, bindingContext).map { resolvedClass ->
                             FlowElement.RuleFlow(
@@ -349,21 +339,16 @@ private fun KtBlockExpression.extractFlow(bctx: BindingContext): Result<FlowElem
                     }
                 }
 
-//                is KtProperty -> FlowElement.Documentation(
-//                    child.children.filterIsInstance<KDoc>().first().formatOrEmpty()
-//                )
-//
-//                is KDoc -> FlowElement.Documentation(child.formatOrEmpty())
                 is KtDotQualifiedExpression -> {
-                    val resolvedClass = child.resolveReceiverClass2(bctx).getOrThrow()
+                    val resolvedClass = child.resolveReceiverClass2(bctx)
                     when {
-                        resolvedClass.isSubClassOfRuleFlowClass() -> FlowElement.RuleFlow(
+                        resolvedClass?.isSubClassOfRuleFlowClass() == true -> FlowElement.RuleFlow(
                             resolvedClass.name ?: "Unknown",
                             child.extractKDocOrEmpty(),
                             File(resolvedClass.containingKtFile.name)
                         )
 
-                        resolvedClass.isSubClassOfRuleSetClass() -> FlowElement.RuleSet(
+                        resolvedClass?.isSubClassOfRuleSetClass() == true -> FlowElement.RuleSet(
                             resolvedClass.name ?: "Unknown",
                             child.extractKDocOrEmpty(),
                             File(resolvedClass.containingKtFile.name)
@@ -421,5 +406,5 @@ private fun KtDotQualifiedExpression.resolveReceiverClass(
 
 private fun KtDotQualifiedExpression.resolveReceiverClass2(
     bindingContext: BindingContext,
-): Result<KtClass> = (receiverExpression as KtReferenceExpression).resolveToKtClass(bindingContext)
+): KtClass? = (receiverExpression as? KtReferenceExpression)?.resolveToKtClass(bindingContext)?.getOrNull()
 
