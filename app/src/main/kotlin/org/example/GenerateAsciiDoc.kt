@@ -1,6 +1,7 @@
 package org.example
 
-import org.example.FlowElement.Documentation
+import org.example.FlowElement
+import org.example.FlowElement.Flow
 import org.example.FlowElement.RuleFlow
 import org.example.FlowElement.RuleSet
 import java.io.File
@@ -50,10 +51,6 @@ fun generateAsciiDoc(ruleDocs: List<RuleServiceDoc>, outputPath: String) {
 fun StringBuilder.appendFlowElement(elementer: List<FlowElement>) {
     elementer.forEach { element ->
         when (element) {
-            is Documentation -> {
-                // TODO Dette bør kanskje et annet sted? Se FastettTrygdetidService.adoc som eksempel
-                this.appendLine("|Beskrivelse: ${element.beskrivelse}")
-            }
             // TODO burde kanskje ha pakkereferanse om vi skal referere til .adoc filer. Dette er nå kun sti for filen.
             is FlowElement.Function -> {
                 this.appendLine("link:${element.fil.canonicalPath.replace(".kt", ".adoc")}[${element.navn}]")

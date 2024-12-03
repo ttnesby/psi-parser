@@ -1,18 +1,18 @@
 package org.example
 
-import java.io.File
-import kotlin.test.assertEquals
-import org.jetbrains.kotlin.cli.jvm.compiler.*
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
-import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.idea.KotlinFileType
-import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.psi.KtClass
+import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.resolve.BindingContext
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import java.io.File
 
+// TODO - hvordan strukturere test(er) som er store - ref. siste test som blir involverende
 class PsiKtFunctionsTest {
 
     private lateinit var disposable: Disposable
@@ -25,14 +25,19 @@ class PsiKtFunctionsTest {
     data class SourceCode(val code: String, val fileName: String = FILE_NAME)
 
     private fun analyzeKotlinCode(
-            code: SourceCode,
-    ): KtFile =
-            context.psiFactory.createFileFromText(
-                    code.fileName,
+        codeList: List<SourceCode>,
+    ): Result<Pair<List<KtFile>, BindingContext>> =
+        codeList
+            .map { (sourceCode, fileName) ->
+                context.psiFactory.createFileFromText(
+                    fileName,
                     KotlinFileType.INSTANCE,
-                    code.code
-            ) as
-                    KtFile
+                    sourceCode
+                ) as KtFile
+            }
+            .let { ktFiles ->
+                getBindingContext(ktFiles, context).map { bctx -> Pair(ktFiles, bctx) }
+            }
 
     @BeforeEach
     fun setUp() {
@@ -46,187 +51,236 @@ class PsiKtFunctionsTest {
     }
 
     @Test
-    @DisplayName("Should extract RuleService KtClass from KtFile")
-    fun testExtractRuleServiceKtClass() {
+    fun `Should extract RuleService KtClass from KtFile`() {
         val code =
-                SourceCode(
-                        """
+            SourceCode(
+                """
             class Test() : AbstractPensjonRuleService {}
         """.trimIndent()
-                )
+            )
 
-        analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
-                    .map { assert(true) }
+        analyzeKotlinCode(listOf(code))
+            .onSuccess { (ktFiles, _) ->
+                ktFiles.first()
+                    .getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                    .onSuccess { assert(true) }
                     .onFailure { assert(false) }
-        }
+            }
+            .onFailure { assert(false) }
     }
 
     @Test
-    @DisplayName("Should extract RuleFlow KtClass from KtFile")
-    fun testExtractRuleFlowKtClass() {
+    fun `Should extract RuleFlow KtClass from KtFile`() {
         val code =
-                SourceCode(
-                        """
+            SourceCode(
+                """
             class Test() : AbstractPensjonRuleflow {}
         """.trimIndent()
-                )
+            )
 
-        analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleFlowClass)
-                    .map { assert(true) }
+        analyzeKotlinCode(listOf(code))
+            .onSuccess { (ktFiles, _) ->
+                ktFiles.first()
+                    .getSubClassOfSuperClass(KtClass::isSubClassOfRuleFlowClass)
+                    .onSuccess { assert(true) }
                     .onFailure { assert(false) }
-        }
+            }
+            .onFailure { assert(false) }
     }
 
     @Test
-    @DisplayName("Should handle non existing KtClass in KtFile - 1")
-    fun testExtractKtClassFailure1() {
+    fun `Should handle non existing KtClass in KtFile - 1`() {
         val code =
-                SourceCode("""
+            SourceCode(
+                """
             class Test() : SomethingElse {}
-        """.trimIndent())
+        """.trimIndent()
+            )
 
-        analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
-                    .map { assert(false) }
-                    .onFailure { assert(it is NoSuchElementException) }
-        }
+        analyzeKotlinCode(listOf(code))
+            .onSuccess { (ktFiles, _) ->
+                ktFiles.first()
+                    .getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                    .onSuccess { assert(false) }
+                    .onFailure { assert(true) }
+            }
+            .onFailure { assert(it is NoSuchElementException) }
     }
 
     @Test
-    @DisplayName("Should handle non existing KtClass in KtFile - 2")
-    fun testExtractKtClassFailure2() {
-        val code = SourceCode("""
+    fun `Should handle non existing KtClass in KtFile - 2`() {
+        val code = SourceCode(
+            """
             class Test() {}
-        """.trimIndent())
+        """.trimIndent()
+        )
 
-        analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
-                    .map { assert(false) }
-                    .onFailure { assert(it is NoSuchElementException) }
-        }
+        analyzeKotlinCode(listOf(code))
+            .onSuccess { (ktFiles, _) ->
+                ktFiles.first()
+                    .getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                    .onSuccess { assert(false) }
+                    .onFailure { assert(true) }
+            }
+            .onFailure { assert(it is NoSuchElementException) }
     }
 
+    // TODO - unngå dype/pyramide mønster som går innover i de ulike Result med success/failure
+    /**
+     * @Test
+     * fun `Should extract sequence of flow KtElements from RuleService KtClass`() {
+     *     val methodName = "ruleService"
+     *     val code = SourceCode("""
+     *         // ... your test code here ...
+     *     """.trimIndent())
+     *
+     *     runCatching {
+     *         val (ktFile, bindingContext) = analyzeKotlinCode(listOf(code)).getOrThrow()
+     *         val ruleService = ktFile.first()
+     *             .getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
+     *             .getOrThrow()
+     *
+     *         val flowElements = ruleService.getRuleServiceFlow(bindingContext).getOrThrow()
+     *             .toList()
+     *
+     *         // Assertions
+     *         assertEquals(3, flowElements.size)
+     *
+     *         with(flowElements[0] as FlowElement.Documentation) {
+     *             assertEquals("Test1", beskrivelse)
+     *         }
+     *
+     *         with(flowElements[1] as FlowElement.Documentation) {
+     *             assertEquals("Test2", beskrivelse)
+     *         }
+     *
+     *         with(flowElements[2] as FlowElement.RuleFlow) {
+     *             assertEquals("StartTrygdetidFlyt", navn)
+     *         }
+     *     }.onFailure {
+     *         fail("Test failed with exception: ${it.message}")
+     *     }
+     * }
+     */
+
     @Test
-    @DisplayName("Should get ServiceRequestInfo data class from RuleService KtClass")
-    fun testGetRequestClassFromRuleServiceClass() {
+    fun `Should get ServiceRequestInfo data class from RuleService KtClass`() {
         val reqName = "req"
         val reqType = "ARequest"
         val code =
-                SourceCode(
-                        """
+            SourceCode(
+                """
             class $reqType() : ServiceRequest {}
             class Test(val $reqName: $reqType) : AbstractPensjonRuleService {}
         """.trimIndent()
-                )
+            )
 
-        analyzeKotlinCode(code).let { ktFile ->
-            getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
-                        .map { ruleService ->
-                            ruleService
-                                    .getServiceRequestInfo(bindingContext)
-                                    .map { (param, requestClass) ->
-                                        assertEquals(reqName, param.name)
-                                        assertEquals(reqType, requestClass.name)
-                                    }
-                                    .onFailure { assert(false) }
-                        }
-                        .onFailure { assert(false) }
+        analyzeKotlinCode(listOf(code))
+            .onSuccess { (ktFile, bindingContext) ->
+                ktFile.first()
+                    .getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                    .onSuccess { ruleService ->
+                        ruleService
+                            .getServiceRequestInfo(bindingContext)
+                            .onSuccess { (param, requestClass) ->
+                                assertEquals(reqName, param.name)
+                                assertEquals(reqType, requestClass.name)
+                            }
+                            .onFailure { assert(false) }
+                    }
+                    .onFailure { assert(false) }
             }
-        }
+            .onFailure { assert(false) }
     }
 
     @Test
-    @DisplayName("Should handle no ServiceRequestInfo data class from RuleService KtClass")
-    fun testGetRequestClassFromRuleServiceClassError() {
+    fun `Should handle no ServiceRequestInfo data class from RuleService KtClass`() {
         val reqName = "req"
         val reqType = "ARequest"
         val code =
-                SourceCode(
-                        """
+            SourceCode(
+                """
             class $reqType() : SomethingElse() {}
             class Test(val $reqName: $reqType) : AbstractPensjonRuleService {}
         """.trimIndent()
-                )
+            )
 
-        analyzeKotlinCode(code).let { ktFile ->
-            getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
-                        .map { ruleService ->
-                            ruleService
-                                    .getServiceRequestInfo(bindingContext)
-                                    .map { (_, _) -> assert(false) }
-                                    .onFailure { assert(it is NoSuchElementException) }
-                        }
-                        .onFailure { assert(false) }
+        analyzeKotlinCode(listOf(code))
+            .onSuccess { (ktFile, bindingContext) ->
+                ktFile.first()
+                    .getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                    .onSuccess { ruleService ->
+                        ruleService
+                            .getServiceRequestInfo(bindingContext)
+                            .onSuccess { (_, _) -> assert(false) }
+                            .onFailure { assert(it is NoSuchElementException) }
+                    }
+                    .onFailure { assert(false) }
             }
-        }
+            .onFailure { assert(false) }
     }
 
     @Test
-    @DisplayName("Should get ServiceResponse class for RuleService KtClass")
-    fun testGetResponseClassFromRuleServiceClass() {
+    fun `Should get ServiceResponse class for RuleService KtClass`() {
         val respType = "AResponse"
         val code =
-                SourceCode(
-                        """
+            SourceCode(
+                """
             class $respType() : ServiceResponse() {}
             class Test() : AbstractPensjonRuleService<$respType> {}
         """.trimIndent()
-                )
+            )
 
-        analyzeKotlinCode(code).let { ktFile ->
-            getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
-                        .map { ruleService ->
-                            ruleService
-                                    .getServiceResponseClass(bindingContext)
-                                    .map { responseClass ->
-                                        assertEquals(respType, responseClass.name)
-                                    }
-                                    .onFailure { assert(false) }
-                        }
-                        .onFailure { assert(false) }
+        analyzeKotlinCode(listOf(code))
+            .onSuccess { (ktFile, bindingContext) ->
+                ktFile.first()
+                    .getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                    .onSuccess { ruleService ->
+                        ruleService
+                            .getServiceResponseClass(bindingContext)
+                            .onSuccess { responseClass ->
+                                assertEquals(respType, responseClass.name)
+                            }
+                            .onFailure { assert(false) }
+                    }
+                    .onFailure { assert(false) }
             }
-        }
+            .onFailure { assert(false) }
     }
 
     @Test
-    @DisplayName("Should handle no ServiceResponse class for RuleService KtClass")
-    fun testGetResponseClassFromRuleServiceClassError() {
+    fun `Should handle no ServiceResponse class for RuleService KtClass`() {
         val respType = "AResponse"
         val code =
-                SourceCode(
-                        """
+            SourceCode(
+                """
             class $respType() : SomeThingElse() {}
             class Test() : AbstractPensjonRuleService<$respType> {}
         """.trimIndent()
-                )
+            )
 
-        analyzeKotlinCode(code).let { ktFile ->
-            getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
-                        .map { ruleService ->
-                            ruleService
-                                    .getServiceResponseClass(bindingContext)
-                                    .map { _ -> assert(false) }
-                                    .onFailure { assert(it is NoSuchElementException) }
-                        }
-                        .onFailure { assert(false) }
+        analyzeKotlinCode(listOf(code))
+            .onSuccess { (ktFile, bindingContext) ->
+                ktFile.first()
+                    .getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                    .onSuccess { ruleService ->
+                        ruleService
+                            .getServiceResponseClass(bindingContext)
+                            .onSuccess { _ -> assert(false) }
+                            .onFailure { assert(it is NoSuchElementException) }
+                    }
+                    .onFailure { assert(false) }
             }
-        }
+            .onFailure { assert(false) }
     }
 
     @Test
-    @DisplayName("Should extract KDoc from relevant KtClass")
-    fun testExtractKDoc() {
+    fun `Should extract KDoc from relevant KtClass`() {
         val doc1 = "Some documentation line 1"
         val doc2 = "Some documentation line 2"
         val code =
-                SourceCode(
-                        """
+            SourceCode(
+                """
             /**
              * $doc1
              * $doc2
@@ -234,43 +288,47 @@ class PsiKtFunctionsTest {
 
             class Test() : AbstractPensjonRuleService {}
         """.trimIndent()
-                )
+            )
 
-        analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
-                    .map {
+        analyzeKotlinCode(listOf(code))
+            .onSuccess { (ktFile, _) ->
+                ktFile.first()
+                    .getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                    .onSuccess {
                         val expected = listOf(doc1, doc2).joinToString("\n").trim()
                         assertEquals(expected, it.getKDocOrEmpty())
                     }
                     .onFailure { assert(false) }
-        }
+            }
+            .onFailure { assert(false) }
     }
 
     @Test
-    @DisplayName("Should handle no KDoc for relevant KtClass")
-    fun testExtractKDocEmpty() {
+    fun `Should handle no KDoc for relevant KtClass`() {
         val code =
-                SourceCode(
-                        """
+            SourceCode(
+                """
             class Test() : AbstractPensjonRuleService {}
         """.trimIndent()
-                )
+            )
 
-        analyzeKotlinCode(code).let { ktFile ->
-            ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
-                    .map { it.getKDocOrEmpty().isEmpty() }
+        analyzeKotlinCode(listOf(code))
+            .onSuccess { (ktFile, _) ->
+                ktFile.first()
+                    .getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                    .onSuccess { it.getKDocOrEmpty().isEmpty() }
                     .onFailure { assert(false) }
-        }
+            }
+            .onFailure { assert(false) }
     }
 
     @Test
-    @DisplayName("Should extract KDoc for parameters in ServiceRequest primary constructor")
-    fun testParameterKDocFromRequestPrimaryConstructor() {
+    fun `Should extract KDoc for parameters in ServiceRequest primary constructor`() {
         val reqName = "req"
         val reqType = "ARequest"
         val code =
-                SourceCode(
-                        """
+            SourceCode(
+                """
             class $reqType(
                 /**
                 * Virkningstidspunktets fom. for �nsket ytelse.
@@ -285,50 +343,54 @@ class PsiKtFunctionsTest {
 
             class Test(val $reqName: $reqType) : AbstractPensjonRuleService {}
         """.trimIndent()
-                )
+            )
 
-        analyzeKotlinCode(code).let { ktFile ->
-            getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
-                        .map { ruleService ->
-                            ruleService
-                                    .getServiceRequestInfo(bindingContext)
-                                    .map { (_, requestClass) ->
-                                        assertEquals(reqType, requestClass.name)
-                                        requestClass.primaryConstructor?.let { primaryConstructor ->
-                                            primaryConstructor.valueParameters.forEach { param ->
-                                                when (param.name) {
-                                                    "virkFom" ->
-                                                            assertEquals(
-                                                                    "Virkningstidspunktets fom. for �nsket ytelse.",
-                                                                    param.getKDocOrEmpty()
-                                                            )
-                                                    "virkTom" ->
-                                                            assertEquals(
-                                                                    "Tom for trygdetiden som skal beregnes. Kun for AP2011, AP2016 og AP2025.",
-                                                                    param.getKDocOrEmpty()
-                                                            )
-                                                    else -> assert(false)
-                                                }
-                                            }
+        analyzeKotlinCode(listOf(code))
+            .onSuccess { (ktFile, bindingContext) ->
+                ktFile.first()
+                    .getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                    .onSuccess { ruleService ->
+                        ruleService
+                            .getServiceRequestInfo(bindingContext)
+                            .onSuccess { (_, requestClass) ->
+                                assertEquals(reqType, requestClass.name)
+                                requestClass.primaryConstructor?.let { primaryConstructor ->
+                                    primaryConstructor.valueParameters.forEach {
+                                            param,
+                                        ->
+                                        when (param.name) {
+                                            "virkFom" ->
+                                                assertEquals(
+                                                    "Virkningstidspunktets fom. for �nsket ytelse.",
+                                                    param.getKDocOrEmpty()
+                                                )
+
+                                            "virkTom" ->
+                                                assertEquals(
+                                                    "Tom for trygdetiden som skal beregnes. Kun for AP2011, AP2016 og AP2025.",
+                                                    param.getKDocOrEmpty()
+                                                )
+
+                                            else -> assert(false)
                                         }
-                                                ?: assert(false)
                                     }
-                                    .onFailure { assert(false) }
-                        }
-                        .onFailure { assert(false) }
+                                }
+                                    ?: assert(false)
+                            }
+                            .onFailure { assert(false) }
+                    }
+                    .onFailure { assert(false) }
             }
-        }
+            .onFailure { assert(false) }
     }
 
     @Test
-    @DisplayName("Should no or KDoc for parameters in ServiceRequest primary constructor")
-    fun testMixParameterKDocFromRequestPrimaryConstructor() {
+    fun `Should no or KDoc for parameters in ServiceRequest primary constructor`() {
         val reqName = "req"
         val reqType = "ARequest"
         val code =
-                SourceCode(
-                        """
+            SourceCode(
+                """
             class $reqType(
 
                 var virkFom: Date? = null,
@@ -341,46 +403,55 @@ class PsiKtFunctionsTest {
 
             class Test(val $reqName: $reqType) : AbstractPensjonRuleService {}
         """.trimIndent()
-                )
+            )
 
-        analyzeKotlinCode(code).let { ktFile ->
-            getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
-                        .map { ruleService ->
-                            ruleService
-                                    .getServiceRequestInfo(bindingContext)
-                                    .map { (_, requestClass) ->
-                                        assertEquals(reqType, requestClass.name)
-                                        requestClass.primaryConstructor?.let { primaryConstructor ->
-                                            primaryConstructor.valueParameters.forEach { param ->
-                                                when (param.name) {
-                                                    "virkFom" ->
-                                                            assert(param.getKDocOrEmpty().isEmpty())
-                                                    "virkTom" ->
-                                                            assertEquals(
-                                                                    "Tom for trygdetiden som skal beregnes. Kun for AP2011, AP2016 og AP2025.",
-                                                                    param.getKDocOrEmpty()
-                                                            )
-                                                    else -> assert(false)
-                                                }
-                                            }
+        analyzeKotlinCode(listOf(code))
+            .onSuccess { (ktFile, bindingContext) ->
+                ktFile.first()
+                    .getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                    .onSuccess { ruleService ->
+                        ruleService
+                            .getServiceRequestInfo(bindingContext)
+                            .onSuccess { (_, requestClass) ->
+                                assertEquals(reqType, requestClass.name)
+                                requestClass.primaryConstructor?.let { primaryConstructor ->
+                                    primaryConstructor.valueParameters.forEach {
+                                            param,
+                                        ->
+                                        when (param.name) {
+                                            "virkFom" ->
+                                                assert(
+                                                    param.getKDocOrEmpty()
+                                                        .isEmpty()
+                                                )
+
+                                            "virkTom" ->
+                                                assertEquals(
+                                                    "Tom for trygdetiden som skal beregnes. Kun for AP2011, AP2016 og AP2025.",
+                                                    param.getKDocOrEmpty()
+                                                )
+
+                                            else -> assert(false)
                                         }
-                                                ?: assert(false)
                                     }
-                                    .onFailure { assert(false) }
-                        }
-                        .onFailure { assert(false) }
+                                }
+                                    ?: assert(false)
+                            }
+                            .onFailure { assert(false) }
+                    }
+                    .onFailure { assert(false) }
             }
-        }
+            .onFailure { assert(false) }
     }
 
     @Test
-    @DisplayName("Should extract sequence of flow KtElements from RuleService KtClass")
-    fun testExtractSequenceFlowKtElements() {
+    fun `Should extract sequence of flow KtElements from RuleService KtClass`() {
         val methodName = "ruleService"
         val code =
-                SourceCode(
-                        """
+            SourceCode(
+                """     /**
+                        * StartTrygdetidFlytDoc
+                        */
                         class StartTrygdetidFlyt(
                             private val trygdetidParametere: TrygdetidParameterType
                         ) : AbstractPensjonRuleflow() {
@@ -389,9 +460,13 @@ class PsiKtFunctionsTest {
 
                             override var ruleflow: () -> Unit = {}
                         }
+                        fun log_debug(msg: String) {}
 
                         class FastsettTrygdetidService() : AbstractPensjonRuleService {
                             override val $methodName: () -> TrygdetidResponse = {
+                                /**
+                                * log_debug
+                                */
                                 log_debug("[FUN] startFastsettTrygdetid")
 
                                 /**
@@ -439,65 +514,316 @@ class PsiKtFunctionsTest {
                                 )
                             }
                         }
+                        
+                        class TrygdetidResponse(
+                            /**
+                             * Fastsatt trygdetid.
+                             */
+                            var trygdetid: Trygdetid? = null,
+
+                            /**
+                             * Fastsatt trygdetid for AP2016 iht. kapittel 20 og AP2025.
+                             */
+                            var trygdetidKapittel20: Trygdetid? = null,
+
+                            /**
+                             * Fastsatt trygdetid for annet uf�retidspunkt.
+                             */
+                            var trygdetidAlternativ: Trygdetid? = null,
+                            override val pakkseddel: Pakkseddel = Pakkseddel()
+                        ) : ServiceResponse() {}
 
         """.trimIndent()
-                )
+            )
 
-        analyzeKotlinCode(code).let { ktFile ->
-            getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
-                        .map { ruleService ->
-                            ruleService
-                                    .getRuleServiceFlow(bindingContext)
-                                    .map { seq ->
-                                        assertEquals(3, seq.count())
-                                        assertEquals(
-                                                "Test1",
-                                                (seq.elementAt(0) as FlowElement.Documentation)
-                                                        .beskrivelse
-                                        )
-                                        assertEquals(
-                                                "Test2",
-                                                (seq.elementAt(1) as FlowElement.Documentation)
-                                                        .beskrivelse
-                                        )
-                                        assertEquals(
-                                                "StartTrygdetidFlyt",
-                                                (seq.elementAt(2) as FlowElement.RuleFlow).navn
-                                        )
-                                    }
-                                    .onFailure { assert(false) }
-                        }
-                        .onFailure { assert(false) }
+        analyzeKotlinCode(listOf(code))
+            .onSuccess { (ktFile, bindingContext) ->
+                ktFile.first()
+                    .getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                    .onSuccess { ruleService ->
+                        ruleService
+                            .getRuleServiceFlow(bindingContext)
+                            .onSuccess { seq ->
+                                assertEquals(3, seq.count())
+                                assertEquals(
+                                    "log_debug",
+                                    (seq.elementAt(0) as FlowElement.Function).navn
+                                )
+                                assertEquals(
+                                    "log_debug",
+                                    (seq.elementAt(0) as FlowElement.Function).beskrivelse
+                                )
+                                assertEquals(
+                                    "StartTrygdetidFlyt",
+                                    (seq.elementAt(1) as FlowElement.RuleFlow).navn
+                                )
+                                assertEquals(
+                                    "TrygdetidResponse",
+                                    (seq.elementAt(2) as FlowElement.Function).navn
+                                )
+                            }
+                            .onFailure { assert(false) }
+                    }
+                    .onFailure { assert(false) }
             }
-        }
+            .onFailure { assert(false) }
     }
 
     @Test
-    @DisplayName("Should handle no named KtProperty in RuleService KtClass")
-    fun testExtractSequenceFlowKtElementsError() {
+    fun `Should handle no named KtProperty in RuleService KtClass`() {
         val methodName = "someOtherMethod"
         val code =
-                SourceCode(
-                        """
+            SourceCode(
+                """
                         class FastsettTrygdetidService() : AbstractPensjonRuleService {
                             override val $methodName: () -> TrygdetidResponse = {}
                         }
 
         """.trimIndent()
-                )
+            )
 
-        analyzeKotlinCode(code).let { ktFile ->
-            getBindingContext(listOf(ktFile), context).map { bindingContext ->
-                ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
-                        .map { ruleService ->
-                            ruleService
-                                    .getRuleServiceFlow(bindingContext)
-                                    .map { _ -> assert(false) }
-                                    .onFailure { assert(it is NoSuchElementException) }
-                        }
-                        .onFailure { assert(false) }
-            }
+        analyzeKotlinCode(listOf(code)).onSuccess { (ktFile, bindingContext) ->
+            ktFile.first()
+                .getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass)
+                .onSuccess { ruleService ->
+                    ruleService
+                        .getRuleServiceFlow(bindingContext)
+                        .onSuccess { _ -> assert(false) }
+                        .onFailure { assert(it is NoSuchElementException) }
+                }
+                .onFailure { assert(false) }
         }
+    }
+
+    @Test
+    fun `Should extract sequence of flow KtElements from StartTrygdetidFlyt KtClass`() {
+        val methodName = "ruleflow"
+        val code =
+            SourceCode(
+                """
+
+                        class StartTrygdetidFlyt(
+                            private val trygdetidParametere: TrygdetidParameterType
+                        ) : AbstractPensjonRuleflow() {
+                            private var førsteVirk: Date? = null
+                            private var kapittel20: Boolean? = null
+
+                            override var $methodName: () -> Unit = {
+
+                                /**
+                                 * Task: Kontroller informasjonsgrunnlag
+                                 */
+                                KontrollerTrygdetidInformasjonsgrunnlagFlyt(trygdetidParametere).run(this)
+                                /**
+                                 * Task: Input ok?
+                                 * EPS skal beregnes som SOKER når ytelsen er AP. CR 165527
+                                 */
+                                forgrening("Input ok?") {
+                                    gren {
+                                        betingelse { trygdetidParametere.resultat?.pakkseddel!!.merknadListe.isEmpty() }
+                                        flyt {
+                                            /**
+                                             * Task: Init Trygdetidberegning
+                                             */
+                                            settPregVariableUtenGlobals(
+                                                trygdetidParametere.grunnlag?.bruker,
+                                                trygdetidParametere.grunnlag?.virkFom
+                                            )
+                                            trygdetidParametere.grunnlag?.bruker?.vilkarsVedtak = VilkarsVedtak(
+                                                kravlinjeType = trygdetidParametere.grunnlag?.ytelseType,
+                                                virkFom = trygdetidParametere.grunnlag?.virkFom,
+                                                forsteVirk = trygdetidParametere.grunnlag?.førsteVirk,
+                                                vilkarsvedtakResultat = VedtakResultatEnum.INNV
+                                            )
+                                            trygdetidParametere.grunnlag?.beregning = Beregning()
+
+                                            /**
+                                             * Task: AP og bruker er EPS?
+                                             * EPS skal beregnes som SOKER når ytelsen er AP. CR 165527
+                                             */
+                                            forgrening("AP og bruker er EPS?") {
+                                                gren {
+                                                    betingelse {
+                                                        trygdetidParametere.grunnlag?.ytelseType == KravlinjeTypeEnum.AP &&
+                                                                trygdetidParametere.grunnlag?.bruker?.grunnlagsrolle in listOf(
+                                                                    EKTEF,
+                                                                    PARTNER,
+                                                                    SAMBO
+                                                                )
+                                                    }
+                                                    flyt {
+                                                        /**
+                                                         * Task: Gjør om EPS til soker
+                                                         * Gjør om EPS til soker
+                                                         */
+                                                        settEPStilSøker(trygdetidParametere)
+                                                    }
+                                                }
+                                                gren {
+                                                    betingelse { false }
+                                                    flyt {
+                                                    }
+                                                }
+                                            }
+                                            /**
+                                             * Task: Finn første virkningsdato i trygden
+                                             */
+                                            førsteVirk = FinnPersonensFørsteVirkRS(
+                                                trygdetidParametere.grunnlag?.bruker!!,
+                                                trygdetidParametere.grunnlag?.førsteVirk,
+                                                trygdetidParametere.grunnlag?.virkFom!!,
+                                                trygdetidParametere.grunnlag?.ytelseType!!,
+                                                trygdetidParametere.grunnlag?.uttaksgradListe!!
+                                            ).run(this)
+                                            /**
+                                             * Task: Bestem kapittel 20
+                                             */
+                                            kapittel20 = BestemTTKapittel20RS(
+                                                trygdetidParametere.grunnlag?.ytelseType!!,
+                                                trygdetidParametere.grunnlag?.regelverkType
+                                            ).run(this)
+                                            /**
+                                             * Task: Init Variable
+                                             */
+                                            InitTrygdetidVariableRS(trygdetidParametere, førsteVirk, kapittel20).run(this)
+                                            /**
+                                             * Task: Init resultat
+                                             */
+                                            //InitTrygdetidResultatRS(trygdetidParametere, kapittel20).run(this)
+                                            /**
+                                             * Task: Kontroller bostedLand
+                                             */
+                                            //BestemBosattLandRS(trygdetidParametere.grunnlag?.bruker!!).run(this)
+                                            /**
+                                             * Task: Overgangskull?
+                                             */
+                                            forgrening("Overgangskull?") {
+                                                gren {
+                                                    betingelse {
+                                                        (trygdetidParametere.variable?.kapittel20 == true
+                                                                && trygdetidParametere.variable?.regelverkType == RegelverkTypeEnum.N_REG_G_N_OPPTJ)
+                                                    }
+                                                    flyt {
+                                                        /**
+                                                         * Task: Fastsett Trygdetid overgangskull
+                                                         */
+                                                        TrygdetidOvergangskullFlyt(trygdetidParametere).run(this)
+                                                    }
+                                                }
+                                                gren {
+                                                    betingelse {
+                                                        !(trygdetidParametere.variable?.kapittel20 == true
+                                                                && trygdetidParametere.variable?.regelverkType == RegelverkTypeEnum.N_REG_G_N_OPPTJ)
+                                                    }
+                                                    flyt {
+                                                        /**
+                                                         * Task: Fastsett Trygdetid
+                                                         */
+                                                        //FastsettTrygdetidFlyt(trygdetidParametere).run(this)
+                                                    }
+                                                }
+                                            }
+                                            /**
+                                             * Task: Sett virkFom og virkTom på alle returnerte trygdetider
+                                             */
+                                            //SettVirkFomOgTomPåTrygdetidResultatRS(trygdetidParametere).run(this)
+                                        }
+                                    }
+                                    gren {
+                                        betingelse { trygdetidParametere.resultat?.pakkseddel!!.merknadListe.isNotEmpty() }
+                                        flyt {
+                                        }
+                                    }
+                                }
+
+                            }
+
+                        }
+
+        """.trimIndent()
+            )
+
+        val kigFlyt =
+            SourceCode(
+                """
+            class KontrollerTrygdetidInformasjonsgrunnlagFlyt() : AbstractPensjonRuleflow() {
+                override var ruleflow: () -> Unit = { }
+            }
+            """.trimIndent()
+            )
+
+        val initTrygdeTidVariableRS = SourceCode(
+            """
+class InitTrygdetidVariableRS(
+    private val innParametere: TrygdetidParameterType?,
+    private val innFørsteVirk: Date?,
+    private val innKapittel20: Boolean?
+) : AbstractPensjonRuleset<Unit>() {}
+                
+            """.trimIndent()
+        )
+
+        val trygdetidOvergangskullFlyt = SourceCode(
+            """
+class TrygdetidOvergangskullFlyt(
+    trygdetidParametere: TrygdetidParameterType
+) : AbstractPensjonRuleflow() {}            
+        """.trimIndent()
+        )
+
+        analyzeKotlinCode(listOf(code, kigFlyt, initTrygdeTidVariableRS, trygdetidOvergangskullFlyt))
+            .onSuccess { (ktFileList, bctx) ->
+                ktFileList
+                    .first()
+                    .getSubClassOfSuperClass(KtClass::isSubClassOfRuleFlowClass)
+                    .onSuccess { ruleFlow ->
+                        ruleFlow.getRuleFlowFlow(bctx)
+                            .onSuccess { flow ->
+                                when (val flowElement = flow.elementer[0]) {
+                                    is FlowElement.RuleFlow -> {
+                                        assertEquals(
+                                            "KontrollerTrygdetidInformasjonsgrunnlagFlyt",
+                                            flowElement.navn
+                                        )
+                                        assertEquals(
+                                            "Task: Kontroller informasjonsgrunnlag",
+                                            flowElement.beskrivelse
+                                        )
+                                    }
+
+                                    else -> assert(false)
+                                }
+                                when (val flowElement = flow.elementer[1]) {
+                                    is FlowElement.Forgrening -> {
+                                        assertEquals(
+                                            "Task: Input ok?\nEPS skal beregnes som SOKER når ytelsen er AP. CR 165527",
+                                            flowElement.beskrivelse
+                                        )
+                                        assertEquals(
+                                            "Task: Input ok?\nEPS skal beregnes som SOKER når ytelsen er AP. CR 165527",
+                                            flowElement.beskrivelse
+                                        )
+                                        assertEquals("Input ok?", flowElement.navn)
+                                        assertEquals(2, flowElement.gren.size)
+                                        assertEquals(
+                                            "trygdetidParametere.resultat?.pakkseddel!!.merknadListe.isEmpty()",
+                                            flowElement.gren[0].betingelse
+                                        )
+                                        assertEquals(
+                                            "trygdetidParametere.resultat?.pakkseddel!!.merknadListe.isNotEmpty()",
+                                            flowElement.gren[1].betingelse
+                                        )
+                                    }
+                                    else -> assert(false)
+                                }
+                            }
+                            .onFailure {
+                                it.printStackTrace()
+                                assert(false)
+                            }
+                    }
+                    .onFailure { assert(false) }
+            }
+            .onFailure { assert(false) }
     }
 }

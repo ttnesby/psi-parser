@@ -1,0 +1,11 @@
+// Kotlin test tasks
+//
+//
+[
+    {
+        "label": "Kotlin PsiKtFunctions test - symbol",
+        "command": "$ZED_WORKTREE_ROOT/gradlew test --tests org.example.PsiKtFunctionsTest.$ZED_SELECTED_TEXT",
+        "use_new_terminal": false,
+        "reveal": "always"
+    }
+]

@@ -1,8 +1,5 @@
 package org.example
 
-import org.example.FlowElement.Documentation
-import org.example.FlowElement.RuleFlow
-import org.example.FlowElement.RuleSet
 import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoots
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
@@ -60,13 +57,13 @@ private fun addDependenciesToClasspath(folder: File, context: CompilerContext) {
 fun processRepo(
     context: CompilerContext,
     root: File,
-    dependencies: File? = null,
+    dependencies: File,
 ): Result<AnalysisResult> {
-    dependencies?.let { addDependenciesToClasspath(it, context) }
+    addDependenciesToClasspath(dependencies, context)
 
     return findKotlinSourceFiles(root, context).let { sourceFiles ->
-        getBindingContext(sourceFiles, context).map { bindingContext ->
-            analyzeSourceFiles2(sourceFiles, bindingContext)
+        getBindingContext(sourceFiles, context).flatMap { bindingContext ->
+            analyzeSourceFiles(sourceFiles, bindingContext)
         }.onSuccess {
             println("Created Binding Context")
         }
@@ -93,37 +90,25 @@ fun analyzeRepository(
 
 /**
  * arg[0] - sti til repository (C:\\data\\pensjon-regler)
- * arg[1] - sti til bibliotek med avhengigheter. Kan bruke m2, eller så les README for å opprette fra pensjon-regler.
- * arg[2] - true/false for generering av AsciiDoc
+ * arg[1] - sti til bibliotek med avhengigheter. Kan bruke m2 (C:\\.m2), eller så les README for å opprette  et mindre bibliotek fra pensjon-regler.
  */
 fun main(args: Array<String>) {
     val disposable = Disposer.newDisposable()
     val elapsed = measureTimeMillis {
-        try {
-            analyzeRepository(
-                jdkHome = File(System.getProperty("java.home")),
-                repoPath = File(args[0]),
-                libsPath = File(args[1]),
-                disposable = disposable
-            )
-                .getOrNull()
-                ?.let { result ->
-//                    println("Rule Services:")
-//                    result.services.forEach(::println)
-//                    println("\nRule Flows:")
-//                    result.flows.forEach(::println)
-//                    println("\nRule Sets:")
-//                    result.sets.forEach(::println)
-//                    println("\nSummary:")
-                    println("Found ${result.services.size} rule services")
-                    println("Found ${result.flows.size} rule flows")
-                    println("Found ${result.sets.size} rule sets")
-                    if(args[2] == "true") generateAsciiDoc(result.services, "C:\\data\\psi-parser")
-                }
-        } finally {
-            disposable.dispose()
+
+        analyzeRepository(
+            jdkHome = File(System.getProperty("java.home")),
+            repoPath = File(args[0]),
+            libsPath = File(args[1]),
+            disposable = disposable
+        ).map { result ->
+            println("Found ${result.services.size} rule services")
+            println("Found ${result.flows.size} rule flows")
+            println("Found ${result.sets.size} rule sets")
+            generateAsciiDoc(result.services, "C:\\data\\psi-parser")
         }
     }
+    disposable.dispose()
     println("elapsed: ${String.format("%d min, %d sec", (elapsed / 1000) / 60, (elapsed / 1000) % 60)}")
 }
 
