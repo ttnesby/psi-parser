@@ -1,6 +1,7 @@
 package org.example
 
-import org.example.FlowElement.Documentation
+import org.example.FlowElement
+import org.example.FlowElement.Flow
 import org.example.FlowElement.RuleFlow
 import org.example.FlowElement.RuleSet
 import java.io.File
@@ -51,7 +52,8 @@ fun StringBuilder.appendFlowElement(elementer: List<FlowElement>) {
     elementer.forEach { element ->
         when (element) {
             // TODO burde kanskje ha pakkereferanse om vi skal referere til .adoc filer. Dette er nå kun sti for filen.
-            is Function -> {
+
+            is FlowElement.Function -> {
                 this.appendLine("link:${element.fil.canonicalPath.replace(".kt", ".adoc")}[${element.navn}]")
             }
 
@@ -63,7 +65,7 @@ fun StringBuilder.appendFlowElement(elementer: List<FlowElement>) {
                 this.appendLine("link:${element.fil.canonicalPath.replace(".kt", ".adoc")}[${element.navn}]")
             }
 
-            is Flow -> {
+            is FlowElement.Flow -> {
                 this.appendFlowElement(element.elementer)
             }
             is FlowElement.Forgrening -> {
