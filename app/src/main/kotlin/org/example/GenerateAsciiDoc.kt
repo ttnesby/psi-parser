@@ -50,12 +50,8 @@ fun generateAsciiDoc(ruleDocs: List<RuleServiceDoc>, outputPath: String) {
 fun StringBuilder.appendFlowElement(elementer: List<FlowElement>) {
     elementer.forEach { element ->
         when (element) {
-            is Documentation -> {
-                // TODO Dette bør kanskje et annet sted? Se FastettTrygdetidService.adoc som eksempel
-                this.appendLine("|Beskrivelse: ${element.beskrivelse}")
-            }
             // TODO burde kanskje ha pakkereferanse om vi skal referere til .adoc filer. Dette er nå kun sti for filen.
-            is FlowElement.Function -> {
+            is Function -> {
                 this.appendLine("link:${element.fil.canonicalPath.replace(".kt", ".adoc")}[${element.navn}]")
             }
 
@@ -67,7 +63,7 @@ fun StringBuilder.appendFlowElement(elementer: List<FlowElement>) {
                 this.appendLine("link:${element.fil.canonicalPath.replace(".kt", ".adoc")}[${element.navn}]")
             }
 
-            is FlowElement.Flow -> {
+            is Flow -> {
                 this.appendFlowElement(element.elementer)
             }
             is FlowElement.Forgrening -> {

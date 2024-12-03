@@ -124,7 +124,9 @@ class AnalyzerFunctionsTests {
 
                     trygdetidParametere.resultat = TrygdetidResultat(pakkseddel = Pakkseddel())
 
-                    // Kjør reglene
+                    /**
+                    * StartTrygdetidFlyt
+                    */
                     StartTrygdetidFlyt(trygdetidParametere).run(this)
 
                     TrygdetidResponse(
@@ -228,10 +230,17 @@ class AnalyzerFunctionsTests {
             assertEquals("Pakkseddel", rs.utdata[4].type)
             assert(rs.utdata[4].beskrivelse.isEmpty())
 
-            assertEquals(5, rs.flyt.elementer.count())
+            assertEquals(3, rs.flyt.elementer.count())
 
-            val aRuleFlow = rs.flyt.elementer[3] as FlowElement.RuleFlow
+            val firstFunction = rs.flyt.elementer[0] as FlowElement.Function
+            assertEquals("log_debug", firstFunction.navn)
+
+            val aRuleFlow = rs.flyt.elementer[1] as FlowElement.RuleFlow
             assertEquals("StartTrygdetidFlyt", aRuleFlow.navn)
+            assertEquals("StartTrygdetidFlyt", aRuleFlow.beskrivelse)
+
+            val secondFunction = rs.flyt.elementer[2] as FlowElement.Function
+            assertEquals("TrygdetidResponse", secondFunction.navn)
         }
     }
 

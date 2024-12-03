@@ -13,8 +13,6 @@ import org.junit.jupiter.api.Test
 import java.io.File
 
 // TODO - hvordan strukturere test(er) som er store - ref. siste test som blir involverende
-//
-
 class PsiKtFunctionsTest {
 
     private lateinit var disposable: Disposable
@@ -451,7 +449,9 @@ class PsiKtFunctionsTest {
         val methodName = "ruleService"
         val code =
             SourceCode(
-                """
+                """     /**
+                        * StartTrygdetidFlytDoc
+                        */
                         class StartTrygdetidFlyt(
                             private val trygdetidParametere: TrygdetidParameterType
                         ) : AbstractPensjonRuleflow() {
@@ -460,9 +460,13 @@ class PsiKtFunctionsTest {
 
                             override var ruleflow: () -> Unit = {}
                         }
+                        fun log_debug(msg: String) {}
 
                         class FastsettTrygdetidService() : AbstractPensjonRuleService {
                             override val $methodName: () -> TrygdetidResponse = {
+                                /**
+                                * log_debug
+                                */
                                 log_debug("[FUN] startFastsettTrygdetid")
 
                                 /**
@@ -510,6 +514,24 @@ class PsiKtFunctionsTest {
                                 )
                             }
                         }
+                        
+                        class TrygdetidResponse(
+                            /**
+                             * Fastsatt trygdetid.
+                             */
+                            var trygdetid: Trygdetid? = null,
+
+                            /**
+                             * Fastsatt trygdetid for AP2016 iht. kapittel 20 og AP2025.
+                             */
+                            var trygdetidKapittel20: Trygdetid? = null,
+
+                            /**
+                             * Fastsatt trygdetid for annet uf�retidspunkt.
+                             */
+                            var trygdetidAlternativ: Trygdetid? = null,
+                            override val pakkseddel: Pakkseddel = Pakkseddel()
+                        ) : ServiceResponse() {}
 
         """.trimIndent()
             )
@@ -524,18 +546,20 @@ class PsiKtFunctionsTest {
                             .onSuccess { seq ->
                                 assertEquals(3, seq.count())
                                 assertEquals(
-                                    "Test1",
-                                    (seq.elementAt(0) as FlowElement.Documentation)
-                                        .beskrivelse
+                                    "log_debug",
+                                    (seq.elementAt(0) as FlowElement.Function).navn
                                 )
                                 assertEquals(
-                                    "Test2",
-                                    (seq.elementAt(1) as FlowElement.Documentation)
-                                        .beskrivelse
+                                    "log_debug",
+                                    (seq.elementAt(0) as FlowElement.Function).beskrivelse
                                 )
                                 assertEquals(
                                     "StartTrygdetidFlyt",
-                                    (seq.elementAt(2) as FlowElement.RuleFlow).navn
+                                    (seq.elementAt(1) as FlowElement.RuleFlow).navn
+                                )
+                                assertEquals(
+                                    "TrygdetidResponse",
+                                    (seq.elementAt(2) as FlowElement.Function).navn
                                 )
                             }
                             .onFailure { assert(false) }
@@ -756,34 +780,25 @@ class TrygdetidOvergangskullFlyt(
                         ruleFlow.getRuleFlowFlow(bctx)
                             .onSuccess { flow ->
                                 when (val flowElement = flow.elementer[0]) {
-                                    is FlowElement.Documentation ->
-                                        assertEquals(
-                                            "Task: Kontroller informasjonsgrunnlag",
-                                            flowElement.beskrivelse
-                                        )
-
-                                    else -> assert(false)
-                                }
-                                when (val flowElement = flow.elementer[1]) {
-                                    is FlowElement.RuleFlow ->
+                                    is FlowElement.RuleFlow -> {
                                         assertEquals(
                                             "KontrollerTrygdetidInformasjonsgrunnlagFlyt",
                                             flowElement.navn
                                         )
+                                        assertEquals(
+                                            "Task: Kontroller informasjonsgrunnlag",
+                                            flowElement.beskrivelse
+                                        )
+                                    }
 
                                     else -> assert(false)
                                 }
-                                when (val flowElement = flow.elementer[2]) {
-                                    is FlowElement.Documentation ->
+                                when (val flowElement = flow.elementer[1]) {
+                                    is FlowElement.Forgrening -> {
                                         assertEquals(
                                             "Task: Input ok?\nEPS skal beregnes som SOKER når ytelsen er AP. CR 165527",
                                             flowElement.beskrivelse
                                         )
-
-                                    else -> assert(false)
-                                }
-                                when (val flowElement = flow.elementer[3]) {
-                                    is FlowElement.Forgrening -> {
                                         assertEquals(
                                             "Task: Input ok?\nEPS skal beregnes som SOKER når ytelsen er AP. CR 165527",
                                             flowElement.beskrivelse
@@ -799,7 +814,6 @@ class TrygdetidOvergangskullFlyt(
                                             flowElement.gren[1].betingelse
                                         )
                                     }
-
                                     else -> assert(false)
                                 }
                             }

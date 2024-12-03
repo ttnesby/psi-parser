@@ -209,7 +209,7 @@ fun KtElement.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> 
 private fun KtCallExpression.resolveFunctionDeclaration(
     bindingContext: BindingContext,
 ): Result<Pair<String, File>> = runCatching {
-    val namedReference = calleeExpression as? KtNameReferenceExpression ?: throw NoSuchElementException(
+    val namedReference = this.calleeExpression as? KtNameReferenceExpression ?: throw NoSuchElementException(
         "Call expression does not have a named reference"
     )
 
@@ -233,26 +233,34 @@ private fun KtProperty.streamRuleServiceElements(
     superType: DSLType,
     bindingContext: BindingContext,
 ): Result<Sequence<FlowElement>> = runCatching {
-    getLambdaBlock().map { block ->
+    this.getLambdaBlock().map { block ->
         block.children.asSequence().flatMap { element ->
             sequence {
                 when (element) {
                     is KtCallExpression -> {
                         element.resolveFunctionDeclaration(bindingContext)
-                            .map { (name, file) -> FlowElement.Function(name, file) }.getOrNull()?.let { yield(it) }
+                            .map { (name, file) ->
+                                FlowElement.Function(
+                                    name,
+                                    element.extractKDocOrEmpty(),
+                                    file
+                                )
+                            }.getOrNull()?.let { yield(it) }
                     }
 
-                    is KtProperty -> {
-                        element.children.filterIsInstance<KDoc>().forEach {
-                            yield(FlowElement.Documentation(it.formatOrEmpty()))
-                        }
-                    }
+//                    is KtProperty -> {
+//                        element.children.filterIsInstance<KDoc>().forEach {
+//                            yield(FlowElement.Documentation(it.formatOrEmpty()))
+//                        }
+//                    }
 
-                    is KDoc -> yield(FlowElement.Documentation(element.formatOrEmpty()))
+//                    is KDoc -> yield(FlowElement.Documentation(element.formatOrEmpty()))
                     is KtDotQualifiedExpression -> {
                         element.resolveReceiverClass(superType, bindingContext).map { resolvedClass ->
                             FlowElement.RuleFlow(
-                                resolvedClass.name ?: "Unknown", File(resolvedClass.containingKtFile.name)
+                                resolvedClass.name ?: "Unknown",
+                                element.extractKDocOrEmpty(),
+                                File(resolvedClass.containingKtFile.name)
                             )
                         }.getOrNull()?.let { yield(it) }
                     }
@@ -341,20 +349,24 @@ private fun KtBlockExpression.extractFlow(bctx: BindingContext): Result<FlowElem
                     }
                 }
 
-                is KtProperty -> FlowElement.Documentation(
-                    child.children.filterIsInstance<KDoc>().first().formatOrEmpty()
-                )
-
-                is KDoc -> FlowElement.Documentation(child.formatOrEmpty())
+//                is KtProperty -> FlowElement.Documentation(
+//                    child.children.filterIsInstance<KDoc>().first().formatOrEmpty()
+//                )
+//
+//                is KDoc -> FlowElement.Documentation(child.formatOrEmpty())
                 is KtDotQualifiedExpression -> {
                     val resolvedClass = child.resolveReceiverClass2(bctx).getOrThrow()
                     when {
                         resolvedClass.isSubClassOfRuleFlowClass() -> FlowElement.RuleFlow(
-                            resolvedClass.name ?: "Unknown", File(resolvedClass.containingKtFile.name)
+                            resolvedClass.name ?: "Unknown",
+                            child.extractKDocOrEmpty(),
+                            File(resolvedClass.containingKtFile.name)
                         )
 
                         resolvedClass.isSubClassOfRuleSetClass() -> FlowElement.RuleSet(
-                            resolvedClass.name ?: "Unknown", File(resolvedClass.containingKtFile.name)
+                            resolvedClass.name ?: "Unknown",
+                            child.extractKDocOrEmpty(),
+                            File(resolvedClass.containingKtFile.name)
                         )
 
                         else -> null
