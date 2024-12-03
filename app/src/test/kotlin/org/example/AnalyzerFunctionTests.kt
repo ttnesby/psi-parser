@@ -6,7 +6,9 @@ package org.example
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.idea.KotlinFileType
+import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.resolve.BindingContext
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -15,6 +17,7 @@ import java.io.File
 import java.net.URI
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.junit5.JUnit5Asserter.fail
 
 class AnalyzerFunctionsTests {
 
@@ -42,6 +45,22 @@ class AnalyzerFunctionsTests {
                     analyzeSourceFilesTest(ktFiles, bctx)
                 }
             }
+
+    private fun analyzeSourceFiles(code: List<SourceCode>): Result<Pair<List<KtFile>, BindingContext>> = runCatching {
+        val ktFiles = code
+            .map { (sourceCode, fileName) ->
+                context.psiFactory.createFileFromText(
+                    fileName,
+                    KotlinFileType.INSTANCE,
+                    sourceCode
+                ) as
+                        KtFile
+            }
+
+            getBindingContext(ktFiles, context).map { bctx ->
+                Pair(ktFiles, bctx)
+            }.getOrThrow()
+    }
 
     @BeforeEach
     fun setUp() {
@@ -230,6 +249,54 @@ class AnalyzerFunctionsTests {
 
         analyzeKotlinCode(listOf(testCode)).map { ruleServices ->
             assertTrue(ruleServices.isEmpty())
+        }
+    }
+
+    @Test
+    @DisplayName("Should give a list of PropertyDoc for a Rule flow KtClass")
+    fun `Should give a list of PropertyDoc for a Rule flow KtClass`() {
+
+
+        val ruleFlow = SourceCode(
+            """
+            class StartTrygdetidFlyt(
+                private val trygdetidParametere: TrygdetidParameterType
+            ) : AbstractPensjonRuleflow() {
+                private var førsteVirk: Date? = null
+                private var kapittel20: Boolean? = null
+
+                override var ruleflow: () -> Unit = {}
+            }
+        """.trimIndent()
+        )
+
+        val trygdeTidParameter = SourceCode(
+            """
+            class TrygdetidParameterType {
+                var grunnlag: TrygdetidGrunnlag? = null
+                /**
+                 * Resultat av trygdetidsberegningen.
+                 */
+                var resultat: TrygdetidResultat? = null
+                var variable: TrygdetidVariable? = null
+            }
+        """.trimIndent()
+        )
+
+        runCatching() {
+            val (ktFiles, bindingContext) = analyzeSourceFiles(listOf(ruleFlow, trygdeTidParameter)).getOrThrow()
+            val ruleFlowClass = ktFiles.first().getSubClassOfSuperClass(KtClass::isSubClassOfRuleFlowClass).getOrThrow()
+            val propertyDocs = getFlowRequestFields(ruleFlowClass, bindingContext).getOrThrow()
+
+            assertEquals(4, propertyDocs.size)
+            assertEquals("trygdetidParametere", propertyDocs[0].navn)
+            assertEquals("TrygdetidParameterType", propertyDocs[0].type)
+            assertEquals("Resultat av trygdetidsberegningen.", propertyDocs[2].beskrivelse)
+            assertEquals("variable", propertyDocs[3].navn)
+            assertEquals("TrygdetidVariable?", propertyDocs[3].type)
+
+        }.onFailure {
+            fail("Test failed with exception: ${it.message}")
         }
     }
 }

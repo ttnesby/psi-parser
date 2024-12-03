@@ -3,6 +3,7 @@ package org.example
 import org.example.PropertyDoc.Companion.fromParameter
 import org.jetbrains.annotations.TestOnly
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
+import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.BindingContext
@@ -86,14 +87,14 @@ fun getRuleService(ktFile: KtFile, bindingContext: BindingContext): Result<RuleS
         RuleServiceDoc(
             navn = ktClass.name!!,
             beskrivelse = ktClass.getKDocOrEmpty(),
-            inndata = getRequestFields(ktClass, bindingContext).getOrThrow(),
-            utdata = getResponseFields(ktClass, bindingContext).getOrThrow(),
+            inndata = getServiceRequestFields(ktClass, bindingContext).getOrThrow(),
+            utdata = getServiceResponseFields(ktClass, bindingContext).getOrThrow(),
             flyt = getRuleService(ktClass, bindingContext).getOrThrow(),
             gitHubUri = URI(ktFile.name.convertToGitHubUrl())
         )
     }
 
-fun getRequestFields(ktClass: KtClass, bindingContext: BindingContext): Result<List<PropertyDoc>> = runCatching {
+fun getServiceRequestFields(ktClass: KtClass, bindingContext: BindingContext): Result<List<PropertyDoc>> = runCatching {
     ktClass.getServiceRequestInfo(bindingContext)
         .map { (parameter, serviceRequestClass) ->
             buildList {
@@ -107,7 +108,7 @@ fun getRequestFields(ktClass: KtClass, bindingContext: BindingContext): Result<L
         }.getOrThrow()
 }
 
-fun getResponseFields(ktClass: KtClass, bindingContext: BindingContext): Result<List<PropertyDoc>> = runCatching {
+fun getServiceResponseFields(ktClass: KtClass, bindingContext: BindingContext): Result<List<PropertyDoc>> = runCatching {
     ktClass.getServiceResponseClass(bindingContext)
         .map { serviceResponseClass ->
             buildList {
@@ -138,11 +139,33 @@ fun getRuleFlow(ktFile: KtFile, bindingContext: BindingContext): Result<RuleFlow
         RuleFlowDoc.new(
             navn = ktClass.name!!,
             beskrivelse = ktClass.getKDocOrEmpty(),
-            inndata = emptyList(),
-            flyt = FlowElement.Flow(emptyList()),
+            inndata = getFlowRequestFields(ktClass, bindingContext).getOrThrow(),
+            flyt = ktClass.getRuleFlowFlow(bindingContext).getOrThrow(),
             gitHubUri = URI(ktFile.name.convertToGitHubUrl())
         )
     }
+
+fun getFlowRequestFields(ktClass: KtClass, bindingContext: BindingContext): Result<List<PropertyDoc>> = runCatching {
+    ktClass.primaryConstructor?.valueParameters?.firstNotNullOfOrNull { parameter ->
+        val resolvedClass = parameter.typeReference?.resolveToKtClass(bindingContext)?.getOrThrow()
+            ?: throw NoSuchElementException("No type reference found")
+
+        buildList {
+            add(fromParameter(parameter, ktClass))
+            addAll(
+                resolvedClass.getProperties().map {
+                    PropertyDoc.new(
+                        it.name!!,
+                        it.typeReference?.text ?: "Unknown",
+                        it.children.filterIsInstance<KDoc>().firstOrNull()?.formatOrEmpty() ?: ""
+                    )
+                }
+            )
+        }
+    } ?: throw NoSuchElementException(
+        "No flow request fields found ${ktClass.name}"
+    )
+}
 
 fun getRuleSet(ktFile: KtFile, bindingContext: BindingContext): Result<RuleSetDoc> =
     ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleSetClass).map { ktClass ->

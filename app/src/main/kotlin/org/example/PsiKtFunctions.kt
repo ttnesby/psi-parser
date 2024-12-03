@@ -141,6 +141,8 @@ private fun KtClass.getOverriddenProperty(method: DSLType): Result<KtProperty> =
     } ?: throw NoSuchElementException("No overridden property '$name' found")
 }
 
+//fun get
+
 /** KDoc extension functions */
 //
 fun KDoc.formatOrEmpty(): String =
@@ -197,7 +199,7 @@ private fun KtElement.resolveToDeclaration(bindingContext: BindingContext): Resu
 
 // HIGHLY IMPORTANT: eventually resolve (KtTypeReference, KtReferenceExpression) to KtClass
 //
-private fun KtElement.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> =
+fun KtElement.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> =
     resolveToDeclaration(bindingContext).map {
         it as? KtClass ?: throw NoSuchElementException("Declaration is not a KtClass")
     }
@@ -265,7 +267,7 @@ private fun KtProperty.streamRuleServiceElements(
  * elementet. Det lages en sekvens som starter fra forrige søsken-element og fortsetter til forrige
  * søsken-element for hver iterasjon. Filtrerer ut PsiWhiteSpace og KDoc-elementer og sekvensen stopper når et element er hverken KDoc eller PsiWhiteSpace.
  */
-fun KtCallExpression.extractKDocOrEmpty(): String =
+fun KtElement.extractKDocOrEmpty(): String =
     generateSequence(this.prevSibling) { it.prevSibling }
         .takeWhile { it is PsiWhiteSpace || it is KDoc }
         .firstOrNull { it is KDoc }?.let {
