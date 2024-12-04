@@ -11,6 +11,9 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.*
+import embeddable.compiler.CompilerContext
 
 // TODO - hvordan strukturere test(er) som er store - ref. siste test som blir involverende
 class PsiKtFunctionsTest {
@@ -19,7 +22,7 @@ class PsiKtFunctionsTest {
     private lateinit var context: CompilerContext
 
     private fun createTestCompilerContext(): CompilerContext {
-        return createCompilerContext(File(System.getProperty("java.home")), disposable).getOrThrow()
+        return CompilerContext.new(File(System.getProperty("java.home")),Path(""), disposable).getOrThrow()
     }
 
     data class SourceCode(val code: String, val fileName: String = FILE_NAME)
@@ -36,7 +39,7 @@ class PsiKtFunctionsTest {
                 ) as KtFile
             }
             .let { ktFiles ->
-                getBindingContext(ktFiles, context).map { bctx -> Pair(ktFiles, bctx) }
+                context.buildBindingContext(ktFiles).map { bctx -> Pair(ktFiles, bctx) }
             }
 
     @BeforeEach

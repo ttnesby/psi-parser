@@ -1,6 +1,5 @@
 package org.example
 
-import org.example.DSLType.values
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiWhiteSpace
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
@@ -98,7 +97,7 @@ fun KtClass.getServiceRequestInfo(bindingContext: BindingContext): Result<Servic
             KtClass::isSubClassOfServiceRequestClass, bindingContext
         ).map { resolvedClass -> ServiceRequestInfo(parameter, resolvedClass) }.getOrNull()
     } ?: throw NoSuchElementException(
-        "No ServiceRequest parameter found in primary constructor"
+        "No ServiceRequest parameter found in primary constructor for $name [${containingKtFile.name}]"
     )
 }
 
@@ -179,18 +178,20 @@ fun KtParameter.getKDocOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
 // Key point - DescriptorToSourceUtils.getSourceFromDescriptor, thanks to BindingContext
 //
 private fun KtElement.resolveToDeclaration(bindingContext: BindingContext): Result<PsiElement> = runCatching {
-    when (val descriptor = when (this) {
-        is KtNameReferenceExpression -> bindingContext[BindingContext.REFERENCE_TARGET, this]
+    when (
+        val descriptor = when (this) {
+            is KtNameReferenceExpression -> bindingContext[BindingContext.REFERENCE_TARGET, this]
 
-        is KtTypeReference -> bindingContext.get(BindingContext.TYPE, this)?.constructor?.declarationDescriptor
+            is KtTypeReference -> bindingContext.get(BindingContext.TYPE, this)?.constructor?.declarationDescriptor
 
-        is KtReferenceExpression -> bindingContext.getType(this)?.constructor?.declarationDescriptor
+            is KtReferenceExpression -> bindingContext.getType(this)?.constructor?.declarationDescriptor
 
-        else -> throw IllegalArgumentException(
-            "Unsupported element type: ${this.javaClass.simpleName} for binding context resolution"
-        )
-    }) {
-        null -> throw NoSuchElementException("Could not resolve descriptor ${this.text}")
+            else -> throw IllegalArgumentException(
+                "Unsupported element type: ${this.javaClass.simpleName} for binding context resolution"
+            )
+        }
+    ) {
+        null -> throw NoSuchElementException("Could not resolve descriptor ${this.text} [${this.containingKtFile.name}]")
         else -> DescriptorToSourceUtils.getSourceFromDescriptor(descriptor)
             ?: throw NoSuchElementException("Could not resolve to declaration")
     }

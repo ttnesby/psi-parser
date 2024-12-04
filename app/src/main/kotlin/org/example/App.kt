@@ -1,11 +1,12 @@
 package org.example
 
-import org.jetbrains.kotlin.cli.jvm.config.addJvmClasspathRoots
+import embeddable.compiler.CompilerContext
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.KtFile
-import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.*
 import kotlin.system.measureTimeMillis
 
 // TODO:
@@ -17,76 +18,60 @@ fun <T> Result<T>.onFailurePrint(message: String): Result<T> = onFailure {
     println("$message: ${it.message}")
 }
 
-private fun findSourceRoots(root: File): List<String> =
-    root.walk().filter { file ->
-        file.isDirectory
-                && (file.absolutePath.contains("repository\\") || file.absolutePath.contains("system\\"))
-                && !file.absolutePath.contains("src\\test\\")
-                && !file.absolutePath.contains("\\target")
-                && file.name == "kotlin"
-    }
-        .map { it.absolutePath }
+private fun findSourceRoots(root: Path): List<Path> =
+    root.walk(PathWalkOption.INCLUDE_DIRECTORIES)
+        .filter { path ->
+            path.isDirectory()
+                    && (path.contains("/repository/") || path.contains("/system/"))
+                    && !(path.contains("/src/test/") || path.contains("/target/"))
+                    && path.name == "kotlin"
+        }
         .toList()
-
-private fun findKotlinSourceFiles(root: File, context: CompilerContext): List<KtFile> =
-    findSourceRoots(root)
-        .flatMap { sourceRoot ->
-            File(sourceRoot)
-                .walk()
-                .filter { it.isFile && it.extension.lowercase() == "kt" }
-                .map { file ->
-                    context.psiFactory.createFileFromText(
-                        file.absolutePath,
-                        KotlinFileType.INSTANCE,
-                        file.readText().replace("\r\n", "\n")
-                    ) as KtFile
-                }
-        }
-        .toList().also {
-            println("Finished mapping KtFiles")
+        .also {
+            println("Found ${it.size} source roots")
+            println(it.joinToString("\n"))
         }
 
-private fun addDependenciesToClasspath(folder: File, context: CompilerContext) {
-    folder.walk().filter { it.isFile && it.extension == "jar" }.toList().let { jarFiles ->
-        context.configuration.addJvmClasspathRoots(jarFiles)
-    }.also {
-        println("Added Dependencies to Classpath")
+// Extension function to safely check path components, normalize path separators from Windows to Mac/Linux
+private fun Path.contains(subPath: String): Boolean =
+    this.absolutePathString().replace('\\', '/').contains(subPath)
+
+private fun findKotlinSourceFiles(sourceRoots: List<Path>, context: CompilerContext): List<KtFile> =
+    sourceRoots.flatMap { sourceRoot ->
+        sourceRoot
+            .walk()
+            .filter { it.isRegularFile() && it.extension.lowercase() == "kt" }
+            .map { file ->
+                context.psiFactory.createFileFromText(
+                    file.absolutePathString(),
+                    KotlinFileType.INSTANCE,
+                    file.readText().replace("\r\n", "\n")
+                ) as KtFile
+            }
+
     }
-}
+        .toList()
+        .also {
+            println("Finished mapping ${it.size} kt files to PSI format")
+        }
 
 fun processRepo(
-    context: CompilerContext,
-    root: File,
-    dependencies: File,
-): Result<AnalysisResult> {
-    addDependenciesToClasspath(dependencies, context)
-
-    return findKotlinSourceFiles(root, context).let { sourceFiles ->
-        getBindingContext(sourceFiles, context).flatMap { bindingContext ->
-            analyzeSourceFiles(sourceFiles, bindingContext)
-        }.onSuccess {
-            println("Created Binding Context")
-        }
-    }
-}
-
-fun analyzeRepository(
-    jdkHome: File,
-    repoPath: File,
-    libsPath: File,
+    repoPath: Path,
+    libsPath: Path,
     disposable: Disposable,
 ): Result<AnalysisResult> =
-    createCompilerContext(jdkHome, disposable)
-        .map { context: CompilerContext ->
-            processRepo(context, repoPath, libsPath).getOrThrow().let { result ->
-                AnalysisResult(
-                    services = result.services.sortedBy { it.navn },
-                    flows = result.flows.sortedBy { it.navn },
-                    sets = result.sets.sortedBy { it.navn }
-                )
-            }
+
+    CompilerContext.new(libsPath = libsPath, disposable = disposable).flatMap { context ->
+
+        val psiFiles = findKotlinSourceFiles(findSourceRoots(repoPath), context)
+
+        context.buildBindingContext(psiFiles.toList()).flatMap { bindingContext ->
+            analyzeSourceFiles(
+                psiFiles,
+                bindingContext
+            )
         }
-        .onFailurePrint("Repository analysis failed")
+    }
 
 /**
  * arg[0] - sti til repository (C:\\data\\pensjon-regler)
@@ -96,16 +81,20 @@ fun main(args: Array<String>) {
     val disposable = Disposer.newDisposable()
     val elapsed = measureTimeMillis {
 
-        analyzeRepository(
-            jdkHome = File(System.getProperty("java.home")),
-            repoPath = File(args[0]),
-            libsPath = File(args[1]),
+        println("Repo root is: ${args[0]}")
+        println("Libs path is: ${args[1]}")
+
+        processRepo(
+            repoPath = Path(args[0]),
+            libsPath = Path(args[1]),
             disposable = disposable
         ).map { result ->
             println("Found ${result.services.size} rule services")
             println("Found ${result.flows.size} rule flows")
             println("Found ${result.sets.size} rule sets")
             generateAsciiDoc(result.services, "C:\\data\\psi-parser")
+        }.onFailure {
+            println("Failed to process repo: ${it.stackTraceToString()}")
         }
     }
     disposable.dispose()
