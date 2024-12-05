@@ -1,9 +1,9 @@
 package org.example
 
 import embeddable.compiler.CompilerContext
+import pensjon.regler.Repo
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
-import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.psi.KtFile
 import java.nio.file.Path
 import kotlin.io.path.*
@@ -21,21 +21,16 @@ fun processRepo(
     repoPath: Path,
     //libsPath: Path,
     disposable: Disposable,
-): Result<AnalysisResult> =
+): Result<AnalysisResult> = runCatching {
 
-    CompilerContext.new(
-        //libsPath = libsPath,
-        disposable = disposable).flatMap { context ->
+    val context = CompilerContext.new(disposable = disposable).getOrThrow()
+    val repo = Repo.fromPath(repoPath, context.psiFactory)
+    val psiFiles = repo.psiFiles()
 
-        val psiFiles = sourceFilesToPSI(sourceRoots(repoPath), context)
+    val bindingContext = context.buildBindingContext(psiFiles).getOrThrow()
 
-        context.buildBindingContext(psiFiles.toList()).flatMap { bindingContext ->
-            analyzeSourceFiles(
-                psiFiles,
-                bindingContext
-            )
-        }
-    }
+    analyzeSourceFiles(psiFiles, bindingContext).getOrThrow()
+}
 
 
 /**
