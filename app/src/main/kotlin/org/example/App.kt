@@ -17,45 +17,6 @@ fun <T> Result<T>.onFailurePrint(message: String): Result<T> = onFailure {
     println("$message: ${it.message}")
 }
 
-private fun sourceRoots(root: Path): List<Path> =
-    root.walk(PathWalkOption.INCLUDE_DIRECTORIES)
-        .filter { path ->
-
-            path.isDirectory()
-                    && (path.startsWith(root / "repository") || path.startsWith(root / "system"))
-                    && path.name == "kotlin"
-                    && path.parent?.name == "main"
-                    && path.parent?.parent?.name == "src"
-        }
-        .toList()
-        .also {
-            println("Found ${it.size} source roots")
-            println(it.joinToString("\n"))
-        }
-
-// Extension function to safely check path components, normalize path separators from Windows to Mac/Linux
-private fun Path.contains(subPath: String): Boolean =
-    this.absolutePathString().replace('\\', '/').contains(subPath)
-
-private fun sourceFilesToPSI(sourceRoots: List<Path>, context: CompilerContext): List<KtFile> =
-    sourceRoots.flatMap { sourceRoot ->
-        sourceRoot
-            .walk()
-            .filter { it.isRegularFile() && it.extension.lowercase() == "kt" }
-            .map { file ->
-                context.psiFactory.createFileFromText(
-                    file.absolutePathString(),
-                    KotlinFileType.INSTANCE,
-                    file.readText().replace("\r\n", "\n")
-                ) as KtFile
-            }
-
-    }
-        .toList()
-        .also {
-            println("Finished mapping ${it.size} kt files to PSI format")
-        }
-
 fun processRepo(
     repoPath: Path,
     //libsPath: Path,
