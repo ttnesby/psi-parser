@@ -1,9 +1,20 @@
 # psi-parser
 
+## Kjøre programmet
+
+Programmet tar 3 argumenter:
+1) Filsti til pensjon-regler repo root
+2) Filsti til output mappe for AsciiDoc filer
+
+```zsh
+./gradlew run --args="/Users/torsteinnesby/gitHub/navikt/pensjon-regler /Users/torsteinnesby/tmp/AsciiDocs"
+```
+
+## Introduksjon
 Det overordnede formålet er å automatisere kode-til-dokumentasjon for `pensjon-regler` repo:
 1) Bruk av `embeddable compiler` for å oversette kotlin kode til internformatet `Program Structure Interface (PSI)`
-2) Ekstrahere relevante PSI elementer (regeltjenester, regelflyt, regelsett, regel og javaDoc) og deres relasjon
-3) Generere dokumentasjon på formatet [AsciiDoc](https://asciidoc.org/) med flyttegninger
+2) Ekstrahere relevante PSI elementer, regeltjenester, regelflyt og regelsett og deres flyt og relasjoner
+3) Generere dokumentasjon på formatet [AsciiDoc](https://asciidoc.org/) for relevante PSI elementer
 4) Bidrag til [PO Pensjon-systemdokumentasjon](https://pensjon-dokumentasjon.intern.dev.nav.no/pen/index.html)
 
 ## Teknisk
@@ -22,20 +33,26 @@ Ekstrahering av relevante PSI elementer og deres relasjon (user type reference m
 Oppsett av embeddable compiler:
 1) Konfigurasjon
 2) Opprettelse av compiler miljøet
-3) Analyse av kotlin moduler og filer
+3) Legge til eventuelle relevante avhengigheter som `JVMClasspathRoots`
+3) Analyse av kotlin filer
 4) Klar for ekstrahering av relevante elementer gjennom PSI parsing
 
 ### Konfigurasjon og Analyse
 
-Repo `pensjon-regler` har mange avhengigheter. For å forenkle situasjonen er følgende hardkodet:
+Forutsetningen for en enkel navigering mellom PSI filer basert på avhengigheter, er full analyse og tilhørende `BindingContext`.
+En `god nok` bindingContext forutsetter færrest mulig feil. Per nå er antall feil og advarsler så godt som det kan bli.
+
+#### `Eksterne avhengigheter behøves ikke per nå`
+
+Repo `pensjon-regler` har mange avhengigheter. En enkel måte å laste ned alle avhengigheter er å bruke `maven` og `dependency:copy-dependencies` målet.
 ```zsh
 mvn dependency:copy-dependencies -DoutputDirectory=/Users/torsteinnesby/tmp/Libs
 ```
+Da er det ganske lett å laste opp samtlige avhengigheter som `JVMClasspathRoots` som gir en mer fullstendig `BindingContext`.
 
-Da er det ganske lett å laste opp samtlige avhengigheter som `JVMClasspathRoots`.
+Alternativt kan man bruke maven `m2`.
 
-Forutsetningen for en enkel navigering mellom PSI filer basert på avhengigheter, er full analyse og tilhørende `BindingContext`.
-En `god nok` bindingContext forutsetter færrest mulig feil. Per nå er antall feil og advarsler så godt som det kan bli.
+
 
 
 ### Program Structure Interface (PSI)

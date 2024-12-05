@@ -14,10 +14,13 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.*
 import java.net.URI
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.junit5.JUnit5Asserter.fail
+import embeddable.compiler.CompilerContext
 
 class AnalyzerFunctionsTests {
 
@@ -25,7 +28,9 @@ class AnalyzerFunctionsTests {
     private lateinit var context: CompilerContext
 
     private fun createTestCompilerContext(): CompilerContext {
-        return createCompilerContext(File(System.getProperty("java.home")), disposable).getOrThrow()
+        return CompilerContext.new(
+            //libsPath = Path(""),
+            disposable = disposable).getOrThrow()
     }
 
     private fun analyzeKotlinCode(
@@ -41,7 +46,7 @@ class AnalyzerFunctionsTests {
                         KtFile
             }
             .let { ktFiles ->
-                getBindingContext(ktFiles, context).map { bctx ->
+                context.buildBindingContext(ktFiles).map { bctx ->
                     analyzeSourceFilesTest(ktFiles, bctx)
                 }
             }
@@ -57,7 +62,7 @@ class AnalyzerFunctionsTests {
                         KtFile
             }
 
-            getBindingContext(ktFiles, context).map { bctx ->
+            context.buildBindingContext(ktFiles).map { bctx ->
                 Pair(ktFiles, bctx)
             }.getOrThrow()
     }
