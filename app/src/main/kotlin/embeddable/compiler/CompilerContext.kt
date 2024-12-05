@@ -51,7 +51,7 @@ class CompilerContext private constructor(
                     println("Created Compiler Context")
                     val jarDependencies = jarDependencies(libsPath)
                     context.configuration.addJvmClasspathRoots(jarDependencies)
-                    println("Added ${jarDependencies.size} jar files from $libsPath to Classpath")
+                    println("Added ${jarDependencies.size} jar files from $libsPath to Classpath\n")
                 }
             }
 

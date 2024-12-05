@@ -4,7 +4,9 @@ import embeddable.compiler.CompilerContext
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.idea.KotlinFileType
+import org.jetbrains.kotlin.konan.file.File
 import org.jetbrains.kotlin.psi.KtFile
+import java.nio.file.FileSystem
 import java.nio.file.Path
 import kotlin.io.path.*
 import kotlin.system.measureTimeMillis
@@ -21,10 +23,12 @@ fun <T> Result<T>.onFailurePrint(message: String): Result<T> = onFailure {
 private fun findSourceRoots(root: Path): List<Path> =
     root.walk(PathWalkOption.INCLUDE_DIRECTORIES)
         .filter { path ->
+
             path.isDirectory()
-                    && (path.contains("/repository/") || path.contains("/system/"))
-                    && !(path.contains("/src/test/") || path.contains("/target/"))
+                    && (path.startsWith(root / "repository") || path.startsWith(root / "system"))
                     && path.name == "kotlin"
+                    && path.parent?.name == "main"
+                    && path.parent?.parent?.name == "src"
         }
         .toList()
         .also {
@@ -76,6 +80,7 @@ fun processRepo(
 /**
  * arg[0] - sti til repository (C:\\data\\pensjon-regler)
  * arg[1] - sti til bibliotek med avhengigheter. Kan bruke m2 (C:\\.m2), eller så les README for å opprette  et mindre bibliotek fra pensjon-regler.
+ * arg[2] - sti til output mappe for AsciiDoc filer
  */
 fun main(args: Array<String>) {
     val disposable = Disposer.newDisposable()
@@ -83,6 +88,7 @@ fun main(args: Array<String>) {
 
         println("Repo root is: ${args[0]}")
         println("Libs path is: ${args[1]}")
+        println("AsciiDoc output path is: ${args[2]}\n")
 
         processRepo(
             repoPath = Path(args[0]),
@@ -91,8 +97,8 @@ fun main(args: Array<String>) {
         ).map { result ->
             println("Found ${result.services.size} rule services")
             println("Found ${result.flows.size} rule flows")
-            println("Found ${result.sets.size} rule sets")
-            generateAsciiDoc(result.services, "C:\\data\\psi-parser")
+            println("Found ${result.sets.size} rule sets\n")
+            generateAsciiDoc(ruleDocs = result.services, outputPath = Path(args[2]))
         }.onFailure {
             println("Failed to process repo: ${it.stackTraceToString()}")
         }

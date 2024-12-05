@@ -5,8 +5,10 @@ import org.example.FlowElement.Flow
 import org.example.FlowElement.RuleFlow
 import org.example.FlowElement.RuleSet
 import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.*
 
-fun generateAsciiDoc(ruleDocs: List<RuleServiceDoc>, outputPath: String) {
+fun generateAsciiDoc(ruleDocs: List<RuleServiceDoc>, outputPath: Path) {
 
     for (rule in ruleDocs) {
         val docBuilder = StringBuilder()
@@ -44,7 +46,7 @@ fun generateAsciiDoc(ruleDocs: List<RuleServiceDoc>, outputPath: String) {
         docBuilder.appendLine("*GitHub Lenke:*")
         docBuilder.appendLine("link:${rule.gitHubUri}[${rule.navn}]")
         docBuilder.appendLine()
-        File("$outputPath\\${rule.navn}.adoc").writeText(docBuilder.toString())
+        File((outputPath / "${rule.navn}.adoc").absolutePathString()).writeText(docBuilder.toString())
     }
 }
 
