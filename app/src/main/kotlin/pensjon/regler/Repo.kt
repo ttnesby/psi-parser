@@ -9,12 +9,19 @@ import kotlin.io.path.*
 
 private const val ORG_NAVIKT = "https://github.com/navikt"
 
-class Repo private constructor(
-    private val root: Path,
-    private val psiFactory: PsiFileFactoryImpl,
-    val gitHubUri: URI
-) {
+object Repo {
+    private lateinit var root: Path
+    private lateinit var psiFactory: PsiFileFactoryImpl
+    lateinit var gitHubUri: URI
+        private set
+
     private var isSourceRoot: (Path) -> Boolean = createDefaultFilter()
+
+    fun initialize(path: Path, psiFactory: PsiFileFactoryImpl) {
+        this.root = path
+        this.psiFactory = psiFactory
+        this.gitHubUri = URI("$ORG_NAVIKT/${path.last()}")
+    }
 
     private fun createDefaultFilter(): (Path) -> Boolean = { path ->
         path.isDirectory() &&
@@ -63,13 +70,4 @@ class Repo private constructor(
                     ) as KtFile
                 }
         }
-
-    companion object {
-        fun fromPath(path: Path, psiFactory: PsiFileFactoryImpl): Repo =
-            Repo(
-                root = path,
-                psiFactory = psiFactory,
-                gitHubUri = URI("$ORG_NAVIKT/${path.last()}")
-            )
-    }
 }

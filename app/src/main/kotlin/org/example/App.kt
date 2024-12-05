@@ -4,7 +4,6 @@ import embeddable.compiler.CompilerContext
 import pensjon.regler.Repo
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
-import org.jetbrains.kotlin.psi.KtFile
 import java.nio.file.Path
 import kotlin.io.path.*
 import kotlin.system.measureTimeMillis
@@ -24,12 +23,11 @@ fun processRepo(
 ): Result<AnalysisResult> = runCatching {
 
     val context = CompilerContext.new(disposable = disposable).getOrThrow()
-    val repo = Repo.fromPath(repoPath, context.psiFactory)
-    val psiFiles = repo.psiFiles()
+    Repo.initialize(repoPath, context.psiFactory)
 
-    val bindingContext = context.buildBindingContext(psiFiles).getOrThrow()
+    val bindingContext = context.buildBindingContext(Repo.psiFiles()).getOrThrow()
 
-    analyzeSourceFiles(psiFiles, bindingContext).getOrThrow()
+    analyzeSourceFiles(bindingContext).getOrThrow()
 }
 
 

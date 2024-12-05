@@ -7,6 +7,7 @@ import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.BindingContext
+import pensjon.regler.Repo
 import java.net.URI
 
 data class AnalysisResult(
@@ -18,9 +19,9 @@ data class AnalysisResult(
 // TODO
 // - Add support for RuleFlow and RuleSet, included into analyzeSourceFiles
 //
-fun analyzeSourceFiles(sourceFiles: List<KtFile>, bindingContext: BindingContext): Result<AnalysisResult> =
+fun analyzeSourceFiles(bindingContext: BindingContext): Result<AnalysisResult> =
     runCatching {
-        sourceFiles
+        Repo.psiFiles()
             .chunked(100)
             .fold(AnalysisResult(emptyList(), emptyList(), emptyList())) { acc, batch ->
                 val batchResults = batch.mapNotNull { file ->

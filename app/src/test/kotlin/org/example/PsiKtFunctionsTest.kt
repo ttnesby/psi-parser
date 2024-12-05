@@ -10,9 +10,6 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.io.File
-import java.nio.file.Path
-import kotlin.io.path.*
 import embeddable.compiler.CompilerContext
 
 // TODO - hvordan strukturere test(er) som er store - ref. siste test som blir involverende
