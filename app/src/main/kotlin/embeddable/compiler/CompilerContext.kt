@@ -30,13 +30,16 @@ class CompilerContext private constructor(
 
         fun new(
             jdkHome: File = File(System.getProperty("java.home")),
-            libsPath: Path,
+            //libsPath: Path,
             disposable: Disposable
-        ): Result<CompilerContext> = createCompilerContext(jdkHome, libsPath, disposable)
+        ): Result<CompilerContext> = createCompilerContext(
+            jdkHome = jdkHome,
+            //libsPath = libsPath,
+            disposable = disposable)
 
         private fun createCompilerContext(
             jdkHome: File,
-            libsPath: Path,
+            //libsPath: Path,
             disposable: Disposable
         ): Result<CompilerContext> =
             runCatching {
@@ -49,9 +52,10 @@ class CompilerContext private constructor(
                     psiFactory = psiFactory
                 ).also { context ->
                     println("Created Compiler Context")
-                    val jarDependencies = jarDependencies(libsPath)
-                    context.configuration.addJvmClasspathRoots(jarDependencies)
-                    println("Added ${jarDependencies.size} jar files from $libsPath to Classpath\n")
+                    println("No need to add jar dependencies to classpath for now")
+//                    val jarDependencies = jarDependencies(libsPath)
+//                    context.configuration.addJvmClasspathRoots(jarDependencies)
+//                    println("Added ${jarDependencies.size} jar files from $libsPath to Classpath\n")
                 }
             }
 

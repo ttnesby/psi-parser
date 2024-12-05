@@ -22,7 +22,9 @@ class PsiKtFunctionsTest {
     private lateinit var context: CompilerContext
 
     private fun createTestCompilerContext(): CompilerContext {
-        return CompilerContext.new(File(System.getProperty("java.home")),Path(""), disposable).getOrThrow()
+        return CompilerContext.new(
+            //libsPath = Path(""),
+            disposable = disposable).getOrThrow()
     }
 
     data class SourceCode(val code: String, val fileName: String = FILE_NAME)

@@ -28,7 +28,9 @@ class AnalyzerFunctionsTests {
     private lateinit var context: CompilerContext
 
     private fun createTestCompilerContext(): CompilerContext {
-        return CompilerContext.new(File(System.getProperty("java.home")),Path(""), disposable).getOrThrow()
+        return CompilerContext.new(
+            //libsPath = Path(""),
+            disposable = disposable).getOrThrow()
     }
 
     private fun analyzeKotlinCode(

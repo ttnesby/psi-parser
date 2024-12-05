@@ -13,8 +13,7 @@ import kotlin.system.measureTimeMillis
 
 // TODO:
 // - logging
-// - parameter for repo root
-// - automatic extract of pensjon-regler dependencies to temp folder
+
 
 fun <T> Result<T>.onFailurePrint(message: String): Result<T> = onFailure {
     println("$message: ${it.message}")
@@ -61,11 +60,13 @@ private fun findKotlinSourceFiles(sourceRoots: List<Path>, context: CompilerCont
 
 fun processRepo(
     repoPath: Path,
-    libsPath: Path,
+    //libsPath: Path,
     disposable: Disposable,
 ): Result<AnalysisResult> =
 
-    CompilerContext.new(libsPath = libsPath, disposable = disposable).flatMap { context ->
+    CompilerContext.new(
+        //libsPath = libsPath,
+        disposable = disposable).flatMap { context ->
 
         val psiFiles = findKotlinSourceFiles(findSourceRoots(repoPath), context)
 
@@ -87,18 +88,18 @@ fun main(args: Array<String>) {
     val elapsed = measureTimeMillis {
 
         println("Repo root is: ${args[0]}")
-        println("Libs path is: ${args[1]}")
-        println("AsciiDoc output path is: ${args[2]}\n")
+        //println("Libs path is: ${args[1]}")
+        println("AsciiDoc output path is: ${args[1]}\n")
 
         processRepo(
             repoPath = Path(args[0]),
-            libsPath = Path(args[1]),
+            //libsPath = Path(args[1]),
             disposable = disposable
         ).map { result ->
             println("Found ${result.services.size} rule services")
             println("Found ${result.flows.size} rule flows")
             println("Found ${result.sets.size} rule sets\n")
-            generateAsciiDoc(ruleDocs = result.services, outputPath = Path(args[2]))
+            generateAsciiDoc(ruleDocs = result.services, outputPath = Path(args[1]))
         }.onFailure {
             println("Failed to process repo: ${it.stackTraceToString()}")
         }
