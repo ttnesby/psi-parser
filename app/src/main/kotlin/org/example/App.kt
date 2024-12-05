@@ -4,9 +4,7 @@ import embeddable.compiler.CompilerContext
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.idea.KotlinFileType
-import org.jetbrains.kotlin.konan.file.File
 import org.jetbrains.kotlin.psi.KtFile
-import java.nio.file.FileSystem
 import java.nio.file.Path
 import kotlin.io.path.*
 import kotlin.system.measureTimeMillis
@@ -19,7 +17,7 @@ fun <T> Result<T>.onFailurePrint(message: String): Result<T> = onFailure {
     println("$message: ${it.message}")
 }
 
-private fun findSourceRoots(root: Path): List<Path> =
+private fun sourceRoots(root: Path): List<Path> =
     root.walk(PathWalkOption.INCLUDE_DIRECTORIES)
         .filter { path ->
 
@@ -39,7 +37,7 @@ private fun findSourceRoots(root: Path): List<Path> =
 private fun Path.contains(subPath: String): Boolean =
     this.absolutePathString().replace('\\', '/').contains(subPath)
 
-private fun findKotlinSourceFiles(sourceRoots: List<Path>, context: CompilerContext): List<KtFile> =
+private fun sourceFilesToPSI(sourceRoots: List<Path>, context: CompilerContext): List<KtFile> =
     sourceRoots.flatMap { sourceRoot ->
         sourceRoot
             .walk()
@@ -68,7 +66,7 @@ fun processRepo(
         //libsPath = libsPath,
         disposable = disposable).flatMap { context ->
 
-        val psiFiles = findKotlinSourceFiles(findSourceRoots(repoPath), context)
+        val psiFiles = sourceFilesToPSI(sourceRoots(repoPath), context)
 
         context.buildBindingContext(psiFiles.toList()).flatMap { bindingContext ->
             analyzeSourceFiles(
@@ -77,6 +75,7 @@ fun processRepo(
             )
         }
     }
+
 
 /**
  * arg[0] - sti til repository (C:\\data\\pensjon-regler)

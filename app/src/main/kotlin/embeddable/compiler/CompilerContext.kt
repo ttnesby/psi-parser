@@ -16,10 +16,6 @@ import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.BindingContext
 import java.io.File
-import java.nio.file.Path
-import kotlin.io.path.extension
-import kotlin.io.path.isRegularFile
-import kotlin.io.path.walk
 
 class CompilerContext private constructor(
     val configuration: CompilerConfiguration,
@@ -50,7 +46,7 @@ class CompilerContext private constructor(
                     configuration = configuration,
                     environment = environment,
                     psiFactory = psiFactory
-                ).also { context ->
+                ).also { _ ->
                     println("Created Compiler Context")
                     println("No need to add jar dependencies to classpath for now")
 //                    val jarDependencies = jarDependencies(libsPath)
@@ -59,12 +55,12 @@ class CompilerContext private constructor(
                 }
             }
 
-        private fun jarDependencies(folder: Path): List<File> =
-            folder
-                .walk()
-                .filter { it.isRegularFile() && it.extension == "jar" }
-                .map { it.toFile() }
-                .toList()
+//        private fun jarDependencies(folder: Path): List<File> =
+//            folder
+//                .walk()
+//                .filter { it.isRegularFile() && it.extension == "jar" }
+//                .map { it.toFile() }
+//                .toList()
 
 
         private fun createConfiguration(jdkHome: File): CompilerConfiguration =
@@ -131,13 +127,13 @@ class CompilerContext private constructor(
                 }
             }
 
-            fun printSummary() {
-                println("Compilation summary:")
-                println("- Errors: $errorCount")
-                println("- Warnings: $warningCount")
-                println("- Info messages: $infoCount")
-                println()
-            }
+//            fun printSummary() {
+//                println("Compilation summary:")
+//                println("- Errors: $errorCount")
+//                println("- Warnings: $warningCount")
+//                println("- Info messages: $infoCount")
+//                println()
+//            }
         }
     }
 
