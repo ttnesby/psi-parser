@@ -9,6 +9,8 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.BindingContext
 import pensjon.regler.Repo
 import java.net.URI
+import java.nio.file.Path
+import kotlin.io.path.*
 
 data class AnalysisResult(
     val services: List<RuleServiceDoc>,
@@ -91,7 +93,8 @@ fun getRuleService(ktFile: KtFile, bindingContext: BindingContext): Result<RuleS
             inndata = getServiceRequestFields(ktClass, bindingContext).getOrThrow(),
             utdata = getServiceResponseFields(ktClass, bindingContext).getOrThrow(),
             flyt = getRuleService(ktClass, bindingContext).getOrThrow(),
-            gitHubUri = URI(ktFile.name.convertToGitHubUrl())
+            // TODO - Legge om til å hente URI fra Repo, krever en del endringer i test oppsettet
+            gitHubUri = URI(ktFile.name.convertToGitHubUrl()) //Repo.toGithubURI(Path(ktFile.name))
         )
     }
 

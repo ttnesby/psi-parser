@@ -8,9 +8,10 @@ import java.nio.file.Path
 import kotlin.io.path.*
 
 private const val ORG_NAVIKT = "https://github.com/navikt"
+private const val BRANCH = "blob/master"
 
 object Repo {
-    private lateinit var root: Path
+    private lateinit var localRoot: Path
     private lateinit var psiFactory: PsiFileFactoryImpl
     lateinit var gitHubUri: URI
         private set
@@ -18,15 +19,15 @@ object Repo {
     private var isSourceRoot: (Path) -> Boolean = createDefaultFilter()
 
     fun initialize(path: Path, psiFactory: PsiFileFactoryImpl) {
-        this.root = path
+        this.localRoot = path
         this.psiFactory = psiFactory
-        this.gitHubUri = URI("$ORG_NAVIKT/${path.last()}")
+        this.gitHubUri = URI("$ORG_NAVIKT/${path.last()}/$BRANCH")
     }
 
     private fun createDefaultFilter(): (Path) -> Boolean = { path ->
         path.isDirectory() &&
-                (path.startsWith(this.root / "repository") ||
-                        path.startsWith(this.root / "system")) &&
+                (path.startsWith(this.localRoot / "repository") ||
+                        path.startsWith(this.localRoot / "system")) &&
                 path.name == "kotlin" &&
                 path.parent?.name == "main" &&
                 path.parent?.parent?.name == "src"
@@ -45,15 +46,15 @@ object Repo {
         }
     }
 
-    fun defineSourceRoots(filter: (Path) -> Boolean): Repo {
-        this.isSourceRoot = filter
-        return this
-    }
+//    fun defineSourceRoots(filter: (Path) -> Boolean): Repo {
+//        this.isSourceRoot = filter
+//        return this
+//    }
 
     fun psiFiles(): List<KtFile> = psiSourceRootFiles
 
     private fun findSourceRoots(): List<Path> =
-        this.root.walk(PathWalkOption.INCLUDE_DIRECTORIES)
+        this.localRoot.walk(PathWalkOption.INCLUDE_DIRECTORIES)
             .filter { isSourceRoot(it) }
             .toList()
 
@@ -70,4 +71,6 @@ object Repo {
                     ) as KtFile
                 }
         }
+
+    fun toGithubURI(localFilePath: Path): URI = URI("$gitHubUri/${localFilePath.relativeTo(localRoot)}")
 }
