@@ -18,50 +18,6 @@ data class AnalysisResult(
     val sets: List<RuleSetDoc>
 )
 
-// TODO
-// - Add support for RuleFlow and RuleSet, included into analyzeSourceFiles
-//
-fun analyzeSourceFiles(bindingContext: BindingContext): Result<AnalysisResult> =
-    runCatching {
-        Repo.psiFiles()
-            .chunked(100)
-            .fold(AnalysisResult(emptyList(), emptyList(), emptyList())) { acc, batch ->
-                val batchResults = batch.mapNotNull { file ->
-                    // TODO - Vurder om å kategorisere en fil ihht. dsl types er en god idé
-                    when {
-                        file.isRuleService() -> {
-                            getRuleService(file, bindingContext).map { service ->
-                                AnalysisResult(listOf(service), emptyList(), emptyList())
-                            }.getOrThrow()
-                        }
-
-                        file.isRuleflow() -> {
-                            getRuleFlow(file, bindingContext).map { flow ->
-                                AnalysisResult(emptyList(), listOf(flow), emptyList())
-                            }.getOrThrow()
-                        }
-
-                        file.isRuleset() -> {
-                            getRuleSet(file, bindingContext).map { set ->
-                                AnalysisResult(emptyList(), emptyList(), listOf(set))
-                            }.getOrThrow()
-                        }
-
-                        else -> null
-                    }.also {
-                        (file as PsiFileImpl).clearCaches()
-                    }
-                }
-                AnalysisResult(
-                    services = acc.services + batchResults.flatMap { it.services },
-                    flows = acc.flows + batchResults.flatMap { it.flows },
-                    sets = acc.sets + batchResults.flatMap { it.sets }
-                )
-            }.also {
-                println("Analyzed Source Files")
-            }
-    }
-
 @TestOnly
 fun analyzeSourceFilesTest(
     sourceFiles: List<KtFile>,

@@ -51,6 +51,25 @@ fun KtFile.getSubClassOfSuperClass(superClassRef: (KtClass) -> Boolean): Result<
         ?: throw NoSuchElementException("No class found with specified superClassRef")
 }
 
+fun KtFile.getDSLType(): DSLType? {
+    val typesToCheck = listOf(
+        DSLType.ABSTRACT_RULE_SERVICE,
+        DSLType.ABSTRACT_RULE_FLOW,
+        DSLType.ABSTRACT_RULE_SET
+    )
+
+    return declarations
+        .asSequence()
+        .filterIsInstance<KtClass>()
+        .firstOrNull()
+        ?.getSuperTypeListEntries()
+        ?.firstNotNullOfOrNull { superTypeEntry ->
+            typesToCheck.find { type ->
+                superTypeEntry.typeReference?.text?.contains(type.typeName) == true
+            }
+        }
+}
+
 fun KtFile.isRuleService(): Boolean {
     return this.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass).isSuccess
 }

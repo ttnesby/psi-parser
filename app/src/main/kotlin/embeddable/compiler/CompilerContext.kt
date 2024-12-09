@@ -16,6 +16,7 @@ import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.BindingContext
 import java.io.File
+import org.jetbrains.kotlin.idea.KotlinFileType
 
 class CompilerContext private constructor(
     val configuration: CompilerConfiguration,
@@ -89,6 +90,9 @@ class CompilerContext private constructor(
                         )
                     )
                 )
+
+                put(CommonConfigurationKeys.PARALLEL_BACKEND_THREADS,
+                    maxOf(1, Runtime.getRuntime().availableProcessors() - 2)) // Parallel processing
             }
 
         private fun createEnvironment(
@@ -136,6 +140,9 @@ class CompilerContext private constructor(
 //            }
         }
     }
+
+    fun createKtFile(fileName: String, content: String): KtFile =
+        psiFactory.createFileFromText(fileName, KotlinFileType.INSTANCE, content) as KtFile
 
     // easy navigation between source files is done via binding context, which is a map of all symbols in the project
     // the binding context is created by the Kotlin compiler analysis phase
