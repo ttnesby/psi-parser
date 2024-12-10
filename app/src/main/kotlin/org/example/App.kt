@@ -22,10 +22,9 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> = runCa
         println("Repo root is: ${args[0]}")
         println("AsciiDoc output path is: ${args[1]}\n")
 
-        Repo.initialize(Path(args[0]))
-
         val repoAnalyzer = RepoAnalyzer.new(
-            CompilerContext.new(disposable = disposable).getOrThrow()
+            repo = Repo(Path(args[0])),
+            context = CompilerContext.new(disposable = disposable).getOrThrow()
         ).getOrThrow()
 
         repoAnalyzer.analyze().getOrThrow().let { result ->
