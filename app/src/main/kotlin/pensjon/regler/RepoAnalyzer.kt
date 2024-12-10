@@ -8,9 +8,9 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import kotlin.io.path.absolutePathString
 
 class RepoAnalyzer private constructor(
-    val context: CompilerContext,
-    val psiFiles: List<KtFile>,
-    val bindingContext: BindingContext
+    private val context: CompilerContext,
+    private val psiFiles: List<KtFile>,
+    private val bindingContext: BindingContext
 ) {
     companion object {
         fun new(context: CompilerContext): Result<RepoAnalyzer> = runCatching {
@@ -24,37 +24,29 @@ class RepoAnalyzer private constructor(
         }
     }
 
-    data class Facts(
-        val services: List<RuleServiceDoc>,
-        val flows: List<RuleFlowDoc>,
-        val sets: List<RuleSetDoc>
-    )
-
-    // TODO
-    // - Add support for RuleFlow and RuleSet, included into analyzeSourceFiles
-    fun analyze(): Result<Facts> = runCatching {
+    fun analyze(): Result<RulesOverview> = runCatching {
         psiFiles
             .chunked(100)
-            .fold(Facts(emptyList(), emptyList(), emptyList())) { acc, batch ->
+            .fold(RulesOverview.empty()) { acc, batch ->
                 val batchResults = batch.mapNotNull { file ->
 
                     when (file.getDSLType()){
                         DSLType.ABSTRACT_RULE_SERVICE -> {
-                            getRuleService(file, bindingContext).map { service ->
-                                Facts(listOf(service), emptyList(), emptyList())
-                            }.getOrThrow()
+                            getRuleService(file, bindingContext)
+                                .map {  RulesOverview.newService(it) }
+                                .getOrThrow()
                         }
 
                         DSLType.ABSTRACT_RULE_FLOW -> {
-                            getRuleFlow(file, bindingContext).map { flow ->
-                                Facts(emptyList(), listOf(flow), emptyList())
-                            }.getOrThrow()
+                            getRuleFlow(file, bindingContext)
+                                .map { RulesOverview.newFlow(it) }
+                                .getOrThrow()
                         }
 
                         DSLType.ABSTRACT_RULE_SET -> {
-                            getRuleSet(file, bindingContext).map { set ->
-                                Facts(emptyList(), emptyList(), listOf(set))
-                            }.getOrThrow()
+                            getRuleSet(file, bindingContext)
+                                .map { RulesOverview.newSet(it) }
+                                .getOrThrow()
                         }
 
                         else -> null
@@ -62,10 +54,10 @@ class RepoAnalyzer private constructor(
                         (file as PsiFileImpl).clearCaches()
                     }
                 }
-                Facts(
-                    services = acc.services + batchResults.flatMap { it.services },
-                    flows = acc.flows + batchResults.flatMap { it.flows },
-                    sets = acc.sets + batchResults.flatMap { it.sets }
+                acc.addBatch(
+                    services = batchResults.flatMap { it.services },
+                    flows = batchResults.flatMap { it.flows },
+                    sets = batchResults.flatMap { it.sets }
                 )
             }
     }

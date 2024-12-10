@@ -130,14 +130,6 @@ class CompilerContext private constructor(
                     else -> {} // ignore other severities
                 }
             }
-
-//            fun printSummary() {
-//                println("Compilation summary:")
-//                println("- Errors: $errorCount")
-//                println("- Warnings: $warningCount")
-//                println("- Info messages: $infoCount")
-//                println()
-//            }
         }
     }
 
