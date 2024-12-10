@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import embeddable.compiler.CompilerContext
+import pensjon.regler.FlowElement
 
 // TODO - hvordan strukturere test(er) som er store - ref. siste test som blir involverende
 class PsiKtFunctionsTest {

@@ -76,7 +76,7 @@ class AnalyzerFunctionsTests {
         disposable.dispose()
     }
 
-    /** Test Types.kt::RuleServiceDoc */
+    /** Test Model.kt::RuleServiceDoc */
 //    @Test
 //    @DisplayName("Should extract RuleService from KtFile")
 //    fun testExtractRuleService() {

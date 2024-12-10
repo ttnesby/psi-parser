@@ -1,14 +1,14 @@
 package org.example
 
-import org.example.FlowElement
-import org.example.FlowElement.Flow
-import org.example.FlowElement.RuleFlow
-import org.example.FlowElement.RuleSet
+import pensjon.regler.FlowElement
+import pensjon.regler.FlowElement.RuleFlow
+import pensjon.regler.FlowElement.RuleSet
+import pensjon.regler.RuleServiceInfo
 import java.io.File
 import java.nio.file.Path
 import kotlin.io.path.*
 
-fun generateAsciiDoc(ruleDocs: List<RuleServiceDoc>, outputPath: Path) {
+fun generateAsciiDoc(ruleDocs: List<RuleServiceInfo>, outputPath: Path) {
 
     for (rule in ruleDocs) {
         val docBuilder = StringBuilder()

@@ -1,5 +1,6 @@
-package org.example
+package pensjon.regler
 
+import org.example.getKDocOrEmpty
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtPrimaryConstructor
@@ -7,11 +8,11 @@ import java.io.File
 import java.net.URI
 
 // data class for rule service documentation, see AbstractPensjonRuleService
-data class RuleServiceDoc(
+data class RuleServiceInfo(
     val navn: String,
     val beskrivelse: String,
-    val inndata: List<PropertyDoc>,
-    val utdata: List<PropertyDoc>,
+    val inndata: List<PropertyInfo>,
+    val utdata: List<PropertyInfo>,
     val flyt: FlowElement.Flow,
     val gitHubUri: URI,
 ) {
@@ -19,11 +20,11 @@ data class RuleServiceDoc(
         fun new(
             navn: String,
             beskrivelse: String,
-            inndata: List<PropertyDoc>,
-            utdata: List<PropertyDoc>,
+            inndata: List<PropertyInfo>,
+            utdata: List<PropertyInfo>,
             flyt: FlowElement.Flow,
             gitHubUri: URI
-        ): RuleServiceDoc = RuleServiceDoc(navn, beskrivelse, inndata, utdata, flyt, gitHubUri)
+        ): RuleServiceInfo = RuleServiceInfo(navn, beskrivelse, inndata, utdata, flyt, gitHubUri)
     }
 
     override fun toString(): String {
@@ -41,10 +42,10 @@ data class RuleServiceDoc(
 }
 
 // data class for rule flow documentation, see AbstractPensjonRuleFlow
-data class RuleFlowDoc(
+data class RuleFlowInfo(
     val navn: String,
     val beskrivelse: String,
-    val inndata: List<PropertyDoc>,
+    val inndata: List<PropertyInfo>,
     val flyt: FlowElement.Flow,
     val gitHubUri: URI,
 ) {
@@ -52,10 +53,10 @@ data class RuleFlowDoc(
         fun new(
             navn: String,
             beskrivelse: String,
-            inndata: List<PropertyDoc>,
+            inndata: List<PropertyInfo>,
             flyt: FlowElement.Flow,
             gitHubUri: URI
-        ): RuleFlowDoc = RuleFlowDoc(navn, beskrivelse, inndata, flyt, gitHubUri)
+        ): RuleFlowInfo = RuleFlowInfo(navn, beskrivelse, inndata, flyt, gitHubUri)
     }
 
     override fun toString(): String {
@@ -72,10 +73,10 @@ data class RuleFlowDoc(
 }
 
 // data class for rule set documentation, see AbstractPensjonRuleSet
-data class RuleSetDoc(
+data class RuleSetInfo(
     val navn: String,
     val beskrivelse: String,
-    val inndata: List<PropertyDoc>,
+    val inndata: List<PropertyInfo>,
     val flyt: FlowElement.Flow,
     val gitHubUri: URI,
 ) {
@@ -83,10 +84,10 @@ data class RuleSetDoc(
         fun new(
             navn: String,
             beskrivelse: String,
-            inndata: List<PropertyDoc>,
+            inndata: List<PropertyInfo>,
             flyt: FlowElement.Flow,
             gitHubUri: URI
-        ): RuleSetDoc = RuleSetDoc(navn, beskrivelse, inndata, flyt, gitHubUri)
+        ): RuleSetInfo = RuleSetInfo(navn, beskrivelse, inndata, flyt, gitHubUri)
     }
 
     override fun toString(): String {
@@ -102,26 +103,26 @@ data class RuleSetDoc(
     }
 }
 
-data class PropertyDoc(
+data class PropertyInfo(
     val navn: String,
     val type: String,
     val beskrivelse: String,
 ) {
 
     companion object {
-        fun new(navn: String, type: String, beskrivelse: String): PropertyDoc =
-            PropertyDoc(navn, type, beskrivelse)
+        fun new(navn: String, type: String, beskrivelse: String): PropertyInfo =
+            PropertyInfo(navn, type, beskrivelse)
 
-        fun fromParameter(parameter: KtParameter, ktClass: KtClass): PropertyDoc =
-            PropertyDoc(
+        fun fromParameter(parameter: KtParameter, ktClass: KtClass): PropertyInfo =
+            PropertyInfo(
                 navn = parameter.name ?: "",
                 type = parameter.typeReference?.text ?: "Unknown",
                 beskrivelse = "Parameter of ${ktClass.name}"
             )
 
-        fun fromPrimaryConstructor(constructor: KtPrimaryConstructor): List<PropertyDoc> =
+        fun fromPrimaryConstructor(constructor: KtPrimaryConstructor): List<PropertyInfo> =
             constructor.valueParameters.map { param ->
-                PropertyDoc(
+                PropertyInfo(
                     navn = param.name ?: "",
                     type = param.typeReference?.text ?: "Unknown",
                     beskrivelse = param.getKDocOrEmpty()

@@ -4,7 +4,7 @@ import embeddable.compiler.CompilerContext
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import pensjon.regler.Repo
-import pensjon.regler.RepoAnalyzer
+import pensjon.regler.Analyzer
 import kotlin.io.path.Path
 import kotlin.system.measureTimeMillis
 
@@ -22,12 +22,12 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> = runCa
         println("Repo root is: ${args[0]}")
         println("AsciiDoc output path is: ${args[1]}\n")
 
-        val repoAnalyzer = RepoAnalyzer.new(
+        val analyzer = Analyzer.new(
             repo = Repo(Path(args[0])),
             context = CompilerContext.new(disposable = disposable).getOrThrow()
         ).getOrThrow()
 
-        repoAnalyzer.analyze().getOrThrow().let { result ->
+        analyzer.analyze().getOrThrow().let { result ->
             println("Found ${result.services.size} rule services")
             println("Found ${result.flows.size} rule flows")
             println("Found ${result.sets.size} rule sets\n")

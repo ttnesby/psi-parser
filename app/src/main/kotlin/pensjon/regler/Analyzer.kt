@@ -2,7 +2,7 @@ package pensjon.regler
 
 import embeddable.compiler.CompilerContext
 import org.example.*
-import org.example.PropertyDoc.Companion.fromParameter
+import pensjon.regler.PropertyInfo.Companion.fromParameter
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.psi.KtClass
@@ -11,21 +11,21 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import java.net.URI
 import kotlin.io.path.absolutePathString
 
-class RepoAnalyzer private constructor(
+class Analyzer private constructor(
     private val repo: Repo,
     private val context: CompilerContext,
     private val psiFiles: List<KtFile>,
     private val bindingContext: BindingContext
 ) {
     companion object {
-        fun new(repo: Repo, context: CompilerContext): Result<RepoAnalyzer> = runCatching {
+        fun new(repo: Repo, context: CompilerContext): Result<Analyzer> = runCatching {
 
             val psiFiles = repo.files().map { fileInfo ->
                 context.createKtFile(fileInfo.file.absolutePathString(), fileInfo.content)
             }
             val bindingContext = context.buildBindingContext(psiFiles).getOrThrow()
 
-            RepoAnalyzer(repo, context, psiFiles, bindingContext)
+            Analyzer(repo, context, psiFiles, bindingContext)
         }
     }
 
@@ -67,9 +67,9 @@ class RepoAnalyzer private constructor(
             }
     }
 
-    private fun extractRuleServiceFlow(ktFile: KtFile): Result<RuleServiceDoc> =
+    private fun extractRuleServiceFlow(ktFile: KtFile): Result<RuleServiceInfo> =
         ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass).map { ktClass ->
-            RuleServiceDoc(
+            RuleServiceInfo(
                 navn = ktClass.name!!,
                 beskrivelse = ktClass.getKDocOrEmpty(),
                 inndata = extractServiceRequestFields(ktClass).getOrThrow(),
@@ -80,26 +80,26 @@ class RepoAnalyzer private constructor(
             )
         }
 
-    private fun extractServiceRequestFields(ktClass: KtClass): Result<List<PropertyDoc>> = runCatching {
+    private fun extractServiceRequestFields(ktClass: KtClass): Result<List<PropertyInfo>> = runCatching {
         ktClass.getServiceRequestInfo(bindingContext)
             .map { (parameter, serviceRequestClass) ->
                 buildList {
                     add(fromParameter(parameter, ktClass))
                     addAll(
                         serviceRequestClass.primaryConstructor?.let {
-                            PropertyDoc.fromPrimaryConstructor(it)
+                            PropertyInfo.fromPrimaryConstructor(it)
                         } ?: throw IllegalStateException("No primary constructor found for ${serviceRequestClass.name}")
                     )
                 }
             }.getOrThrow()
     }
 
-    private fun extractServiceResponseFields(ktClass: KtClass): Result<List<PropertyDoc>> = runCatching {
+    private fun extractServiceResponseFields(ktClass: KtClass): Result<List<PropertyInfo>> = runCatching {
         ktClass.getServiceResponseClass(bindingContext)
             .map { serviceResponseClass ->
                 buildList {
                     add(
-                        PropertyDoc.new(
+                        PropertyInfo.new(
                             serviceResponseClass.name!!,
                             serviceResponseClass.name!!,
                             "Response for ${ktClass.name}"
@@ -107,7 +107,7 @@ class RepoAnalyzer private constructor(
                     )
                     addAll(
                         serviceResponseClass.primaryConstructor?.let {
-                            PropertyDoc.fromPrimaryConstructor(it)
+                            PropertyInfo.fromPrimaryConstructor(it)
                         }
                             ?: throw IllegalArgumentException("No primary constructor found for ${serviceResponseClass.name}")
                     )
@@ -121,9 +121,9 @@ class RepoAnalyzer private constructor(
             .getOrThrow()
     }
 
-    private fun extractRuleFlow(ktFile: KtFile): Result<RuleFlowDoc> =
+    private fun extractRuleFlow(ktFile: KtFile): Result<RuleFlowInfo> =
         ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleFlowClass).map { ktClass ->
-            RuleFlowDoc.new(
+            RuleFlowInfo.new(
                 navn = ktClass.name!!,
                 beskrivelse = ktClass.getKDocOrEmpty(),
                 inndata = extractFlowRequestFields(ktClass).getOrThrow(),
@@ -132,7 +132,7 @@ class RepoAnalyzer private constructor(
             )
         }
 
-    private fun extractFlowRequestFields(ktClass: KtClass): Result<List<PropertyDoc>> = runCatching {
+    private fun extractFlowRequestFields(ktClass: KtClass): Result<List<PropertyInfo>> = runCatching {
         ktClass.primaryConstructor?.valueParameters?.firstNotNullOfOrNull { parameter ->
             val resolvedClass = parameter.typeReference?.resolveToKtClass(bindingContext)?.getOrThrow()
                 ?: throw NoSuchElementException("No type reference found")
@@ -141,7 +141,7 @@ class RepoAnalyzer private constructor(
                 add(fromParameter(parameter, ktClass))
                 addAll(
                     resolvedClass.getProperties().map {
-                        PropertyDoc.new(
+                        PropertyInfo.new(
                             it.name!!,
                             it.typeReference?.text ?: "Unknown",
                             it.children.filterIsInstance<KDoc>().firstOrNull()?.formatOrEmpty() ?: ""
@@ -154,9 +154,9 @@ class RepoAnalyzer private constructor(
         )
     }
 
-    private fun extractRuleSet(ktFile: KtFile): Result<RuleSetDoc> =
+    private fun extractRuleSet(ktFile: KtFile): Result<RuleSetInfo> =
         ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleSetClass).map { ktClass ->
-            RuleSetDoc.new(
+            RuleSetInfo.new(
                 navn = ktClass.name!!,
                 beskrivelse = ktClass.getKDocOrEmpty(),
                 inndata = emptyList(),
