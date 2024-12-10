@@ -2,7 +2,7 @@
 
 ## Kjøre programmet
 
-Programmet tar 3 argumenter:
+Programmet tar 2 argumenter:
 1) Filsti til pensjon-regler repo root
 2) Filsti til output mappe for AsciiDoc filer
 

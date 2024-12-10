@@ -73,8 +73,8 @@ class CompilerContext private constructor(
                 put(
                     CommonConfigurationKeys.LANGUAGE_VERSION_SETTINGS,
                     LanguageVersionSettingsImpl(
-                        languageVersion = LanguageVersion.KOTLIN_2_0,
-                        apiVersion = ApiVersion.KOTLIN_2_0
+                        languageVersion = LanguageVersion.KOTLIN_2_1,
+                        apiVersion = ApiVersion.KOTLIN_2_1
                     )
                 )
                 // add classpath roots for the Kotlin standard library and reflection
@@ -109,6 +109,10 @@ class CompilerContext private constructor(
             private var errorCount = 0
             private var warningCount = 0
             private var infoCount = 0
+        
+            fun getErrorCount(): Int {
+                return errorCount
+            }
 
             override fun clear() {
                 errorCount = 0
