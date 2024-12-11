@@ -75,7 +75,6 @@ class Extractor private constructor(
                 inndata = extractServiceRequestFields(ktClass).getOrThrow(),
                 utdata = extractServiceResponseFields(ktClass).getOrThrow(),
                 flyt = extractRuleServiceFlow(ktClass).getOrThrow(),
-                // TODO - Legge om til å hente URI fra Repo, krever en del endringer i test oppsettet
                 gitHubUri = repo.toGithubURI(ktFile.name)
             )
         }
