@@ -1,5 +1,6 @@
 package pensjon.regler
 
+import org.jetbrains.annotations.TestOnly
 import java.net.URI
 import java.nio.file.Path
 import kotlin.io.path.*
@@ -21,10 +22,11 @@ class Repo(private val localRoot: Path) {
                 path.parent?.parent?.name == "src"
     }
 
-//    fun defineSourceRoots(filter: (Path) -> Boolean): Repo {
-//        this.isSourceRoot = filter
-//        return this
-//    }
+    @TestOnly
+    fun defineSourceRoots(filter: (Path) -> Boolean): Repo {
+        this.isSourceRoot = filter
+        return this
+    }
 
     val sourceRoots: List<Path> by lazy {
         findSourceRoots().also {

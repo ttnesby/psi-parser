@@ -28,10 +28,11 @@ class RepoTest {
 
     @Test
     fun `should find source root paths based on default filter`() {
-        (tempDir / "repository" / "src" / "main" / "kotlin").also {it.createDirectories()}
-        (tempDir / "other" / "src" / "main" / "java").also {it.createDirectories()}
+        (tempDir / "repository" / "src" / "main" / "kotlin").also { it.createDirectories() }
+        (tempDir / "system" / "src" / "main" / "kotlin").also { it.createDirectories() }
+        (tempDir / "other" / "src" / "main" / "java").also { it.createDirectories() }
 
-        assertEquals(1, Repo(tempDir).sourceRoots.size)
+        assertEquals(2, Repo(tempDir).sourceRoots.size)
     }
 
     @Test
@@ -49,5 +50,19 @@ class RepoTest {
             URI("https://github.com/navikt/testRepo/blob/master/repository/src/main/kotlin/Example.kt"),
             uri
         )
+    }
+
+
+    @Test
+    fun `should find custom source root paths`() {
+        val src = (tempDir / "customRepo" / "src").also { it.createDirectories() }
+        val tests = (tempDir / "customRepo" / "tests").also { it.createDirectories() }
+
+        val repo = Repo(tempDir).defineSourceRoots { path ->
+            path.startsWith(tempDir / "customRepo" / "src") ||
+                    path.startsWith(tempDir / "customRepo" / "tests")
+        }
+
+        assertEquals(2, repo.sourceRoots.size)
     }
 }
