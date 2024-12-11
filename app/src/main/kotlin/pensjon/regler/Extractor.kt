@@ -76,7 +76,7 @@ class Extractor private constructor(
                 utdata = extractServiceResponseFields(ktClass).getOrThrow(),
                 flyt = extractRuleServiceFlow(ktClass).getOrThrow(),
                 // TODO - Legge om til å hente URI fra Repo, krever en del endringer i test oppsettet
-                gitHubUri = repo.toGithubURI(ktFile.name) //URI(ktFile.name.convertToGitHubUrl())
+                gitHubUri = repo.toGithubURI(ktFile.name)
             )
         }
 
@@ -128,7 +128,7 @@ class Extractor private constructor(
                 beskrivelse = ktClass.getKDocOrEmpty(),
                 inndata = extractFlowRequestFields(ktClass).getOrThrow(),
                 flyt = ktClass.getRuleFlowFlow(bindingContext).getOrThrow(),
-                gitHubUri = URI(ktFile.name.convertToGitHubUrl())
+                gitHubUri = repo.toGithubURI(ktFile.name)
             )
         }
 
@@ -161,7 +161,7 @@ class Extractor private constructor(
                 beskrivelse = ktClass.getKDocOrEmpty(),
                 inndata = emptyList(),
                 flyt = FlowElement.Flow(emptyList()),
-                gitHubUri = URI(ktFile.name.convertToGitHubUrl())
+                gitHubUri = repo.toGithubURI(ktFile.name)
             )
         }
 }

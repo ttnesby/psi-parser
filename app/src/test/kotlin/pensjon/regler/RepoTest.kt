@@ -55,8 +55,8 @@ class RepoTest {
 
     @Test
     fun `should find custom source root paths`() {
-        val src = (tempDir / "customRepo" / "src").also { it.createDirectories() }
-        val tests = (tempDir / "customRepo" / "tests").also { it.createDirectories() }
+        (tempDir / "customRepo" / "src").also { it.createDirectories() }
+        (tempDir / "customRepo" / "tests").also { it.createDirectories() }
 
         val repo = Repo(tempDir).defineSourceRoots { path ->
             path.startsWith(tempDir / "customRepo" / "src") ||
