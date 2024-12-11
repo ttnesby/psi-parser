@@ -11,46 +11,46 @@ import org.jetbrains.kotlin.resolve.BindingContext
 import java.net.URI
 import kotlin.io.path.absolutePathString
 
-class Analyzer private constructor(
+class Extractor private constructor(
     private val repo: Repo,
-    private val context: CompilerContext,
+    //private val context: CompilerContext,
     private val psiFiles: List<KtFile>,
     private val bindingContext: BindingContext
 ) {
     companion object {
-        fun new(repo: Repo, context: CompilerContext): Result<Analyzer> = runCatching {
+        fun new(repo: Repo, context: CompilerContext): Result<Extractor> = runCatching {
 
             val psiFiles = repo.files().map { fileInfo ->
                 context.createKtFile(fileInfo.file.absolutePathString(), fileInfo.content)
             }
             val bindingContext = context.buildBindingContext(psiFiles).getOrThrow()
 
-            Analyzer(repo, context, psiFiles, bindingContext)
+            Extractor(repo, psiFiles, bindingContext)
         }
     }
 
-    fun analyze(): Result<RulesOverview> = runCatching {
+    fun toModel(): Result<ModelResult> = runCatching {
         psiFiles
             .chunked(100)
-            .fold(RulesOverview.empty()) { acc, batch ->
+            .fold(ModelResult.empty()) { acc, batch ->
                 val batchResults = batch.mapNotNull { file ->
 
                     when (file.getDSLType()) {
                         DSLType.ABSTRACT_RULE_SERVICE -> {
-                            extractRuleServiceFlow(file)
-                                .map { RulesOverview.newService(it) }
+                            extractRuleService(file)
+                                .map { ModelResult.newService(it) }
                                 .getOrThrow()
                         }
 
                         DSLType.ABSTRACT_RULE_FLOW -> {
                             extractRuleFlow(file)
-                                .map { RulesOverview.newFlow(it) }
+                                .map { ModelResult.newFlow(it) }
                                 .getOrThrow()
                         }
 
                         DSLType.ABSTRACT_RULE_SET -> {
                             extractRuleSet(file)
-                                .map { RulesOverview.newSet(it) }
+                                .map { ModelResult.newSet(it) }
                                 .getOrThrow()
                         }
 
@@ -67,7 +67,7 @@ class Analyzer private constructor(
             }
     }
 
-    private fun extractRuleServiceFlow(ktFile: KtFile): Result<RuleServiceInfo> =
+    private fun extractRuleService(ktFile: KtFile): Result<RuleServiceInfo> =
         ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass).map { ktClass ->
             RuleServiceInfo(
                 navn = ktClass.name!!,

@@ -28,7 +28,7 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
 
 application {
     // Define the main class for the application.
-    mainClass = "org.example.AppKt"
+    mainClass = "AppKt"
 }
 
 tasks.named<Test>("test") {

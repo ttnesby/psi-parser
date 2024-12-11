@@ -20,7 +20,7 @@ import kotlin.test.junit5.JUnit5Asserter.fail
 import embeddable.compiler.CompilerContext
 import org.junit.jupiter.api.BeforeAll
 
-class AnalyzerFunctionsTests {
+class ExtractorFunctionsTests {
 
     private lateinit var disposable: Disposable
     private lateinit var context: CompilerContext

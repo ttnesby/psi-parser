@@ -26,7 +26,7 @@ class Repo(private val localRoot: Path) {
 //        return this
 //    }
 
-    private val sourceRoots: List<Path> by lazy {
+    val sourceRoots: List<Path> by lazy {
         findSourceRoots().also {
             println("Found ${it.size} source roots")
             println(it.joinToString("\n"))
