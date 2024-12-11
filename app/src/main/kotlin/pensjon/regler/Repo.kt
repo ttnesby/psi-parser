@@ -58,6 +58,7 @@ class Repo(private val localRoot: Path) {
             sourceRoot
                 .walk()
                 .filter { it.isRegularFile() && it.extension.lowercase() == "kt" }
+                .distinctBy { it.absolutePathString() }
                 .map { file ->
                     FileInfo(
                         file = file,

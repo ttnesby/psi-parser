@@ -211,9 +211,9 @@ private fun KtElement.resolveToDeclaration(bindingContext: BindingContext): Resu
             )
         }
     ) {
-        null -> throw NoSuchElementException("Could not resolve descriptor ${this.text} [${this.containingKtFile.name}]")
+        null -> throw NoSuchElementException("Could not resolve descriptor: ${this.text} [${this.containingKtFile.name}]")
         else -> DescriptorToSourceUtils.getSourceFromDescriptor(descriptor)
-            ?: throw NoSuchElementException("Could not resolve to declaration")
+            ?: throw NoSuchElementException("Could not resolve to declaration: ${this.text} [${this.containingKtFile.name}]")
     }
 }
 
