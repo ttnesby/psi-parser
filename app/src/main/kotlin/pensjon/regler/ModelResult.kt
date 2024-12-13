@@ -1,5 +1,7 @@
 package pensjon.regler
 
+
+
 class ModelResult (
     val services: List<RuleServiceInfo>,
     val flows: List<RuleFlowInfo>,

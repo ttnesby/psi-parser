@@ -4,6 +4,7 @@ import org.example.getKDocOrEmpty
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtPrimaryConstructor
+import org.jetbrains.kotlin.psi.psiUtil.containingClass
 import java.io.File
 import java.net.URI
 
@@ -113,11 +114,11 @@ data class PropertyInfo(
         fun new(navn: String, type: String, beskrivelse: String): PropertyInfo =
             PropertyInfo(navn, type, beskrivelse)
 
-        fun fromParameter(parameter: KtParameter, ktClass: KtClass): PropertyInfo =
+        fun fromParameter(parameter: KtParameter): PropertyInfo =
             PropertyInfo(
                 navn = parameter.name ?: "",
                 type = parameter.typeReference?.text ?: "Unknown",
-                beskrivelse = "Parameter of ${ktClass.name}"
+                beskrivelse = "Parameter in primary constructor of ${parameter.containingClass()?.name}"
             )
 
         fun fromPrimaryConstructor(constructor: KtPrimaryConstructor): List<PropertyInfo> =

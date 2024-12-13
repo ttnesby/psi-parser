@@ -3,7 +3,6 @@ package org.example
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiWhiteSpace
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
-import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
@@ -23,8 +22,8 @@ enum class DSLType(val typeName: String) {
     GREN("gren"),
     FLYT("flyt"),
 
-    SERVICE_REQUEST("ServiceRequest"),
-    SERVICE_RESPONSE("ServiceResponse"),
+//    SERVICE_REQUEST("ServiceRequest"),
+//    SERVICE_RESPONSE("ServiceResponse"),
 
     RULE_SERVICE("ruleService"),
     RULE_FLOW("ruleflow");
@@ -43,13 +42,6 @@ enum class DSLTypeService(val typeName: String) {
     override fun toString(): String = typeName
 }
 
-enum class DSLTypeAbstract(val typeName: String) {
-    RULE_SERVICE("AbstractPensjonRuleService"),
-    RULE_FLOW("AbstractPensjonRuleflow"),
-    RULE_SET("AbstractPensjonRuleset");
-
-    override fun toString(): String = typeName
-}
 
 ///////////////////////////////////////////////////
 /** KtFile extension functions */
@@ -63,49 +55,65 @@ fun KtFile.getSubClassOfSuperClass(superClassRef: (KtClass) -> Boolean): Result<
         ?: throw NoSuchElementException("No class found with specified superClassRef")
 }
 
-fun KtFile.findDSLTypeAbstract(): Result<Pair<DSLTypeAbstract,KtClass>> = runCatching {
+sealed interface DSLTypeAbstractResult {
+    data class Found(val dslType: DSLTypeAbstract, val ktClass: KtClass) : DSLTypeAbstractResult
+    data object NOTFound : DSLTypeAbstractResult
+}
+
+enum class DSLTypeAbstract(val typeName: String) {
+    RULE_SERVICE("AbstractPensjonRuleService"),
+    RULE_FLOW("AbstractPensjonRuleflow"),
+    RULE_SET("AbstractPensjonRuleset");
+
+    override fun toString(): String = typeName
+}
+
+fun KtFile.findDSLTypeAbstract(): Result<DSLTypeAbstractResult> = runCatching {
     declarations
         .filterIsInstance<KtClass>()
         .firstOrNull()
         ?.let { ktClass ->
-            val dslType = DSLTypeAbstract
+            DSLTypeAbstract
                 .entries
                 .firstOrNull { type ->
                     ktClass
                         .getSuperTypeListEntries()
-                        .any { entry ->
-                            entry.typeReference?.text?.contains(type.typeName) == true
-                        }
-                } ?: throw NoSuchElementException("No matching DSLTypeAbstract found [${containingKtFile.name}]")
-            Pair(dslType, ktClass)
-        } ?: throw NoSuchElementException("No class found [${containingKtFile.name}]")
+                        .any { entry -> entry.typeReference?.text?.contains(type.typeName) == true }
+                }
+                ?.let { dslType ->
+                    DSLTypeAbstractResult.Found(dslType, ktClass)
+                }
+        } ?: DSLTypeAbstractResult.NOTFound
 }
 
-fun KtFile.isRuleService(): Boolean {
-    return this.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass).isSuccess
-}
-
-fun KtFile.isRuleflow(): Boolean {
-    return this.getSubClassOfSuperClass(KtClass::isSubClassOfRuleFlowClass).isSuccess
-}
-
-fun KtFile.isRuleset(): Boolean {
-    return this.getSubClassOfSuperClass(KtClass::isSubClassOfRuleSetClass).isSuccess
-}
+//fun KtFile.isRuleService(): Boolean {
+//    return this.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass).isSuccess
+//}
+//
+//fun KtFile.isRuleflow(): Boolean {
+//    return this.getSubClassOfSuperClass(KtClass::isSubClassOfRuleFlowClass).isSuccess
+//}
+//
+//fun KtFile.isRuleset(): Boolean {
+//    return this.getSubClassOfSuperClass(KtClass::isSubClassOfRuleSetClass).isSuccess
+//}
 
 ///////////////////////////////////////////////////
 /** KtClass extension functions */
 ///////////////////////////////////////////////////
 
-fun KtClass.isSubClassOfRuleServiceClass(): Boolean = isSubClassOf(DSLType.ABSTRACT_RULE_SERVICE)
+//fun KtClass.isSubClassOfRuleServiceClass(): Boolean = isSubClassOf(DSLType.ABSTRACT_RULE_SERVICE)
+//
+//fun KtClass.isSubClassOfRuleFlowClass(): Boolean = isSubClassOf(DSLType.ABSTRACT_RULE_FLOW)
+//
+//fun KtClass.isSubClassOfRuleSetClass(): Boolean = isSubClassOf(DSLType.ABSTRACT_RULE_SET)
+//
+//fun KtClass.isSubClassOfServiceRequestClass(): Boolean = isSubClassOf(DSLType.SERVICE_REQUEST)
+//
+//fun KtClass.isSubClassOfServiceResponseClass(): Boolean = isSubClassOf(DSLType.SERVICE_RESPONSE)
 
-fun KtClass.isSubClassOfRuleFlowClass(): Boolean = isSubClassOf(DSLType.ABSTRACT_RULE_FLOW)
-
-fun KtClass.isSubClassOfRuleSetClass(): Boolean = isSubClassOf(DSLType.ABSTRACT_RULE_SET)
-
-fun KtClass.isSubClassOfServiceRequestClass(): Boolean = isSubClassOf(DSLType.SERVICE_REQUEST)
-
-fun KtClass.isSubClassOfServiceResponseClass(): Boolean = isSubClassOf(DSLType.SERVICE_RESPONSE)
+private fun KtClass.isSubClassOf(type: DSLTypeAbstract): Boolean =
+    getSuperTypeListEntries().any { it.typeReference?.text?.contains(type.typeName) == true }
 
 private fun KtClass.isSubClassOf(type: DSLType): Boolean =
     getSuperTypeListEntries().any { it.typeReference?.text?.contains(type.typeName) == true }
@@ -121,57 +129,44 @@ fun KtClass.getKDocOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
 
 data class ServiceRequestInfo(val parameter: KtParameter, val resolvedClass: KtClass)
 
-// eventually, get 1th param of a subclass of ServiceRequest
-// see test `testGetRequestClassFromRuleServiceClass`
-//
-//fun KtClass.getServiceRequestInfo(bindingContext: BindingContext): Result<ServiceRequestInfo> = runCatching {
-//    primaryConstructor?.valueParameters?.firstNotNullOfOrNull { parameter ->
-//        parameter.getSubClassOfSuperClass(
-//            KtClass::isSubClassOfServiceRequestClass, bindingContext
-//        ).map { resolvedClass -> ServiceRequestInfo(parameter, resolvedClass) }.getOrNull()
-//    } ?: throw NoSuchElementException(
-//        "No ServiceRequest parameter found in primary constructor for $name [${containingKtFile.name}]"
-//    )
-//}
-
 // eventually, get the class of the generic param to AbstractPensjonRuleService, which is a subclass
 // of ServiceResponse
 // see test `testGetResponseClassFromRuleServiceClass`
-fun KtClass.getServiceResponseClass(bindingContext: BindingContext): Result<KtClass> = getClassOfSuperClassParam(
-    superClassRef = DSLType.ABSTRACT_RULE_SERVICE,
-    paramSubClassOf = KtClass::isSubClassOfServiceResponseClass,
-    bindingContext = bindingContext
-)
+//fun KtClass.getServiceResponseClass(bindingContext: BindingContext): Result<KtClass> = getClassOfSuperClassParam(
+//    superClassRef = DSLType.ABSTRACT_RULE_SERVICE,
+//    paramSubClassOf = KtClass::isSubClassOfServiceResponseClass,
+//    bindingContext = bindingContext
+//)
 
-private fun KtClass.getClassOfSuperClassParam(
-    superClassRef: DSLType,
-    paramSubClassOf: (KtClass) -> Boolean,
-    bindingContext: BindingContext,
-): Result<KtClass> = runCatching {
-    val resolvedClass =
-        getSuperTypeListEntries().find { it.typeReference?.text?.contains(superClassRef.typeName) == true }?.typeReference?.typeElement?.typeArgumentsAsTypes?.getOrNull(
-            0
-        )?.resolveToKtClass(bindingContext)?.getOrThrow()  // Since we're in runCatching, exceptions will be handled
-            ?: throw NoSuchElementException("No type parameter found for $superClassRef")
+//private fun KtClass.getClassOfSuperClassParam(
+//    superClassRef: DSLType,
+//    paramSubClassOf: (KtClass) -> Boolean,
+//    bindingContext: BindingContext,
+//): Result<KtClass> = runCatching {
+//    val resolvedClass =
+//        getSuperTypeListEntries().find { it.typeReference?.text?.contains(superClassRef.typeName) == true }?.typeReference?.typeElement?.typeArgumentsAsTypes?.getOrNull(
+//            0
+//        )?.resolveToKtClass(bindingContext)?.getOrThrow()  // Since we're in runCatching, exceptions will be handled
+//            ?: throw NoSuchElementException("No type parameter found for $superClassRef")
+//
+//    if (paramSubClassOf(resolvedClass)) resolvedClass
+//    else throw NoSuchElementException("Class is not of expected type")
+//}
 
-    if (paramSubClassOf(resolvedClass)) resolvedClass
-    else throw NoSuchElementException("Class is not of expected type")
-}
+//fun KtClass.getRuleServiceFlow(bindingContext: BindingContext): Result<Sequence<FlowElement>> =
+//    getOverriddenProperty(DSLType.RULE_SERVICE).mapCatching { property ->
+//        property.streamRuleServiceElements(DSLType.ABSTRACT_RULE_FLOW, bindingContext).getOrThrow()
+//    }
 
-fun KtClass.getRuleServiceFlow(bindingContext: BindingContext): Result<Sequence<FlowElement>> =
-    getOverriddenProperty(DSLType.RULE_SERVICE).mapCatching { property ->
-        property.streamRuleServiceElements(DSLType.ABSTRACT_RULE_FLOW, bindingContext).getOrThrow()
-    }
+//fun KtClass.getRuleFlowFlow(bindingContext: BindingContext): Result<FlowElement.Flow> =
+//    getOverriddenProperty(DSLType.RULE_FLOW).flatMap { it.getLambdaBlock() }
+//        .flatMap { it.extractFlow(bindingContext) }
 
-fun KtClass.getRuleFlowFlow(bindingContext: BindingContext): Result<FlowElement.Flow> =
-    getOverriddenProperty(DSLType.RULE_FLOW).flatMap { it.getLambdaBlock() }
-        .flatMap { it.extractFlow(bindingContext) }
-
-private fun KtClass.getOverriddenProperty(method: DSLType): Result<KtProperty> = runCatching {
-    body?.properties?.filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }?.find {
-        it.name == method.typeName
-    } ?: throw NoSuchElementException("No overridden property '$name' found")
-}
+//private fun KtClass.getOverriddenProperty(method: DSLType): Result<KtProperty> = runCatching {
+//    body?.properties?.filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }?.find {
+//        it.name == method.typeName
+//    } ?: throw NoSuchElementException("No overridden property '$name' found")
+//}
 
 /**
  * KDoc extension functions
@@ -251,7 +246,7 @@ private fun KtCallExpression.resolveFunctionDeclaration(
 }
 
 /** KtProperty extension functions */
-private fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> = runCatching {
+fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> = runCatching {
     (initializer as? KtLambdaExpression)?.bodyExpression
         ?: throw NoSuchElementException("No lambda block found in property")
 }
@@ -260,8 +255,8 @@ private fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> = runCatching
 // see data class `FlowReference`
 // see test `testExtractSequenceFlowKtElements`
 //
-private fun KtProperty.streamRuleServiceElements(
-    superType: DSLType,
+fun KtProperty.streamRuleServiceElements(
+    superType: DSLTypeAbstract,
     bindingContext: BindingContext,
 ): Result<Sequence<FlowElement>> = runCatching {
     this.getLambdaBlock().map { block ->
@@ -343,7 +338,9 @@ fun <T, R> Result<T>.flatMap(transform: (T) -> Result<R>): Result<R> {
     )
 }
 
-private fun KtBlockExpression.extractFlow(bctx: BindingContext): Result<FlowElement.Flow> = runCatching {
+//TODO - må også legge på navn til betingelse i gren: Ex betingelse("ja") { ... }, sistnevnte er allrede trukket ut
+// det er ("ja") som mangler
+fun KtBlockExpression.extractFlow(bctx: BindingContext): Result<FlowElement.Flow> = runCatching {
     FlowElement.Flow(
         children.mapNotNull { child ->
             when (child) {
@@ -376,13 +373,13 @@ private fun KtBlockExpression.extractFlow(bctx: BindingContext): Result<FlowElem
                 is KtDotQualifiedExpression -> {
                     val resolvedClass = child.resolveReceiverClass2(bctx)
                     when {
-                        resolvedClass?.isSubClassOfRuleFlowClass() == true -> FlowElement.RuleFlow(
+                        resolvedClass?.isSubClassOf(DSLTypeAbstract.RULE_FLOW) == true -> FlowElement.RuleFlow(
                             resolvedClass.name ?: "Unknown",
                             child.extractKDocOrEmpty(),
                             File(resolvedClass.containingKtFile.name)
                         )
 
-                        resolvedClass?.isSubClassOfRuleSetClass() == true -> FlowElement.RuleSet(
+                        resolvedClass?.isSubClassOf(DSLTypeAbstract.RULE_SET) == true -> FlowElement.RuleSet(
                             resolvedClass.name ?: "Unknown",
                             child.extractKDocOrEmpty(),
                             File(resolvedClass.containingKtFile.name)
@@ -429,7 +426,7 @@ private fun KtBlockExpression.extractBetingelse(): Result<String> = runCatching 
 // eventually resolve a KtDotQualifiedExpression to receiver KtClass
 //
 private fun KtDotQualifiedExpression.resolveReceiverClass(
-    superType: DSLType,
+    superType: DSLTypeAbstract,
     bindingContext: BindingContext,
 ): Result<KtClass> = runCatching {
     (receiverExpression as? KtReferenceExpression)?.resolveToKtClass(bindingContext)?.map { resolvedClass ->
