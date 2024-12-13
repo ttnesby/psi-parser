@@ -26,16 +26,27 @@ enum class DSLType(val typeName: String) {
     SERVICE_REQUEST("ServiceRequest"),
     SERVICE_RESPONSE("ServiceResponse"),
 
-    ABSTRACT_RULE_SERVICE("AbstractPensjonRuleService"),
-    ABSTRACT_RULE_FLOW("AbstractPensjonRuleflow"),
-    ABSTRACT_RULE_SET("AbstractPensjonRuleset"),
-
     RULE_SERVICE("ruleService"),
     RULE_FLOW("ruleflow");
 
     companion object {
         fun fromClassName(className: String): DSLType? = entries.find { it.typeName == className }
     }
+
+    override fun toString(): String = typeName
+}
+
+enum class DSLTypeService(val typeName: String) {
+    REQUEST("ServiceRequest"),
+    RESPONSE("ServiceResponse");
+
+    override fun toString(): String = typeName
+}
+
+enum class DSLTypeAbstract(val typeName: String) {
+    RULE_SERVICE("AbstractPensjonRuleService"),
+    RULE_FLOW("AbstractPensjonRuleflow"),
+    RULE_SET("AbstractPensjonRuleset");
 
     override fun toString(): String = typeName
 }
@@ -52,23 +63,22 @@ fun KtFile.getSubClassOfSuperClass(superClassRef: (KtClass) -> Boolean): Result<
         ?: throw NoSuchElementException("No class found with specified superClassRef")
 }
 
-fun KtFile.getDSLType(): DSLType? {
-    val typesToCheck = listOf(
-        DSLType.ABSTRACT_RULE_SERVICE,
-        DSLType.ABSTRACT_RULE_FLOW,
-        DSLType.ABSTRACT_RULE_SET
-    )
-
-    return declarations
-        .asSequence()
+fun KtFile.findDSLTypeAbstract(): Result<Pair<DSLTypeAbstract,KtClass>> = runCatching {
+    declarations
         .filterIsInstance<KtClass>()
         .firstOrNull()
-        ?.getSuperTypeListEntries()
-        ?.firstNotNullOfOrNull { superTypeEntry ->
-            typesToCheck.find { type ->
-                superTypeEntry.typeReference?.text?.contains(type.typeName) == true
-            }
-        }
+        ?.let { ktClass ->
+            val dslType = DSLTypeAbstract
+                .entries
+                .firstOrNull { type ->
+                    ktClass
+                        .getSuperTypeListEntries()
+                        .any { entry ->
+                            entry.typeReference?.text?.contains(type.typeName) == true
+                        }
+                } ?: throw NoSuchElementException("No matching DSLTypeAbstract found [${containingKtFile.name}]")
+            Pair(dslType, ktClass)
+        } ?: throw NoSuchElementException("No class found [${containingKtFile.name}]")
 }
 
 fun KtFile.isRuleService(): Boolean {
@@ -100,6 +110,9 @@ fun KtClass.isSubClassOfServiceResponseClass(): Boolean = isSubClassOf(DSLType.S
 private fun KtClass.isSubClassOf(type: DSLType): Boolean =
     getSuperTypeListEntries().any { it.typeReference?.text?.contains(type.typeName) == true }
 
+fun KtClass.isSubClassOf(type: DSLTypeService): Boolean =
+    getSuperTypeListEntries().any { it.typeReference?.text?.contains(type.typeName) == true }
+
 // get KDoc for a KtClass, or empty string
 // see test `testExtractKDoc`
 // see ext. function `getOrEmpty` for KDoc
@@ -111,15 +124,15 @@ data class ServiceRequestInfo(val parameter: KtParameter, val resolvedClass: KtC
 // eventually, get 1th param of a subclass of ServiceRequest
 // see test `testGetRequestClassFromRuleServiceClass`
 //
-fun KtClass.getServiceRequestInfo(bindingContext: BindingContext): Result<ServiceRequestInfo> = runCatching {
-    primaryConstructor?.valueParameters?.firstNotNullOfOrNull { parameter ->
-        parameter.getSubClassOfSuperClass(
-            KtClass::isSubClassOfServiceRequestClass, bindingContext
-        ).map { resolvedClass -> ServiceRequestInfo(parameter, resolvedClass) }.getOrNull()
-    } ?: throw NoSuchElementException(
-        "No ServiceRequest parameter found in primary constructor for $name [${containingKtFile.name}]"
-    )
-}
+//fun KtClass.getServiceRequestInfo(bindingContext: BindingContext): Result<ServiceRequestInfo> = runCatching {
+//    primaryConstructor?.valueParameters?.firstNotNullOfOrNull { parameter ->
+//        parameter.getSubClassOfSuperClass(
+//            KtClass::isSubClassOfServiceRequestClass, bindingContext
+//        ).map { resolvedClass -> ServiceRequestInfo(parameter, resolvedClass) }.getOrNull()
+//    } ?: throw NoSuchElementException(
+//        "No ServiceRequest parameter found in primary constructor for $name [${containingKtFile.name}]"
+//    )
+//}
 
 // eventually, get the class of the generic param to AbstractPensjonRuleService, which is a subclass
 // of ServiceResponse

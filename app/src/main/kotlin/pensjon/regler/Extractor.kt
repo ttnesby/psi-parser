@@ -2,13 +2,14 @@ package pensjon.regler
 
 import embeddable.compiler.CompilerContext
 import org.example.*
-import pensjon.regler.PropertyInfo.Companion.fromParameter
+import org.example.DSLTypeAbstract.*
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.resolve.BindingContext
-import java.net.URI
+import pensjon.regler.PropertyInfo.Companion.fromParameter
 import kotlin.io.path.absolutePathString
 
 class Extractor private constructor(
@@ -35,27 +36,27 @@ class Extractor private constructor(
             .fold(ModelResult.empty()) { acc, batch ->
                 val batchResults = batch.mapNotNull { file ->
 
-                    when (file.getDSLType()) {
-                        DSLType.ABSTRACT_RULE_SERVICE -> {
-                            extractRuleService(file)
-                                .map { ModelResult.newService(it) }
-                                .getOrThrow()
+                    val (dslType, ktClass) = file.findDSLTypeAbstract()
+                        .getOrElse {
+                            // ikke relevant fil, rydd opp i cache og fortsett
+                            (file as PsiFileImpl).clearCaches()
+                            return@mapNotNull null
+                        }
+                    when (dslType) {
+
+                        RULE_SERVICE -> {
+                            ktClass.extractRuleService().getOrThrow().let { ModelResult.newService(it) }
                         }
 
-                        DSLType.ABSTRACT_RULE_FLOW -> {
-                            extractRuleFlow(file)
-                                .map { ModelResult.newFlow(it) }
-                                .getOrThrow()
+                        RULE_FLOW -> {
+                            ktClass.extractRuleFlow().getOrThrow().let { ModelResult.newFlow(it) }
                         }
 
-                        DSLType.ABSTRACT_RULE_SET -> {
-                            extractRuleSet(file)
-                                .map { ModelResult.newSet(it) }
-                                .getOrThrow()
+                        RULE_SET -> {
+                            ktClass.extractRuleSet().getOrThrow().let { ModelResult.newSet(it) }
                         }
-
-                        else -> null
                     }.also {
+                        // rydd opp i cache
                         (file as PsiFileImpl).clearCaches()
                     }
                 }
@@ -67,30 +68,71 @@ class Extractor private constructor(
             }
     }
 
-    private fun extractRuleService(ktFile: KtFile): Result<RuleServiceInfo> =
-        ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleServiceClass).map { ktClass ->
-            RuleServiceInfo(
-                navn = ktClass.name!!,
-                beskrivelse = ktClass.getKDocOrEmpty(),
-                inndata = extractServiceRequestFields(ktClass).getOrThrow(),
-                utdata = extractServiceResponseFields(ktClass).getOrThrow(),
-                flyt = extractRuleServiceFlow(ktClass).getOrThrow(),
-                gitHubUri = repo.toGithubURI(ktFile.name)
-            )
-        }
+    private fun KtClass.extractRuleService(): Result<RuleServiceInfo> = runCatching {
+        RuleServiceInfo(
+            navn = name!!,
+            beskrivelse = getKDocOrEmpty(),
+            inndata = extractServiceRequestFields().getOrThrow(),
+            utdata = extractServiceResponseFields(this).getOrThrow(),
+            flyt = extractRuleServiceFlow(this).getOrThrow(),
+            gitHubUri = repo.toGithubURI(containingKtFile.name)
+        )
+    }
 
-    private fun extractServiceRequestFields(ktClass: KtClass): Result<List<PropertyInfo>> = runCatching {
-        ktClass.getServiceRequestInfo(bindingContext)
-            .map { (parameter, serviceRequestClass) ->
+
+//    private fun KtClass.extractServiceRequestFields(): Result<List<PropertyInfo>> = runCatching {
+//        getServiceRequestInfo(bindingContext)
+//            .map { (parameter, serviceRequestClass) ->
+//                buildList {
+//                    add(fromParameter(parameter, this@extractServiceRequestFields))
+//                    addAll(
+//                        serviceRequestClass.primaryConstructor?.let {
+//                            PropertyInfo.fromPrimaryConstructor(it)
+//                        } ?: throw IllegalStateException("No primary constructor found for ${serviceRequestClass.name}")
+//                    )
+//                }
+//            }.getOrThrow()
+//    }
+
+    private fun KtClass.extractServiceRequestFields(): Result<List<PropertyInfo>> = runCatching {
+        primaryConstructor
+            ?.valueParameters
+            ?.findDSLTypeServiceRequest()
+            ?.map { (parameter, serviceRequestClass) ->
                 buildList {
-                    add(fromParameter(parameter, ktClass))
+                    add(fromParameter(parameter, this@extractServiceRequestFields))
                     addAll(
-                        serviceRequestClass.primaryConstructor?.let {
-                            PropertyInfo.fromPrimaryConstructor(it)
-                        } ?: throw IllegalStateException("No primary constructor found for ${serviceRequestClass.name}")
+                        serviceRequestClass
+                            .primaryConstructor
+                            ?.let { PropertyInfo.fromPrimaryConstructor(it) }
+                            ?: throw IllegalArgumentException(
+                                "No primary constructor found for ${serviceRequestClass.containingKtFile.name}"
+                            )
                     )
                 }
-            }.getOrThrow()
+            }?.getOrThrow()
+            ?: throw NoSuchElementException(
+                "No service request field found in primary constructor [${containingKtFile.name}]"
+            )
+    }
+
+    private fun List<KtParameter>.findDSLTypeServiceRequest(): Result<Pair<KtParameter, KtClass>> = runCatching {
+        firstNotNullOf { parameter ->
+            parameter
+                .typeReference
+                ?.resolveToKtClass(bindingContext)
+                ?.getOrNull()
+                ?.let { resolvedClass ->
+                    if (resolvedClass.isSubClassOf(DSLTypeService.REQUEST)) {
+                        parameter to resolvedClass
+                    } else {
+                        null
+                    }
+                }
+                ?: throw NoSuchElementException(
+                    "No type reference found for ${parameter.name} in primary constructor"
+                )
+        }
     }
 
     private fun extractServiceResponseFields(ktClass: KtClass): Result<List<PropertyInfo>> = runCatching {
@@ -120,16 +162,15 @@ class Extractor private constructor(
             .getOrThrow()
     }
 
-    private fun extractRuleFlow(ktFile: KtFile): Result<RuleFlowInfo> =
-        ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleFlowClass).map { ktClass ->
-            RuleFlowInfo.new(
-                navn = ktClass.name!!,
-                beskrivelse = ktClass.getKDocOrEmpty(),
-                inndata = extractFlowRequestFields(ktClass).getOrThrow(),
-                flyt = ktClass.getRuleFlowFlow(bindingContext).getOrThrow(),
-                gitHubUri = repo.toGithubURI(ktFile.name)
-            )
-        }
+    private fun KtClass.extractRuleFlow(): Result<RuleFlowInfo> = runCatching {
+        RuleFlowInfo.new(
+            navn = name!!,
+            beskrivelse = getKDocOrEmpty(),
+            inndata = extractFlowRequestFields(this).getOrThrow(),
+            flyt = getRuleFlowFlow(bindingContext).getOrThrow(),
+            gitHubUri = repo.toGithubURI(containingKtFile.name)
+        )
+    }
 
     private fun extractFlowRequestFields(ktClass: KtClass): Result<List<PropertyInfo>> = runCatching {
         ktClass.primaryConstructor?.valueParameters?.firstNotNullOfOrNull { parameter ->
@@ -153,14 +194,13 @@ class Extractor private constructor(
         )
     }
 
-    private fun extractRuleSet(ktFile: KtFile): Result<RuleSetInfo> =
-        ktFile.getSubClassOfSuperClass(KtClass::isSubClassOfRuleSetClass).map { ktClass ->
-            RuleSetInfo.new(
-                navn = ktClass.name!!,
-                beskrivelse = ktClass.getKDocOrEmpty(),
-                inndata = emptyList(),
-                flyt = FlowElement.Flow(emptyList()),
-                gitHubUri = repo.toGithubURI(ktFile.name)
-            )
-        }
+    private fun KtClass.extractRuleSet(): Result<RuleSetInfo> = runCatching {
+        RuleSetInfo.new(
+            navn = name!!,
+            beskrivelse = getKDocOrEmpty(),
+            inndata = emptyList(),
+            flyt = FlowElement.Flow(emptyList()),
+            gitHubUri = repo.toGithubURI(containingKtFile.name)
+        )
+    }
 }
