@@ -50,10 +50,10 @@ enum class DSLTypeService(val typeName: String) {
 // filter and eventually get subclass of given super class from KtFile
 // see test `testExtractRuleServiceKtClass` and `testExtractRuleFlowKtClass`
 //
-fun KtFile.getSubClassOfSuperClass(superClassRef: (KtClass) -> Boolean): Result<KtClass> = runCatching {
-    declarations.asSequence().filterIsInstance<KtClass>().firstOrNull(superClassRef)
-        ?: throw NoSuchElementException("No class found with specified superClassRef")
-}
+//fun KtFile.getSubClassOfSuperClass(superClassRef: (KtClass) -> Boolean): Result<KtClass> = runCatching {
+//    declarations.asSequence().filterIsInstance<KtClass>().firstOrNull(superClassRef)
+//        ?: throw NoSuchElementException("No class found with specified superClassRef")
+//}
 
 sealed interface DSLTypeAbstractResult {
     data class Found(val dslType: DSLTypeAbstract, val ktClass: KtClass) : DSLTypeAbstractResult
@@ -75,14 +75,15 @@ fun KtFile.findDSLTypeAbstract(): Result<DSLTypeAbstractResult> = runCatching {
         ?.let { ktClass ->
             DSLTypeAbstract
                 .entries
-                .firstOrNull { type ->
+                .firstOrNull { dslType ->
                     ktClass
-                        .getSuperTypeListEntries()
-                        .any { entry -> entry.typeReference?.text?.contains(type.typeName) == true }
+                        .superTypeListEntries
+                        .any { entry -> entry.typeReference?.text?.contains(dslType.typeName) == true }
                 }
                 ?.let { dslType ->
                     DSLTypeAbstractResult.Found(dslType, ktClass)
                 }
+                ?: DSLTypeAbstractResult.NOTFound
         } ?: DSLTypeAbstractResult.NOTFound
 }
 
@@ -112,11 +113,17 @@ fun KtFile.findDSLTypeAbstract(): Result<DSLTypeAbstractResult> = runCatching {
 //
 //fun KtClass.isSubClassOfServiceResponseClass(): Boolean = isSubClassOf(DSLType.SERVICE_RESPONSE)
 
+fun KtClass.findPrimaryConstructor(): Result<KtPrimaryConstructor> = runCatching {
+    primaryConstructor ?: throw NoSuchElementException(
+        "No primary constructor found for $name [${containingKtFile.name}]"
+    )
+}
+
 private fun KtClass.isSubClassOf(type: DSLTypeAbstract): Boolean =
     getSuperTypeListEntries().any { it.typeReference?.text?.contains(type.typeName) == true }
 
-private fun KtClass.isSubClassOf(type: DSLType): Boolean =
-    getSuperTypeListEntries().any { it.typeReference?.text?.contains(type.typeName) == true }
+//private fun KtClass.isSubClassOf(type: DSLType): Boolean =
+//    getSuperTypeListEntries().any { it.typeReference?.text?.contains(type.typeName) == true }
 
 fun KtClass.isSubClassOf(type: DSLTypeService): Boolean =
     getSuperTypeListEntries().any { it.typeReference?.text?.contains(type.typeName) == true }

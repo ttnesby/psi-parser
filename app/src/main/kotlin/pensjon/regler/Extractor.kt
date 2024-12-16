@@ -75,44 +75,35 @@ class Extractor private constructor(
     }
 
     private fun KtClass.extractRuleService(): Result<RuleServiceInfo> = runCatching {
+        val errCtx = "$name [${containingKtFile.name}]"
+
         RuleServiceInfo(
-            navn = name!!,
+            navn = name ?: throw NoSuchElementException("No name found for $errCtx"),
             beskrivelse = getKDocOrEmpty(),
             inndata = extractServiceRequestFields().getOrThrow(),
             utdata = extractServiceResponseFields().getOrThrow(),
             flyt = extractRuleServiceFlow().getOrThrow(),
-            gitHubUri = repo.toGithubURI(containingKtFile.name)
+            gitHubUri = repo.toGithubURI(containingKtFile.name).getOrThrow()
         )
     }
 
-    private fun KtClass.extractServiceRequestFields(): Result<List<PropertyInfo>> = runCatching {
-        primaryConstructor
-            ?.findDSLTypeServiceRequest()
-            ?.map { (parameter, serviceRequestClass) ->
-                buildList {
-                    add(fromParameter(parameter))
-                    addAll(
+    private fun KtClass.extractServiceRequestFields(): Result<List<PropertyInfo>> =
+        findPrimaryConstructor()
+            .flatMap { servicePrimaryConstructor ->
+                servicePrimaryConstructor.findDSLTypeServiceRequest()
+                    .flatMap { (parameter, serviceRequestClass) ->
                         serviceRequestClass
-                            .primaryConstructor
-                            ?.let { PropertyInfo.fromPrimaryConstructor(it) }
-                            ?: throw NoSuchElementException(
-                                String.format(
-                                    "No primary constructor found for %s [%s]",
-                                    serviceRequestClass.name,
-                                    serviceRequestClass.containingKtFile.name
-                                )
-                            )
-                    )
-                }
-            }?.getOrThrow()
-            ?: throw NoSuchElementException(
-                String.format(
-                    "No primary constructor for %s [%s]",
-                    name,
-                    containingKtFile.name
-                )
-            )
-    }
+                            .findPrimaryConstructor()
+                            .map { reqPrimaryConstructor ->
+                                buildList {
+                                    add(fromParameter(parameter))
+                                    addAll(PropertyInfo.fromPrimaryConstructor(reqPrimaryConstructor))
+                                }
+                            }
+                    }
+            }
+
+
 
     private fun KtPrimaryConstructor.findDSLTypeServiceRequest(): Result<Pair<KtParameter, KtClass>> = runCatching {
         valueParameters
@@ -128,13 +119,14 @@ class Extractor private constructor(
                             null
                         }
                     }
-            } ?: throw NoSuchElementException(
-            String.format(
-                "No service request found in primary constructor for %s [%s]",
-                containingClass()?.name,
-                containingKtFile.name
+            }
+            ?: throw NoSuchElementException(
+                String.format(
+                    "No service request found in primary constructor for %s [%s]",
+                    containingClass()?.name,
+                    containingKtFile.name
+                )
             )
-        )
     }
 
     private fun KtClass.extractServiceResponseFields(): Result<List<PropertyInfo>> = runCatching {
@@ -167,13 +159,14 @@ class Extractor private constructor(
                 } else {
                     throw NoSuchElementException("${ktClass.name} is not subclass of ${RESPONSE.typeName}")
                 }
-            } ?: throw NoSuchElementException(
-            String.format(
-                "No service response found for %s [%s]",
-                name,
-                containingKtFile.name
+            }
+            ?: throw NoSuchElementException(
+                String.format(
+                    "No service response found for %s [%s]",
+                    name,
+                    containingKtFile.name
+                )
             )
-        )
     }
 
     private fun KtClass.extractRuleServiceFlow(): Result<FlowElement.Flow> = runCatching {
@@ -199,7 +192,7 @@ class Extractor private constructor(
             beskrivelse = getKDocOrEmpty(),
             inndata = extractFlowRequestFields().getOrThrow(),
             flyt = extractRuleFlowFlow().getOrThrow(),
-            gitHubUri = repo.toGithubURI(containingKtFile.name)
+            gitHubUri = repo.toGithubURI(containingKtFile.name).getOrThrow()
         )
     }
 
@@ -231,21 +224,19 @@ class Extractor private constructor(
     }
 
     private fun KtClass.extractRuleFlowFlow(): Result<FlowElement.Flow> = runCatching {
-        body
+
+        val errCtx = "$name [${containingKtFile.name}]"
+
+        val properties = body
             ?.properties
-            ?.filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }
-            ?.find { it.name == DSLType.RULE_FLOW.typeName }
-            ?.getLambdaBlock()
-            ?.getOrThrow()
-            ?.extractFlow(bindingContext)
-            ?.getOrThrow()
-            ?: throw NoSuchElementException(
-                String.format(
-                    "No rule flow found for %s [%s]",
-                    name,
-                    containingKtFile.name
-                )
-            )
+            ?: throw NoSuchElementException("No properties found, $errCtx")
+
+        val prop = properties
+            .filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }
+            .find { it.name == DSLType.RULE_FLOW.typeName }
+            ?: throw NoSuchElementException("No override rule flow found, $errCtx")
+
+        prop.getLambdaBlock().flatMap { it.extractFlow(bindingContext) }.getOrThrow()
     }
 
     private fun KtClass.extractRuleSet(): Result<RuleSetInfo> = runCatching {
@@ -254,7 +245,12 @@ class Extractor private constructor(
             beskrivelse = getKDocOrEmpty(),
             inndata = emptyList(),
             flyt = FlowElement.Flow(emptyList()),
-            gitHubUri = repo.toGithubURI(containingKtFile.name)
+            gitHubUri = repo.toGithubURI(containingKtFile.name).getOrThrow()
         )
     }
+
+    private inline fun bail(message: String, vararg params: String) {
+        throw NoSuchElementException(String.format(message, *params))
+    }
+
 }

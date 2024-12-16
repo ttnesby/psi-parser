@@ -44,7 +44,7 @@ class RepoTest {
         }
 
         val repo = Repo(localRoot)
-        val uri = repo.toGithubURI(file.absolutePathString())
+        val uri = repo.toGithubURI(file.absolutePathString()).getOrThrow()
 
         assertEquals(
             URI("https://github.com/navikt/testRepo/blob/master/repository/src/main/kotlin/Example.kt"),

@@ -67,5 +67,7 @@ class Repo(private val localRoot: Path) {
                 }
         }
 
-    fun toGithubURI(localFilePath: String): URI = URI("$gitHubUri/${Path(localFilePath).relativeTo(localRoot)}")
+    fun toGithubURI(localFilePath: String): Result<URI> = runCatching {
+        URI("$gitHubUri/${Path(localFilePath).relativeTo(localRoot)}")
+    }
 }
