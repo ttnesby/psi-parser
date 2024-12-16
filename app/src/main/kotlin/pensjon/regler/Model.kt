@@ -3,7 +3,6 @@ package pensjon.regler
 import org.example.formatOrEmpty
 import org.example.getKDocOrEmpty
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
-import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtPrimaryConstructor
 import org.jetbrains.kotlin.psi.KtProperty
@@ -101,7 +100,7 @@ data class RuleSetInfo(
             |   beskrivelse = $beskrivelse
             |   inndata = $inndata
             |   flyt = $flyt
-            |   gitHubUri = ${gitHubUri.toString()}
+            |   gitHubUri = $gitHubUri
             |)
         """.trimMargin()
     }
