@@ -113,12 +113,6 @@ fun KtFile.findDSLTypeAbstract(): Result<DSLTypeAbstractResult> = runCatching {
 //
 //fun KtClass.isSubClassOfServiceResponseClass(): Boolean = isSubClassOf(DSLType.SERVICE_RESPONSE)
 
-fun KtClass.findPrimaryConstructor(): Result<KtPrimaryConstructor> = runCatching {
-    primaryConstructor ?: throw NoSuchElementException(
-        "No primary constructor found for $name [${containingKtFile.name}]"
-    )
-}
-
 private fun KtClass.isSubClassOf(type: DSLTypeAbstract): Boolean =
     getSuperTypeListEntries().any { it.typeReference?.text?.contains(type.typeName) == true }
 

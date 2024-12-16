@@ -87,23 +87,26 @@ class Extractor private constructor(
         )
     }
 
-    private fun KtClass.extractServiceRequestFields(): Result<List<PropertyInfo>> =
-        findPrimaryConstructor()
-            .flatMap { servicePrimaryConstructor ->
-                servicePrimaryConstructor.findDSLTypeServiceRequest()
-                    .flatMap { (parameter, serviceRequestClass) ->
-                        serviceRequestClass
-                            .findPrimaryConstructor()
-                            .map { reqPrimaryConstructor ->
-                                buildList {
-                                    add(fromParameter(parameter))
-                                    addAll(PropertyInfo.fromPrimaryConstructor(reqPrimaryConstructor))
-                                }
-                            }
-                    }
-            }
+    private fun KtClass.extractServiceRequestFields(): Result<List<PropertyInfo>> = runCatching {
 
+        val primaryConstructor = primaryConstructor
+            ?: throw NoSuchElementException("" +
+                    "No primary constructor found for $name [${containingKtFile.name}]"
+            )
 
+        val (parameter, serviceRequestClass) = primaryConstructor.findDSLTypeServiceRequest().getOrThrow()
+
+        val reqFields = serviceRequestClass.primaryConstructor?.let {
+            PropertyInfo.fromPrimaryConstructor(it)
+        } ?: throw NoSuchElementException(
+            "No primary constructor found for ${serviceRequestClass.name} [${serviceRequestClass.containingKtFile.name}]"
+        )
+
+        buildList {
+            add(fromParameter(parameter))
+            addAll(reqFields)
+        }
+    }
 
     private fun KtPrimaryConstructor.findDSLTypeServiceRequest(): Result<Pair<KtParameter, KtClass>> = runCatching {
         valueParameters
