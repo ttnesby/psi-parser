@@ -1,9 +1,12 @@
 package pensjon.regler
 
+import org.example.formatOrEmpty
 import org.example.getKDocOrEmpty
+import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtPrimaryConstructor
+import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.psiUtil.containingClass
 import java.io.File
 import java.net.URI
@@ -120,6 +123,15 @@ data class PropertyInfo(
                 type = parameter.typeReference?.text ?: "Unknown",
                 beskrivelse = "Parameter in primary constructor of ${parameter.containingClass()?.name}"
             )
+
+        fun fromProperties(properties: List<KtProperty>): List<PropertyInfo> =
+            properties.map { prop ->
+                PropertyInfo(
+                    navn = prop.name!!,
+                    type = prop.typeReference?.text ?: "Unknown",
+                    beskrivelse = prop.children.filterIsInstance<KDoc>().firstOrNull()?.formatOrEmpty() ?: ""
+                )
+            }
 
         fun fromPrimaryConstructor(constructor: KtPrimaryConstructor): List<PropertyInfo> =
             constructor.valueParameters.map { param ->

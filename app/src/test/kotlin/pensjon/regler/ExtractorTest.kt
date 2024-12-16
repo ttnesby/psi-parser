@@ -106,6 +106,8 @@ class ExtractorTest {
                     assertEquals(10, result.flows.size)
                     assertEquals(31, result.sets.size)
 
+                    // asserts for regel tjeneste
+
                     val ruleService = result.services.first()
                     assertEquals("FastsettTrygdetidService", ruleService.navn)
                     assertEquals("", ruleService.beskrivelse)
@@ -128,9 +130,28 @@ class ExtractorTest {
 
                         ), ruleService.utdata.last())
 
+                    assertEquals(2, ruleService.flyt.elementer.size)
+
                     assertEquals(
                         URI("https://github.com/navikt/${localRoot.last()}/blob/master/fastsetttrygdetid/function/FastsettTrygdetidService.kt"),
                         ruleService.gitHubUri)
+
+                    // asserts for regel flyter
+
+                    val ruleFlow = result.flows.first()
+                    assertEquals("StartTrygdetidFlyt", ruleFlow.navn)
+                    assertEquals("", ruleFlow.beskrivelse)
+                    assertEquals(4, ruleFlow.inndata.size)
+
+                    assertEquals(PropertyInfo(
+                        navn = "variable",
+                        type = "TrygdetidVariable?",
+                        beskrivelse = ""
+                    ), ruleFlow.inndata.last())
+
+                    assertEquals(2, ruleFlow.flyt.elementer.size)
+
+
                 }.onFailure { assert(false)  }
         }.onFailure { assert(false) }
     }

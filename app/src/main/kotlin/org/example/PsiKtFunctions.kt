@@ -20,17 +20,14 @@ import java.io.File
 enum class DSLType(val typeName: String) {
     FORGRENING("forgrening"),
     GREN("gren"),
-    FLYT("flyt"),
+    FLYT("flyt");
 
-//    SERVICE_REQUEST("ServiceRequest"),
-//    SERVICE_RESPONSE("ServiceResponse"),
+    override fun toString(): String = typeName
+}
 
-    RULE_SERVICE("ruleService"),
-    RULE_FLOW("ruleflow");
-
-    companion object {
-        fun fromClassName(className: String): DSLType? = entries.find { it.typeName == className }
-    }
+enum class DSLTypeFlow(val typeName: String) {
+    SERVICE("ruleService"),
+    FLOW("ruleflow");
 
     override fun toString(): String = typeName
 }
@@ -126,7 +123,7 @@ fun KtClass.isSubClassOf(type: DSLTypeService): Boolean =
 //
 fun KtClass.getKDocOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
 
-data class ServiceRequestInfo(val parameter: KtParameter, val resolvedClass: KtClass)
+//data class ServiceRequestInfo(val parameter: KtParameter, val resolvedClass: KtClass)
 
 // eventually, get the class of the generic param to AbstractPensjonRuleService, which is a subclass
 // of ServiceResponse
@@ -178,17 +175,17 @@ fun KDoc.formatOrEmpty(): String =
 /** KtParameter extension functions */
 ///////////////////////////////////////////////////
 
-private fun KtParameter.getSubClassOfSuperClass(
-    superClassRef: (KtClass) -> Boolean,
-    bindingContext: BindingContext,
-): Result<KtClass> = runCatching {
-
-    val resolvedClass = typeReference?.resolveToKtClass(bindingContext)?.getOrThrow()
-        ?: throw NoSuchElementException("No type reference found")
-
-    if (superClassRef(resolvedClass)) resolvedClass
-    else throw NoSuchElementException("Class is not a ServiceRequest")
-}
+//private fun KtParameter.getSubClassOfSuperClass(
+//    superClassRef: (KtClass) -> Boolean,
+//    bindingContext: BindingContext,
+//): Result<KtClass> = runCatching {
+//
+//    val resolvedClass = typeReference?.resolveToKtClass(bindingContext)?.getOrThrow()
+//        ?: throw NoSuchElementException("No type reference found")
+//
+//    if (superClassRef(resolvedClass)) resolvedClass
+//    else throw NoSuchElementException("Class is not a ServiceRequest")
+//}
 
 // get KDoc for a KtParameter, or empty string
 // see test `testParameterKDocFromRequestPrimaryConstructor`

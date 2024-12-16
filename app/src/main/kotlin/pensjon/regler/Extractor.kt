@@ -5,6 +5,8 @@ import org.example.*
 import org.example.DSLTypeAbstract.*
 import org.example.DSLTypeAbstractResult.Found
 import org.example.DSLTypeAbstractResult.NOTFound
+import org.example.DSLTypeFlow.FLOW
+import org.example.DSLTypeFlow.SERVICE
 import org.example.DSLTypeService.REQUEST
 import org.example.DSLTypeService.RESPONSE
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
@@ -17,6 +19,7 @@ import org.jetbrains.kotlin.psi.KtPrimaryConstructor
 import org.jetbrains.kotlin.psi.psiUtil.containingClass
 import org.jetbrains.kotlin.resolve.BindingContext
 import pensjon.regler.PropertyInfo.Companion.fromParameter
+import pensjon.regler.PropertyInfo.Companion.fromProperties
 import kotlin.io.path.absolutePathString
 
 class Extractor private constructor(
@@ -80,7 +83,7 @@ class Extractor private constructor(
             beskrivelse = getKDocOrEmpty(),
             inndata = extractServiceRequestFields().getOrThrow(),
             utdata = extractServiceResponseFields().getOrThrow(),
-            flyt = extractRuleServiceFlow().getOrThrow(),
+            flyt = extractFlow(SERVICE).getOrThrow(),
             gitHubUri = repo.toGithubURI(containingKtFile.name).getOrThrow()
         )
     }
@@ -137,7 +140,7 @@ class Extractor private constructor(
 
     private fun KtClass.extractServiceResponseFields(): Result<List<PropertyInfo>> = runCatching {
 
-        val superTypeParametertype = superTypeListEntries
+        val abstractRuleServiceGenericParameterType = superTypeListEntries
             .find { it.typeReference?.text?.contains(RULE_SERVICE.typeName) == true }
             ?.typeReference
             ?.typeElement
@@ -145,7 +148,8 @@ class Extractor private constructor(
             ?.firstOrNull()
             ?: throw NoSuchElementException("No service response type found for $name [${containingKtFile.name}]")
 
-        val serviceResponseClass = superTypeParametertype.resolveToKtClass(bindingContext).getOrThrow()
+        val serviceResponseClass = abstractRuleServiceGenericParameterType
+            .resolveToKtClass(bindingContext).getOrThrow()
 
         if (!serviceResponseClass.isSubClassOf(RESPONSE)) {
             throw NoSuchElementException(
@@ -153,7 +157,8 @@ class Extractor private constructor(
                     "%s is not subclass of %s, %s [%s]",
                     serviceResponseClass.name,
                     RESPONSE.typeName,
-                    name, containingKtFile.name
+                    name,
+                    containingKtFile.name
                 )
             )
         }
@@ -184,39 +189,39 @@ class Extractor private constructor(
             navn = name!!,
             beskrivelse = getKDocOrEmpty(),
             inndata = extractFlowRequestFields().getOrThrow(),
-            flyt = extractRuleFlowFlow().getOrThrow(),
+            flyt = extractFlow(FLOW).getOrThrow(),
             gitHubUri = repo.toGithubURI(containingKtFile.name).getOrThrow()
         )
     }
 
     private fun KtClass.extractFlowRequestFields(): Result<List<PropertyInfo>> = runCatching {
-        primaryConstructor
-            ?.valueParameters
-            ?.firstNotNullOfOrNull { parameter ->
-                val resolvedClass = parameter
+
+        val errCtx = "$name [${containingKtFile.name}]"
+
+        val primaryConstructor = primaryConstructor
+            ?: throw NoSuchElementException(
+                "No primary constructor found for $errCtx"
+            )
+
+        val (parameter, parameterClass) = primaryConstructor
+            .valueParameters
+            .firstNotNullOfOrNull { parameter ->
+                parameter
                     .typeReference
                     ?.resolveToKtClass(bindingContext)
-                    ?.getOrThrow()
-                    ?: throw NoSuchElementException("No type reference found")
-
-                buildList {
-                    add(fromParameter(parameter))
-                    addAll(
-                        resolvedClass.getProperties().map {
-                            PropertyInfo.new(
-                                it.name!!,
-                                it.typeReference?.text ?: "Unknown",
-                                it.children.filterIsInstance<KDoc>().firstOrNull()?.formatOrEmpty() ?: ""
-                            )
-                        }
-                    )
-                }
+                    ?.getOrNull()
+                    ?.let { resolvedClass -> Pair(parameter, resolvedClass) }
             } ?: throw NoSuchElementException(
-            "No flow request fields found $name"
+            "No flow parameter of type class found in primary constructor for $errCtx"
         )
+
+        buildList {
+            add(fromParameter(parameter))
+            addAll(fromProperties(parameterClass.getProperties()))
+        }
     }
 
-    private fun KtClass.extractRuleServiceFlow(): Result<FlowElement.Flow> = runCatching {
+    private fun KtClass.extractFlow(flowType: DSLTypeFlow): Result<FlowElement.Flow> = runCatching {
 
         val errCtx = "$name [${containingKtFile.name}]"
 
@@ -226,27 +231,15 @@ class Extractor private constructor(
 
         val prop = properties
             .filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }
-            .find { it.name == DSLType.RULE_SERVICE.typeName }
-            ?: throw NoSuchElementException("No override ${DSLType.RULE_SERVICE.typeName} found, $errCtx")
+            .find { it.name == flowType.typeName }
+            ?: throw NoSuchElementException("No override ${flowType.typeName} found, $errCtx")
 
-        prop.getLambdaBlock().flatMap { it.extractRuleServiceFlow(bindingContext) }.getOrThrow()
-    }
-
-
-    private fun KtClass.extractRuleFlowFlow(): Result<FlowElement.Flow> = runCatching {
-
-        val errCtx = "$name [${containingKtFile.name}]"
-
-        val properties = body
-            ?.properties
-            ?: throw NoSuchElementException("No properties found, $errCtx")
-
-        val prop = properties
-            .filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }
-            .find { it.name == DSLType.RULE_FLOW.typeName }
-            ?: throw NoSuchElementException("No override ${DSLType.RULE_FLOW.typeName} found, $errCtx")
-
-        prop.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }.getOrThrow()
+        prop.getLambdaBlock().flatMap {
+            when (flowType) {
+                SERVICE -> it.extractRuleServiceFlow(bindingContext)
+                FLOW -> it.extractRuleFlowFlow(bindingContext)
+            }
+        }.getOrThrow()
     }
 
     private fun KtClass.extractRuleSet(): Result<RuleSetInfo> = runCatching {
