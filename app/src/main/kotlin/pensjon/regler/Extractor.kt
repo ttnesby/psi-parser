@@ -75,10 +75,8 @@ class Extractor private constructor(
     }
 
     private fun KtClass.extractRuleService(): Result<RuleServiceInfo> = runCatching {
-        val errCtx = "$name [${containingKtFile.name}]"
-
         RuleServiceInfo(
-            navn = name ?: throw NoSuchElementException("No name found for $errCtx"),
+            navn = name!!,
             beskrivelse = getKDocOrEmpty(),
             inndata = extractServiceRequestFields().getOrThrow(),
             utdata = extractServiceResponseFields().getOrThrow(),
@@ -90,16 +88,21 @@ class Extractor private constructor(
     private fun KtClass.extractServiceRequestFields(): Result<List<PropertyInfo>> = runCatching {
 
         val primaryConstructor = primaryConstructor
-            ?: throw NoSuchElementException("" +
-                    "No primary constructor found for $name [${containingKtFile.name}]"
+            ?: throw NoSuchElementException(
+                "No primary constructor found for $name [${containingKtFile.name}]"
             )
 
-        val (parameter, serviceRequestClass) = primaryConstructor.findDSLTypeServiceRequest().getOrThrow()
+        val (parameter, serviceRequestClass) = primaryConstructor
+            .findDSLTypeServiceRequest().getOrThrow()
 
         val reqFields = serviceRequestClass.primaryConstructor?.let {
             PropertyInfo.fromPrimaryConstructor(it)
         } ?: throw NoSuchElementException(
-            "No primary constructor found for ${serviceRequestClass.name} [${serviceRequestClass.containingKtFile.name}]"
+            String.format(
+                "No primary constructor found for %s [%s]",
+                serviceRequestClass.name,
+                serviceRequestClass.containingKtFile.name
+            )
         )
 
         buildList {
@@ -125,7 +128,7 @@ class Extractor private constructor(
             }
             ?: throw NoSuchElementException(
                 String.format(
-                    "No service request found in primary constructor for %s [%s]",
+                    "No service request parameter found in primary constructor for %s [%s]",
                     containingClass()?.name,
                     containingKtFile.name
                 )
@@ -133,60 +136,47 @@ class Extractor private constructor(
     }
 
     private fun KtClass.extractServiceResponseFields(): Result<List<PropertyInfo>> = runCatching {
-        // TODO this is more or less done in toModel and which rule entity - maybe extract extra element
-        superTypeListEntries
+
+        val superTypeParametertype = superTypeListEntries
             .find { it.typeReference?.text?.contains(RULE_SERVICE.typeName) == true }
             ?.typeReference
             ?.typeElement
             ?.typeArgumentsAsTypes
-            ?.getOrNull(0)
-            ?.resolveToKtClass(bindingContext)
-            ?.getOrThrow()
-            ?.let { ktClass ->
-                if (ktClass.isSubClassOf(RESPONSE)) {
-                    buildList {
-                        add(
-                            PropertyInfo(
-                                navn = ktClass.name!!,
-                                type = ktClass.name!!,
-                                beskrivelse = "Response for $name"
-                            )
-                        )
-                        addAll(
-                            ktClass.primaryConstructor?.let {
-                                PropertyInfo.fromPrimaryConstructor(it)
-                            }
-                                ?: throw IllegalArgumentException("No primary constructor found for ${ktClass.name}")
-                        )
-                    }
-                } else {
-                    throw NoSuchElementException("${ktClass.name} is not subclass of ${RESPONSE.typeName}")
-                }
-            }
-            ?: throw NoSuchElementException(
-                String.format(
-                    "No service response found for %s [%s]",
-                    name,
-                    containingKtFile.name
-                )
-            )
-    }
+            ?.firstOrNull()
+            ?: throw NoSuchElementException("No service response type found for $name [${containingKtFile.name}]")
 
-    private fun KtClass.extractRuleServiceFlow(): Result<FlowElement.Flow> = runCatching {
-        body
-            ?.properties
-            ?.filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }
-            ?.find { it.name == DSLType.RULE_SERVICE.typeName }
-            ?.streamRuleServiceElements(RULE_FLOW, bindingContext)
-            ?.map { sequence -> FlowElement.Flow(sequence.toList()) }
-            ?.getOrThrow()
-            ?: throw NoSuchElementException(
+        val serviceResponseClass = superTypeParametertype.resolveToKtClass(bindingContext).getOrThrow()
+
+        if (!serviceResponseClass.isSubClassOf(RESPONSE)) {
+            throw NoSuchElementException(
                 String.format(
-                    "No rule service flow found for %s [%s]",
-                    name,
-                    containingKtFile.name
+                    "%s is not subclass of %s, %s [%s]",
+                    serviceResponseClass.name,
+                    RESPONSE.typeName,
+                    name, containingKtFile.name
                 )
             )
+        }
+
+        val primaryConstructor = serviceResponseClass.primaryConstructor
+            ?: throw NoSuchElementException(
+                String.format(
+                    "No primary constructor found for %s [%s]",
+                    serviceResponseClass.name,
+                    serviceResponseClass.containingKtFile.name
+                )
+            )
+
+        buildList {
+            add(
+                PropertyInfo(
+                    navn = serviceResponseClass.name!!,
+                    type = serviceResponseClass.name!!,
+                    beskrivelse = "Response for $name"
+                )
+            )
+            addAll(PropertyInfo.fromPrimaryConstructor(primaryConstructor))
+        }
     }
 
     private fun KtClass.extractRuleFlow(): Result<RuleFlowInfo> = runCatching {
@@ -226,6 +216,23 @@ class Extractor private constructor(
         )
     }
 
+    private fun KtClass.extractRuleServiceFlow(): Result<FlowElement.Flow> = runCatching {
+
+        val errCtx = "$name [${containingKtFile.name}]"
+
+        val properties = body
+            ?.properties
+            ?: throw NoSuchElementException("No properties found, $errCtx")
+
+        val prop = properties
+            .filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }
+            .find { it.name == DSLType.RULE_SERVICE.typeName }
+            ?: throw NoSuchElementException("No override ${DSLType.RULE_SERVICE.typeName} found, $errCtx")
+
+        prop.getLambdaBlock().flatMap { it.extractRuleServiceFlow(bindingContext) }.getOrThrow()
+    }
+
+
     private fun KtClass.extractRuleFlowFlow(): Result<FlowElement.Flow> = runCatching {
 
         val errCtx = "$name [${containingKtFile.name}]"
@@ -237,9 +244,9 @@ class Extractor private constructor(
         val prop = properties
             .filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }
             .find { it.name == DSLType.RULE_FLOW.typeName }
-            ?: throw NoSuchElementException("No override rule flow found, $errCtx")
+            ?: throw NoSuchElementException("No override ${DSLType.RULE_FLOW.typeName} found, $errCtx")
 
-        prop.getLambdaBlock().flatMap { it.extractFlow(bindingContext) }.getOrThrow()
+        prop.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }.getOrThrow()
     }
 
     private fun KtClass.extractRuleSet(): Result<RuleSetInfo> = runCatching {
@@ -250,10 +257,6 @@ class Extractor private constructor(
             flyt = FlowElement.Flow(emptyList()),
             gitHubUri = repo.toGithubURI(containingKtFile.name).getOrThrow()
         )
-    }
-
-    private inline fun bail(message: String, vararg params: String) {
-        throw NoSuchElementException(String.format(message, *params))
     }
 
 }

@@ -76,9 +76,7 @@ fun KtFile.findDSLTypeAbstract(): Result<DSLTypeAbstractResult> = runCatching {
             DSLTypeAbstract
                 .entries
                 .firstOrNull { dslType ->
-                    ktClass
-                        .superTypeListEntries
-                        .any { entry -> entry.typeReference?.text?.contains(dslType.typeName) == true }
+                    ktClass.isSubClassOf(dslType)
                 }
                 ?.let { dslType ->
                     DSLTypeAbstractResult.Found(dslType, ktClass)
@@ -114,13 +112,13 @@ fun KtFile.findDSLTypeAbstract(): Result<DSLTypeAbstractResult> = runCatching {
 //fun KtClass.isSubClassOfServiceResponseClass(): Boolean = isSubClassOf(DSLType.SERVICE_RESPONSE)
 
 private fun KtClass.isSubClassOf(type: DSLTypeAbstract): Boolean =
-    getSuperTypeListEntries().any { it.typeReference?.text?.contains(type.typeName) == true }
+    superTypeListEntries.any { it.typeReference?.text?.contains(type.typeName) == true }
 
 //private fun KtClass.isSubClassOf(type: DSLType): Boolean =
 //    getSuperTypeListEntries().any { it.typeReference?.text?.contains(type.typeName) == true }
 
 fun KtClass.isSubClassOf(type: DSLTypeService): Boolean =
-    getSuperTypeListEntries().any { it.typeReference?.text?.contains(type.typeName) == true }
+    superTypeListEntries.any { it.typeReference?.text?.contains(type.typeName) == true }
 
 // get KDoc for a KtClass, or empty string
 // see test `testExtractKDoc`
@@ -256,39 +254,39 @@ fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> = runCatching {
 // see data class `FlowReference`
 // see test `testExtractSequenceFlowKtElements`
 //
-fun KtProperty.streamRuleServiceElements(
-    superType: DSLTypeAbstract,
-    bindingContext: BindingContext,
-): Result<Sequence<FlowElement>> = runCatching {
-    this.getLambdaBlock().map { block ->
-        block.children.asSequence().flatMap { element ->
-            sequence {
-                when (element) {
-                    is KtCallExpression -> {
-                        element.resolveFunctionDeclaration(bindingContext)
-                            .map { (name, file) ->
-                                FlowElement.Function(
-                                    name,
-                                    element.extractKDocOrEmpty(),
-                                    file
-                                )
-                            }.getOrNull()?.let { yield(it) }
-                    }
-
-                    is KtDotQualifiedExpression -> {
-                        element.resolveReceiverClass(superType, bindingContext).map { resolvedClass ->
-                            FlowElement.RuleFlow(
-                                resolvedClass.name ?: "Unknown",
-                                element.extractKDocOrEmpty(),
-                                File(resolvedClass.containingKtFile.name)
-                            )
-                        }.getOrNull()?.let { yield(it) }
-                    }
-                }
-            }
-        }
-    }.getOrThrow()
-}
+//fun KtProperty.streamRuleServiceElements(
+//    superType: DSLTypeAbstract,
+//    bindingContext: BindingContext,
+//): Result<Sequence<FlowElement>> = runCatching {
+//    this.getLambdaBlock().map { block ->
+//        block.children.asSequence().flatMap { element ->
+//            sequence {
+//                when (element) {
+//                    is KtCallExpression -> {
+//                        element.resolveFunctionDeclaration(bindingContext)
+//                            .map { (name, file) ->
+//                                FlowElement.Function(
+//                                    navn = name,
+//                                    beskrivelse = element.extractKDocOrEmpty(),
+//                                    fil = file
+//                                )
+//                            }.getOrNull()?.let { yield(it) }
+//                    }
+//
+//                    is KtDotQualifiedExpression -> {
+//                        element.resolveReceiverClass(superType, bindingContext).map { resolvedClass ->
+//                            FlowElement.RuleFlow(
+//                                navn = resolvedClass.name ?: "Unknown",
+//                                beskrivelse = element.extractKDocOrEmpty(),
+//                                fil = File(resolvedClass.containingKtFile.name)
+//                            )
+//                        }.getOrNull()?.let { yield(it) }
+//                    }
+//                }
+//            }
+//        }
+//    }.getOrThrow()
+//}
 
 /**
  * KDoc er enten et barn av PsiElementet eller ligger som et søsken-element umiddelbart før dette
@@ -329,9 +327,6 @@ private fun KtCallExpression.getLambdaBlock(): Result<KtBlockExpression> = runCa
     functionLiteral.bodyExpression ?: throw IllegalStateException("Lambda body is not a block expression")
 }
 
-// TODO - hvordan håndtere flyt/regelsett (KtDotQualifiedExpression) som er høyresiden på en property
-// TODO - NB! når KDoc er relatert til flow/ruleset/function - this.children -> this.statements
-
 fun <T, R> Result<T>.flatMap(transform: (T) -> Result<R>): Result<R> {
     return fold(
         onSuccess = { value -> transform(value) },
@@ -339,9 +334,43 @@ fun <T, R> Result<T>.flatMap(transform: (T) -> Result<R>): Result<R> {
     )
 }
 
+fun KtBlockExpression.extractRuleServiceFlow(bctx: BindingContext): Result<FlowElement.Flow> = runCatching {
+    FlowElement.Flow(
+        children.mapNotNull { element ->
+            when (element) {
+                is KtCallExpression -> {
+                    element.resolveFunctionDeclaration(bctx)
+                        .map { (name, file) ->
+                            FlowElement.Function(
+                                navn = name,
+                                beskrivelse = element.extractKDocOrEmpty(),
+                                fil = file
+                            )
+                        }.getOrNull()
+                }
+
+                is KtDotQualifiedExpression -> {
+                    element.resolveReceiverClass(DSLTypeAbstract.RULE_FLOW, bctx).map { resolvedClass ->
+                        FlowElement.RuleFlow(
+                            navn = resolvedClass.name ?: "Unknown",
+                            beskrivelse = element.extractKDocOrEmpty(),
+                            fil = File(resolvedClass.containingKtFile.name)
+                        )
+                    }.getOrNull()
+                }
+
+                else -> null
+            }
+        }
+    )
+}
+
+// TODO - hvordan håndtere flyt/regelsett (KtDotQualifiedExpression) som er høyresiden på en property
+// TODO - NB! når KDoc er relatert til flow/ruleset/function - this.children -> this.statements
+
 //TODO - må også legge på navn til betingelse i gren: Ex betingelse("ja") { ... }, sistnevnte er allrede trukket ut
 // det er ("ja") som mangler
-fun KtBlockExpression.extractFlow(bctx: BindingContext): Result<FlowElement.Flow> = runCatching {
+fun KtBlockExpression.extractRuleFlowFlow(bctx: BindingContext): Result<FlowElement.Flow> = runCatching {
     FlowElement.Flow(
         children.mapNotNull { child ->
             when (child) {
@@ -349,22 +378,22 @@ fun KtBlockExpression.extractFlow(bctx: BindingContext): Result<FlowElement.Flow
                     when {
                         child.isForgrening() -> {
                             FlowElement.Forgrening(
-                                child.extractKDocOrEmpty(),
-                                child.valueArguments.first().text.removeSurrounding("\""),
-                                child.getLambdaBlock().flatMap { it.extractGrener(bctx) }.getOrThrow()
+                                beskrivelse = child.extractKDocOrEmpty(),
+                                navn = child.valueArguments.first().text.removeSurrounding("\""),
+                                gren = child.getLambdaBlock().flatMap { it.extractGrener(bctx) }.getOrThrow()
                             )
                         }
 
                         child.isGren() -> {
                             FlowElement.Gren(
-                                child.extractKDocOrEmpty(),
-                                child.getLambdaBlock().flatMap { it.extractBetingelse() }.getOrThrow(),
-                                child.getLambdaBlock().flatMap { it.extractFlow(bctx) }.getOrThrow()
+                                beskrivelse = child.extractKDocOrEmpty(),
+                                betingelse = child.getLambdaBlock().flatMap { it.extractBetingelse() }.getOrThrow(),
+                                flyt = child.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bctx) }.getOrThrow()
                             )
                         }
 
                         child.isFlyt() -> {
-                            child.getLambdaBlock().flatMap { it.extractFlow(bctx) }.getOrThrow()
+                            child.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bctx) }.getOrThrow()
                         }
 
                         else -> null
@@ -374,17 +403,19 @@ fun KtBlockExpression.extractFlow(bctx: BindingContext): Result<FlowElement.Flow
                 is KtDotQualifiedExpression -> {
                     val resolvedClass = child.resolveReceiverClass2(bctx)
                     when {
-                        resolvedClass?.isSubClassOf(DSLTypeAbstract.RULE_FLOW) == true -> FlowElement.RuleFlow(
-                            resolvedClass.name ?: "Unknown",
-                            child.extractKDocOrEmpty(),
-                            File(resolvedClass.containingKtFile.name)
-                        )
+                        resolvedClass?.isSubClassOf(DSLTypeAbstract.RULE_FLOW) == true ->
+                            FlowElement.RuleFlow(
+                                navn = resolvedClass.name ?: "Unknown",
+                                beskrivelse = child.extractKDocOrEmpty(),
+                                fil = File(resolvedClass.containingKtFile.name)
+                            )
 
-                        resolvedClass?.isSubClassOf(DSLTypeAbstract.RULE_SET) == true -> FlowElement.RuleSet(
-                            resolvedClass.name ?: "Unknown",
-                            child.extractKDocOrEmpty(),
-                            File(resolvedClass.containingKtFile.name)
-                        )
+                        resolvedClass?.isSubClassOf(DSLTypeAbstract.RULE_SET) == true ->
+                            FlowElement.RuleSet(
+                                navn = resolvedClass.name ?: "Unknown",
+                                beskrivelse = child.extractKDocOrEmpty(),
+                                fil = File(resolvedClass.containingKtFile.name)
+                            )
 
                         else -> null
                     }
@@ -405,7 +436,7 @@ private fun KtBlockExpression.extractGrener(bctx: BindingContext): Result<List<F
             FlowElement.Gren(
                 gren.extractKDocOrEmpty(),
                 gren.getLambdaBlock().flatMap { it.extractBetingelse() }.getOrThrow(),
-                gren.getLambdaBlock().flatMap { it.extractFlow(bctx) }.getOrThrow()
+                gren.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bctx) }.getOrThrow()
             )
         }
     }
