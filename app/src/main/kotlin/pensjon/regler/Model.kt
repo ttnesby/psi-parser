@@ -10,101 +10,38 @@ import org.jetbrains.kotlin.psi.psiUtil.containingClass
 import java.io.File
 import java.net.URI
 
-// data class for rule service documentation, see AbstractPensjonRuleService
+sealed interface RuleInfo {
+    val navn: String
+    val beskrivelse: String
+    val inndata: List<PropertyInfo>
+    val flyt: FlowElement.Flow
+    val gitHubUri: URI
+}
+
 data class RuleServiceInfo(
-    val navn: String,
-    val beskrivelse: String,
-    val inndata: List<PropertyInfo>,
+    override val navn: String,
+    override val beskrivelse: String,
+    override val inndata: List<PropertyInfo>,
     val utdata: List<PropertyInfo>,
-    val flyt: FlowElement.Flow,
-    val gitHubUri: URI,
-) {
-    companion object {
-        fun new(
-            navn: String,
-            beskrivelse: String,
-            inndata: List<PropertyInfo>,
-            utdata: List<PropertyInfo>,
-            flyt: FlowElement.Flow,
-            gitHubUri: URI
-        ): RuleServiceInfo = RuleServiceInfo(navn, beskrivelse, inndata, utdata, flyt, gitHubUri)
-    }
+    override val flyt: FlowElement.Flow,
+    override val gitHubUri: URI,
+) : RuleInfo
 
-    override fun toString(): String {
-        return """
-            |RuleServiceDoc(
-            |   navn = $navn
-            |   beskrivelse = $beskrivelse
-            |   inndata = $inndata
-            |   utdata = $utdata
-            |   flyt = $flyt
-            |   gitHubUri = $gitHubUri
-            |)
-        """.trimMargin()
-    }
-}
-
-// data class for rule flow documentation, see AbstractPensjonRuleFlow
 data class RuleFlowInfo(
-    val navn: String,
-    val beskrivelse: String,
-    val inndata: List<PropertyInfo>,
-    val flyt: FlowElement.Flow,
-    val gitHubUri: URI,
-) {
-    companion object {
-        fun new(
-            navn: String,
-            beskrivelse: String,
-            inndata: List<PropertyInfo>,
-            flyt: FlowElement.Flow,
-            gitHubUri: URI
-        ): RuleFlowInfo = RuleFlowInfo(navn, beskrivelse, inndata, flyt, gitHubUri)
-    }
+    override val navn: String,
+    override val beskrivelse: String,
+    override val inndata: List<PropertyInfo>,
+    override val flyt: FlowElement.Flow,
+    override val gitHubUri: URI,
+) : RuleInfo
 
-    override fun toString(): String {
-        return """
-            |RuleFlowDoc(
-            |   navn = $navn
-            |   beskrivelse = $beskrivelse
-            |   inndata = $inndata
-            |   flyt = $flyt
-            |   gitHubUri = $gitHubUri
-            |)
-        """.trimMargin()
-    }
-}
-
-// data class for rule set documentation, see AbstractPensjonRuleSet
 data class RuleSetInfo(
-    val navn: String,
-    val beskrivelse: String,
-    val inndata: List<PropertyInfo>,
-    val flyt: FlowElement.Flow,
-    val gitHubUri: URI,
-) {
-    companion object {
-        fun new(
-            navn: String,
-            beskrivelse: String,
-            inndata: List<PropertyInfo>,
-            flyt: FlowElement.Flow,
-            gitHubUri: URI
-        ): RuleSetInfo = RuleSetInfo(navn, beskrivelse, inndata, flyt, gitHubUri)
-    }
-
-    override fun toString(): String {
-        return """
-            |RuleSetDoc(
-            |   navn = $navn
-            |   beskrivelse = $beskrivelse
-            |   inndata = $inndata
-            |   flyt = $flyt
-            |   gitHubUri = $gitHubUri
-            |)
-        """.trimMargin()
-    }
-}
+    override val navn: String,
+    override val beskrivelse: String,
+    override val inndata: List<PropertyInfo>,
+    override val flyt: FlowElement.Flow,
+    override val gitHubUri: URI,
+) : RuleInfo
 
 data class PropertyInfo(
     val navn: String,

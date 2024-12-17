@@ -3,8 +3,7 @@ import org.example.flatMap
 import org.example.generateAsciiDoc
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
-import pensjon.regler.Extractor
-import pensjon.regler.Repo
+import pensjon.regler.*
 import kotlin.io.path.Path
 import kotlin.io.path.isDirectory
 import kotlin.system.measureTimeMillis
@@ -38,10 +37,11 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> = runCa
     ).flatMap {
         it.toModel()
     }.map { result ->
-        println("Found ${result.services.size} rule services")
-        println("Found ${result.flows.size} rule flows")
-        println("Found ${result.sets.size} rule sets\n")
-        generateAsciiDoc(result.services, pathAsciiDocOutput)
+        val services = result.filterIsInstance<RuleServiceInfo>()
+        println("Found ${services.size} rule services")
+        println("Found ${result.filterIsInstance<RuleFlowInfo>().size} rule flows")
+        println("Found ${result.filterIsInstance<RuleSetInfo>().size} rule sets\n")
+        generateAsciiDoc(services, pathAsciiDocOutput)
     }
 }
 

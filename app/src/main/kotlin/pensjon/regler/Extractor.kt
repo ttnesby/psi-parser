@@ -10,7 +10,6 @@ import org.example.DSLTypeFlow.SERVICE
 import org.example.DSLTypeService.REQUEST
 import org.example.DSLTypeService.RESPONSE
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
-import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
@@ -34,48 +33,42 @@ class Extractor private constructor(
             val psiFiles = repo.files().map { fileInfo ->
                 context.createKtFile(fileInfo.file.absolutePathString(), fileInfo.content)
             }
+            println("Building binding context for ${psiFiles.size} files\n")
             val bindingContext = context.buildBindingContext(psiFiles).getOrThrow()
 
             Extractor(repo, psiFiles, bindingContext)
         }
     }
 
-    fun toModel(): Result<ModelResult> = runCatching {
-        psiFiles
-            .chunked(100)
-            .fold(ModelResult.empty()) { acc, batch ->
-                val batchResults = batch.mapNotNull { file ->
+    fun toModel(): Result<List<RuleInfo>> {
+        val resultList = mutableListOf<RuleInfo>()
 
-                    when (val result = file.findDSLTypeAbstract().getOrThrow()) {
+        psiFiles
+            .asSequence()
+            .map { file ->
+                file.findDSLTypeAbstract().flatMap { result ->
+                    when (result) {
                         is Found -> {
                             when (result.dslType) {
-                                RULE_SERVICE -> {
-                                    result.ktClass.extractRuleService().getOrThrow().let { ModelResult.newService(it) }
-                                }
-
-                                RULE_FLOW -> {
-                                    result.ktClass.extractRuleFlow().getOrThrow().let { ModelResult.newFlow(it) }
-                                }
-
-                                RULE_SET -> {
-                                    result.ktClass.extractRuleSet().getOrThrow().let { ModelResult.newSet(it) }
-                                }
+                                RULE_SERVICE -> result.ktClass.extractRuleService()
+                                RULE_FLOW -> result.ktClass.extractRuleFlow()
+                                RULE_SET -> result.ktClass.extractRuleSet()
                             }
                         }
 
-                        NOTFound -> null
+                        NOTFound -> Result.failure(IllegalStateException("No DSL type found in file"))
                     }.also {
-                        // rydd opp i cache
                         (file as PsiFileImpl).clearCaches()
                     }
                 }
-                acc.addBatch(
-                    services = batchResults.flatMap { it.services },
-                    flows = batchResults.flatMap { it.flows },
-                    sets = batchResults.flatMap { it.sets }
-                )
             }
+            .forEach { item ->
+                item.onSuccess { rule -> resultList.add(rule) }
+            }
+
+        return Result.success(resultList)
     }
+
 
     private fun KtClass.extractRuleService(): Result<RuleServiceInfo> = runCatching {
         RuleServiceInfo(
@@ -185,7 +178,7 @@ class Extractor private constructor(
     }
 
     private fun KtClass.extractRuleFlow(): Result<RuleFlowInfo> = runCatching {
-        RuleFlowInfo.new(
+        RuleFlowInfo(
             navn = name!!,
             beskrivelse = getKDocOrEmpty(),
             inndata = extractFlowRequestFields().getOrThrow(),
@@ -243,7 +236,7 @@ class Extractor private constructor(
     }
 
     private fun KtClass.extractRuleSet(): Result<RuleSetInfo> = runCatching {
-        RuleSetInfo.new(
+        RuleSetInfo(
             navn = name!!,
             beskrivelse = getKDocOrEmpty(),
             inndata = emptyList(),

@@ -67,9 +67,9 @@ class ExtractorTest {
         extractor.map {
             it.toModel()
                 .map { result ->
-                    assertEquals(0, result.services.size)
-                    assertEquals(0, result.flows.size)
-                    assertEquals(0, result.sets.size)
+                    assertEquals(0, result.filterIsInstance<RuleServiceInfo>().size)
+                    assertEquals(0, result.filterIsInstance<RuleFlowInfo>().size)
+                    assertEquals(0, result.filterIsInstance<RuleSetInfo>().size)
                 }.onFailure { assert(false)  }
         }.onFailure { assert(false) }
     }
@@ -102,13 +102,17 @@ class ExtractorTest {
         extractor.map {
             it.toModel()
                 .map { result ->
-                    assertEquals(1, result.services.size)
-                    assertEquals(10, result.flows.size)
-                    assertEquals(31, result.sets.size)
+                    val services = result.filterIsInstance<RuleServiceInfo>()
+                    val flows = result.filterIsInstance<RuleFlowInfo>()
+                    val sets = result.filterIsInstance<RuleSetInfo>()
+
+                    assertEquals(1, services.size)
+                    assertEquals(10, flows.size)
+                    assertEquals(31, sets.size)
 
                     // asserts for regel tjeneste
 
-                    val ruleService = result.services.first()
+                    val ruleService = services.first()
                     assertEquals("FastsettTrygdetidService", ruleService.navn)
                     assertEquals("", ruleService.beskrivelse)
 
@@ -138,7 +142,7 @@ class ExtractorTest {
 
                     // asserts for regel flyter
 
-                    val ruleFlow = result.flows.first()
+                    val ruleFlow = flows.first()
                     assertEquals("StartTrygdetidFlyt", ruleFlow.navn)
                     assertEquals("", ruleFlow.beskrivelse)
                     assertEquals(4, ruleFlow.inndata.size)
