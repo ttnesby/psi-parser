@@ -2,7 +2,6 @@ package pensjon.regler
 
 import embeddable.compiler.*
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
-import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.BindingContext
@@ -115,18 +114,7 @@ class Extractor private constructor(
 
     private fun KtClass.extractFlow(flowType: DSLTypeFlow): Result<FlowElement.Flow> = runCatching {
 
-        val errCtx = "$name [${containingKtFile.name}]"
-
-        val properties = body
-            ?.properties
-            ?: throw NoSuchElementException("No properties found, $errCtx")
-
-        val prop = properties
-            .filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }
-            .find { it.name == flowType.typeName }
-            ?: throw NoSuchElementException("No override ${flowType.typeName} found, $errCtx")
-
-        prop.getLambdaBlock().flatMap {
+        findMatchingPropertyOrThrow(flowType).getLambdaBlock().flatMap {
             when (flowType) {
                 SERVICE -> it.extractRuleServiceFlow(bindingContext)
                 FLOW -> it.extractRuleFlowFlow(bindingContext)
@@ -143,5 +131,4 @@ class Extractor private constructor(
             gitHubUri = repo.toGithubURI(containingKtFile.name).getOrThrow()
         )
     }
-
 }

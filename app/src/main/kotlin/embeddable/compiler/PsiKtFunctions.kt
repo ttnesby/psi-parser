@@ -14,13 +14,17 @@ import rule.dsl.DSLTypeAbstract
 import rule.dsl.DSLTypeService
 import rule.dsl.DSLTypeService.REQUEST
 import java.io.File
+import org.jetbrains.kotlin.lexer.KtTokens
+import rule.dsl.DSLTypeFlow
 
 enum class ParsingExceptionType(val message: String) {
     ERROR_NO_PRIMARY_CONSTRUCTOR("No primary constructor found for %s [%s]"),
     ERROR_NO_SERVICE_REQUEST_PARAMETER("No service request parameter found in primary constructor for %s [%s]"),
     ERROR_NO_SERVICE_RESPONSE_TYPE("No service response type found for %s [%s]"),
     ERROR_NOT_SUBCLASS_OF_SERVICE("%s is not subclass of %s [%s]"),
-    ERROR_NO_FLOW_PARAMETER("No flow parameter of type class found in primary constructor for %s [%s]");
+    ERROR_NO_FLOW_PARAMETER("No flow parameter of type class found in primary constructor for %s [%s]"),
+    ERROR_NO_PROPERTIES_FOUND("No properties found for %s [%s]"),
+    ERROR_NO_OVERRIDE_FUNCTION("No override function %s found for %s [%s]");
 }
 
 private fun bail(message: String): NoSuchElementException = NoSuchElementException(message)
@@ -91,6 +95,19 @@ fun KtClass.isSubClassOfOrThrow(type: DSLTypeService): KtClass =
 
 fun KtClass.primaryConstructorOrThrow(): KtPrimaryConstructor =
     primaryConstructor ?: throw bail(ParsingExceptionType.ERROR_NO_PRIMARY_CONSTRUCTOR)
+
+fun KtClass.findMatchingPropertyOrThrow(flowType: DSLTypeFlow): KtProperty =
+    body?.properties
+        ?.let { properties ->
+            properties
+                .filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }
+                .find { it.name == flowType.typeName }
+                ?: throw bail(
+                    ParsingExceptionType.ERROR_NO_OVERRIDE_FUNCTION.message.format(
+                        flowType.typeName, name, containingKtFile.name
+                    ))
+        }
+        ?: throw bail(ParsingExceptionType.ERROR_NO_PROPERTIES_FOUND)
 
 private fun KtClass.bail(exceptionType: ParsingExceptionType): NoSuchElementException =
     bail(exceptionType.message.format(name,containingKtFile.name))
