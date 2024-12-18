@@ -57,6 +57,13 @@ private fun KtClass.isSubClassOf(type: DSLTypeAbstract): Boolean =
 fun KtClass.isSubClassOf(type: DSLTypeService): Boolean =
     superTypeListEntries.any { it.typeReference?.text?.contains(type.typeName) == true }
 
+fun KtClass.primaryConstructorOrThrow(): KtPrimaryConstructor =
+    primaryConstructor ?: throw missingConstructorException(this)
+
+private fun missingConstructorException(ktClass: KtClass): NoSuchElementException =
+    NoSuchElementException(
+        "No primary constructor found for ${ktClass.name} [${ktClass.containingKtFile.name}]"
+    )
 
 ///////////////////////////////////////////////////
 /** KtPrimaryConstructor extension functions */
@@ -65,26 +72,16 @@ fun KtClass.isSubClassOf(type: DSLTypeService): Boolean =
 fun KtPrimaryConstructor.findDSLTypeServiceRequest(
     bindingContext: BindingContext
 ): Result<Pair<KtParameter, KtClass>> = runCatching {
+
+    val findServiceRequestParameter: (KtParameter) -> Pair<KtParameter, KtClass>? = { parameter ->
+        val ktClass = parameter.typeReference?.resolveToKtClass(bindingContext)?.getOrNull()
+        if (ktClass?.isSubClassOf(REQUEST) == true) Pair(parameter, ktClass) else null
+    }
+
     valueParameters
-        .firstNotNullOfOrNull { parameter ->
-            parameter
-                .typeReference
-                ?.resolveToKtClass(bindingContext)
-                ?.getOrNull()
-                ?.let { resolvedClass ->
-                    if (resolvedClass.isSubClassOf(REQUEST)) {
-                        Pair(parameter, resolvedClass)
-                    } else {
-                        null
-                    }
-                }
-        }
+        .firstNotNullOfOrNull(findServiceRequestParameter)
         ?: throw NoSuchElementException(
-            String.format(
-                "No service request parameter found in primary constructor for %s [%s]",
-                containingClass()?.name,
-                containingKtFile.name
-            )
+            "No service request parameter found in primary constructor for ${containingClass()?.name} [${containingKtFile.name}]"
         )
 }
 
@@ -101,6 +98,8 @@ fun KtPrimaryConstructor.toPropertyInfo(): List<PropertyInfo> =
 ///////////////////////////////////////////////////
 /** KtParameter extension functions */
 ///////////////////////////////////////////////////
+
+
 
 fun KtParameter.getKDocOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
 

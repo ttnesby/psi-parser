@@ -63,28 +63,13 @@ class Extractor private constructor(
 
     private fun KtClass.extractServiceRequestFields(): Result<List<PropertyInfo>> = runCatching {
 
-        val primaryConstructor = primaryConstructor
-            ?: throw NoSuchElementException(
-                "No primary constructor found for $name [${containingKtFile.name}]"
-            )
-
-        val (parameter, serviceRequestClass) = primaryConstructor
-            .findDSLTypeServiceRequest(bindingContext).getOrThrow()
-
-        val reqFields = serviceRequestClass
-            .primaryConstructor
-            ?.toPropertyInfo()
-            ?: throw NoSuchElementException(
-            String.format(
-                "No primary constructor found for %s [%s]",
-                serviceRequestClass.name,
-                serviceRequestClass.containingKtFile.name
-            )
-        )
+        val (parameter, serviceRequestClass) = primaryConstructorOrThrow()
+            .findDSLTypeServiceRequest(bindingContext)
+            .getOrThrow()
 
         buildList {
             add(parameter.toPropertyInfo())
-            addAll(reqFields)
+            addAll(serviceRequestClass.primaryConstructorOrThrow().toPropertyInfo())
         }
     }
 
