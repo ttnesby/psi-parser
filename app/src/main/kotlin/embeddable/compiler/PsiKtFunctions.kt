@@ -19,7 +19,8 @@ enum class ParsingExceptionType(val message: String) {
     ERROR_NO_PRIMARY_CONSTRUCTOR("No primary constructor found for %s [%s]"),
     ERROR_NO_SERVICE_REQUEST_PARAMETER("No service request parameter found in primary constructor for %s [%s]"),
     ERROR_NO_SERVICE_RESPONSE_TYPE("No service response type found for %s [%s]"),
-    ERROR_NOT_SUBCLASS_OF_SERVICE("%s is not subclass of %s [%s]");
+    ERROR_NOT_SUBCLASS_OF_SERVICE("%s is not subclass of %s [%s]"),
+    ERROR_NO_FLOW_PARAMETER("No flow parameter of type class found in primary constructor for %s [%s]");
 }
 
 private fun bail(message: String): NoSuchElementException = NoSuchElementException(message)
@@ -111,6 +112,16 @@ fun KtPrimaryConstructor.findDSLTypeServiceRequest(
         .firstNotNullOfOrNull(findServiceRequestParameter)
         ?: throw bail(ParsingExceptionType.ERROR_NO_SERVICE_REQUEST_PARAMETER)
 }
+
+fun KtPrimaryConstructor.findFirstParameterOfTypeClassOrThrow(bindingContext: BindingContext): Pair<KtParameter, KtClass> =
+    valueParameters
+        .firstNotNullOfOrNull { parameter ->
+            parameter
+                .typeReference
+                ?.resolveToKtClass(bindingContext)?.getOrNull()
+                ?.let { resolved -> Pair(parameter, resolved) }
+        }
+        ?: throw bail(ParsingExceptionType.ERROR_NO_FLOW_PARAMETER)
 
 fun KtPrimaryConstructor.toPropertyInfo(): List<PropertyInfo> =
     valueParameters.map { parameter ->

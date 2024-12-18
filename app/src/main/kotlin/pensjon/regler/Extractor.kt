@@ -104,28 +104,12 @@ class Extractor private constructor(
 
     private fun KtClass.extractFlowRequestFields(): Result<List<PropertyInfo>> = runCatching {
 
-        val errCtx = "$name [${containingKtFile.name}]"
-
-        val primaryConstructor = primaryConstructor
-            ?: throw NoSuchElementException(
-                "No primary constructor found for $errCtx"
-            )
-
-        val (parameter, parameterClass) = primaryConstructor
-            .valueParameters
-            .firstNotNullOfOrNull { parameter ->
-                parameter
-                    .typeReference
-                    ?.resolveToKtClass(bindingContext)
-                    ?.getOrNull()
-                    ?.let { resolvedClass -> Pair(parameter, resolvedClass) }
-            } ?: throw NoSuchElementException(
-            "No flow parameter of type class found in primary constructor for $errCtx"
-        )
+        val (parameter, parameterType) = primaryConstructorOrThrow()
+            .findFirstParameterOfTypeClassOrThrow(bindingContext)
 
         buildList {
             add(parameter.toPropertyInfo())
-            addAll(parameterClass.getProperties().toPropertyInfo())
+            addAll(parameterType.getProperties().toPropertyInfo())
         }
     }
 
