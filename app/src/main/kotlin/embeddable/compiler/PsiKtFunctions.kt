@@ -16,6 +16,7 @@ import rule.dsl.DSLTypeService.REQUEST
 import java.io.File
 import org.jetbrains.kotlin.lexer.KtTokens
 import pensjon.regler.Condition
+import rule.dsl.DSLTypeAbstract.*
 import rule.dsl.DSLTypeFlow
 
 enum class ParsingExceptionType(val message: String) {
@@ -57,7 +58,7 @@ private fun findMatchingDSLTypeAbstract(ktClass: KtClass): DSLTypeAbstract? {
 /** KDoc extension functions */
 ///////////////////////////////////////////////////
 
-fun KDoc.formatOrEmpty(): String =
+private fun KDoc.formatOrEmpty(): String =
     text?.lines()?.map { it.trim().removePrefix("*").trim() }?.filter { it.isNotEmpty() && it != "/" }
         ?.joinToString("\n")?.removePrefix("/**")?.removeSuffix("*/")?.trim() ?: ""
 
@@ -73,7 +74,7 @@ private fun KtClass.isSubClassOf(type: DSLTypeAbstract): Boolean =
 
 fun KtClass.findGenericParameterForRuleServiceOrThrow(): KtTypeReference {
     return superTypeListEntries
-        .find { it.typeReference?.text?.contains(DSLTypeAbstract.RULE_SERVICE.typeName) == true }
+        .find { it.typeReference?.text?.contains(RULE_SERVICE.typeName) == true }
         ?.typeReference
         ?.typeElement
         ?.typeArgumentsAsTypes
@@ -307,27 +308,33 @@ fun <T, R> Result<T>.flatMap(transform: (T) -> Result<R>): Result<R> {
 
 fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Result<FlowElement.Flow> = runCatching {
     FlowElement.Flow(
-        children.mapNotNull { element ->
-            when (element) {
+        children.mapNotNull { child ->
+            when (child) {
                 is KtCallExpression -> {
-                    element.resolveFunctionDeclaration(bindingContext)
+                    child.resolveFunctionDeclaration(bindingContext)
                         .map { (name, file) ->
                             FlowElement.Function(
                                 navn = name,
-                                beskrivelse = element.extractKDocOrEmpty(),
+                                beskrivelse = child.extractKDocOrEmpty(),
                                 fil = file
                             )
                         }.getOrNull()
                 }
 
                 is KtDotQualifiedExpression -> {
-                    element.resolveReceiverClass(DSLTypeAbstract.RULE_FLOW, bindingContext).map { resolvedClass ->
-                        FlowElement.RuleFlow(
-                            navn = resolvedClass.name ?: "Unknown",
-                            beskrivelse = element.extractKDocOrEmpty(),
-                            fil = File(resolvedClass.containingKtFile.name)
-                        )
-                    }.getOrNull()
+                    child
+                        .resolveReceiverClass(bindingContext)
+                        ?.let { (resolvedClass, dslTypeAbstract) ->
+                            when(dslTypeAbstract) {
+                                RULE_FLOW ->
+                                    FlowElement.RuleFlow(
+                                        navn = resolvedClass.name ?: "Unknown",
+                                        beskrivelse = child.extractKDocOrEmpty(),
+                                        fil = File(resolvedClass.containingKtFile.name)
+                                    )
+                                else -> null
+                            }
+                        }
                 }
 
                 else -> null
@@ -370,24 +377,25 @@ fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Resul
                 }
 
                 is KtDotQualifiedExpression -> {
-                    val resolvedClass = child.resolveReceiverClass2(bindingContext)
-                    when {
-                        resolvedClass?.isSubClassOf(DSLTypeAbstract.RULE_FLOW) == true ->
-                            FlowElement.RuleFlow(
-                                navn = resolvedClass.name ?: "Unknown",
-                                beskrivelse = child.extractKDocOrEmpty(),
-                                fil = File(resolvedClass.containingKtFile.name)
-                            )
-
-                        resolvedClass?.isSubClassOf(DSLTypeAbstract.RULE_SET) == true ->
-                            FlowElement.RuleSet(
-                                navn = resolvedClass.name ?: "Unknown",
-                                beskrivelse = child.extractKDocOrEmpty(),
-                                fil = File(resolvedClass.containingKtFile.name)
-                            )
-
-                        else -> null
-                    }
+                    child
+                        .resolveReceiverClass(bindingContext)
+                        ?.let { (resolvedClass, dslTypeAbstract) ->
+                            when(dslTypeAbstract) {
+                                RULE_FLOW ->
+                                    FlowElement.RuleFlow(
+                                        navn = resolvedClass.name ?: "Unknown",
+                                        beskrivelse = child.extractKDocOrEmpty(),
+                                        fil = File(resolvedClass.containingKtFile.name)
+                                    )
+                                RULE_SET ->
+                                    FlowElement.RuleSet(
+                                        navn = resolvedClass.name ?: "Unknown",
+                                        beskrivelse = child.extractKDocOrEmpty(),
+                                        fil = File(resolvedClass.containingKtFile.name)
+                                    )
+                                else -> null
+                            }
+                        }
                 }
 
                 else -> null
@@ -435,19 +443,13 @@ private fun KtBlockExpression.extractBetingelse(): Result<Condition> = runCatchi
 /** KtDotQualifiedExpression extension functions */
 ///////////////////////////////////////////////////
 
-// eventually resolve a KtDotQualifiedExpression to receiver KtClass
-//
 private fun KtDotQualifiedExpression.resolveReceiverClass(
-    superType: DSLTypeAbstract,
-    bindingContext: BindingContext,
-): Result<KtClass> = runCatching {
-    (receiverExpression as? KtReferenceExpression)?.resolveToKtClass(bindingContext)?.map { resolvedClass ->
-        if (resolvedClass.isSubClassOf(superType)) resolvedClass
-        else throw NoSuchElementException("Class is not of type ${superType.typeName}")
-    }?.getOrThrow() ?: throw NoSuchElementException("Could not resolve receiver expression")
-}
-
-private fun KtDotQualifiedExpression.resolveReceiverClass2(
-    bindingContext: BindingContext,
-): KtClass? = (receiverExpression as? KtReferenceExpression)?.resolveToKtClass(bindingContext)?.getOrNull()
-
+    bindingContext: BindingContext
+): Pair<KtClass, DSLTypeAbstract>? =
+    (receiverExpression as? KtReferenceExpression)
+        ?.resolveToKtClass(bindingContext)?.getOrNull()
+        ?.let { ktClass ->
+            findMatchingDSLTypeAbstract(ktClass)?.let { matchingDslType ->
+                Pair(ktClass, matchingDslType)
+            }
+        }
