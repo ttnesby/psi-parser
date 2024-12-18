@@ -285,12 +285,12 @@ fun <T, R> Result<T>.flatMap(transform: (T) -> Result<R>): Result<R> {
 /** KtBlockExpression extension functions */
 ///////////////////////////////////////////////////
 
-fun KtBlockExpression.extractRuleServiceFlow(bctx: BindingContext): Result<FlowElement.Flow> = runCatching {
+fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Result<FlowElement.Flow> = runCatching {
     FlowElement.Flow(
         children.mapNotNull { element ->
             when (element) {
                 is KtCallExpression -> {
-                    element.resolveFunctionDeclaration(bctx)
+                    element.resolveFunctionDeclaration(bindingContext)
                         .map { (name, file) ->
                             FlowElement.Function(
                                 navn = name,
@@ -301,7 +301,7 @@ fun KtBlockExpression.extractRuleServiceFlow(bctx: BindingContext): Result<FlowE
                 }
 
                 is KtDotQualifiedExpression -> {
-                    element.resolveReceiverClass(DSLTypeAbstract.RULE_FLOW, bctx).map { resolvedClass ->
+                    element.resolveReceiverClass(DSLTypeAbstract.RULE_FLOW, bindingContext).map { resolvedClass ->
                         FlowElement.RuleFlow(
                             navn = resolvedClass.name ?: "Unknown",
                             beskrivelse = element.extractKDocOrEmpty(),
@@ -321,7 +321,7 @@ fun KtBlockExpression.extractRuleServiceFlow(bctx: BindingContext): Result<FlowE
 
 //TODO - må også legge på navn til betingelse i gren: Ex betingelse("ja") { ... }, sistnevnte er allrede trukket ut
 // det er ("ja") som mangler
-fun KtBlockExpression.extractRuleFlowFlow(bctx: BindingContext): Result<FlowElement.Flow> = runCatching {
+fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Result<FlowElement.Flow> = runCatching {
     FlowElement.Flow(
         children.mapNotNull { child ->
             when (child) {
@@ -331,7 +331,7 @@ fun KtBlockExpression.extractRuleFlowFlow(bctx: BindingContext): Result<FlowElem
                             FlowElement.Forgrening(
                                 beskrivelse = child.extractKDocOrEmpty(),
                                 navn = child.valueArguments.first().text.removeSurrounding("\""),
-                                gren = child.getLambdaBlock().flatMap { it.extractGrener(bctx) }.getOrThrow()
+                                gren = child.getLambdaBlock().flatMap { it.extractGrener(bindingContext) }.getOrThrow()
                             )
                         }
 
@@ -339,12 +339,12 @@ fun KtBlockExpression.extractRuleFlowFlow(bctx: BindingContext): Result<FlowElem
                             FlowElement.Gren(
                                 beskrivelse = child.extractKDocOrEmpty(),
                                 betingelse = child.getLambdaBlock().flatMap { it.extractBetingelse() }.getOrThrow(),
-                                flyt = child.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bctx) }.getOrThrow()
+                                flyt = child.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }.getOrThrow()
                             )
                         }
 
                         child.isFlyt() -> {
-                            child.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bctx) }.getOrThrow()
+                            child.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }.getOrThrow()
                         }
 
                         else -> null
@@ -352,7 +352,7 @@ fun KtBlockExpression.extractRuleFlowFlow(bctx: BindingContext): Result<FlowElem
                 }
 
                 is KtDotQualifiedExpression -> {
-                    val resolvedClass = child.resolveReceiverClass2(bctx)
+                    val resolvedClass = child.resolveReceiverClass2(bindingContext)
                     when {
                         resolvedClass?.isSubClassOf(DSLTypeAbstract.RULE_FLOW) == true ->
                             FlowElement.RuleFlow(
@@ -381,13 +381,13 @@ fun KtBlockExpression.extractRuleFlowFlow(bctx: BindingContext): Result<FlowElem
 /**
  * Extracts gren elements from a forgrening lambda block
  */
-private fun KtBlockExpression.extractGrener(bctx: BindingContext): Result<List<FlowElement.Gren>> = runCatching {
+private fun KtBlockExpression.extractGrener(bindingContext: BindingContext): Result<List<FlowElement.Gren>> = runCatching {
     this.statements.mapNotNull { statement ->
         (statement as? KtCallExpression)?.let { gren ->
             FlowElement.Gren(
                 gren.extractKDocOrEmpty(),
                 gren.getLambdaBlock().flatMap { it.extractBetingelse() }.getOrThrow(),
-                gren.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bctx) }.getOrThrow()
+                gren.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }.getOrThrow()
             )
         }
     }
