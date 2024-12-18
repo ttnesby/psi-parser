@@ -52,11 +52,6 @@ enum class DSLTypeService(val typeName: String) {
 //        ?: throw NoSuchElementException("No class found with specified superClassRef")
 //}
 
-sealed interface DSLTypeAbstractResult {
-    data class Found(val dslType: DSLTypeAbstract, val ktClass: KtClass) : DSLTypeAbstractResult
-    data object NOTFound : DSLTypeAbstractResult
-}
-
 enum class DSLTypeAbstract(val typeName: String) {
     RULE_SERVICE("AbstractPensjonRuleService"),
     RULE_FLOW("AbstractPensjonRuleflow"),
@@ -65,21 +60,20 @@ enum class DSLTypeAbstract(val typeName: String) {
     override fun toString(): String = typeName
 }
 
-fun KtFile.findDSLTypeAbstract(): Result<DSLTypeAbstractResult> = runCatching {
-    declarations
-        .filterIsInstance<KtClass>()
-        .firstOrNull()
-        ?.let { ktClass ->
-            DSLTypeAbstract
-                .entries
-                .firstOrNull { dslType ->
-                    ktClass.isSubClassOf(dslType)
-                }
-                ?.let { dslType ->
-                    DSLTypeAbstractResult.Found(dslType, ktClass)
-                }
-                ?: DSLTypeAbstractResult.NOTFound
-        } ?: DSLTypeAbstractResult.NOTFound
+fun KtFile.findDSLTypeAbstract(): Result<Pair<KtClass, DSLTypeAbstract>?> = runCatching {
+    val firstKtClass = declarations.filterIsInstance<KtClass>().firstOrNull()
+        ?: return@runCatching null
+
+    val matchingDslType = findMatchingDSLTypeAbstract(firstKtClass)
+        ?: return@runCatching null
+
+    Pair(firstKtClass, matchingDslType)
+}
+
+private fun findMatchingDSLTypeAbstract(ktClass: KtClass): DSLTypeAbstract? {
+    return DSLTypeAbstract.entries.firstOrNull { dslType ->
+        ktClass.isSubClassOf(dslType)
+    }
 }
 
 //fun KtFile.isRuleService(): Boolean {

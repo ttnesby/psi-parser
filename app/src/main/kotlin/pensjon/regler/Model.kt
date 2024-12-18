@@ -50,9 +50,6 @@ data class PropertyInfo(
 ) {
 
     companion object {
-        fun new(navn: String, type: String, beskrivelse: String): PropertyInfo =
-            PropertyInfo(navn, type, beskrivelse)
-
         fun fromParameter(parameter: KtParameter): PropertyInfo =
             PropertyInfo(
                 navn = parameter.name ?: "",
@@ -78,22 +75,7 @@ data class PropertyInfo(
                 )
             }
     }
-
-    override fun toString(): String {
-        return """
-                |PropertyDoc(
-                |   navn = $navn,
-                |   type = $type,
-                |   beskrivelse = $beskrivelse
-                |)
-            """.trimMargin()
-    }
 }
-
-// TODO
-// - Simplify by integratin FlowReference into FlowElement
-// - Implement this
-//
 
 // Sealed class for flow elements
 //

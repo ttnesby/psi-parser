@@ -3,8 +3,6 @@ package pensjon.regler
 import embeddable.compiler.CompilerContext
 import org.example.*
 import org.example.DSLTypeAbstract.*
-import org.example.DSLTypeAbstractResult.Found
-import org.example.DSLTypeAbstractResult.NOTFound
 import org.example.DSLTypeFlow.FLOW
 import org.example.DSLTypeFlow.SERVICE
 import org.example.DSLTypeService.REQUEST
@@ -40,35 +38,22 @@ class Extractor private constructor(
         }
     }
 
-    fun toModel(): Result<List<RuleInfo>> {
-        val resultList = mutableListOf<RuleInfo>()
+    fun toModel(): Result<List<RuleInfo>> = runCatching {
 
-        psiFiles
-            .asSequence()
-            .map { file ->
-                file.findDSLTypeAbstract().flatMap { result ->
-                    when (result) {
-                        is Found -> {
-                            when (result.dslType) {
-                                RULE_SERVICE -> result.ktClass.extractRuleService()
-                                RULE_FLOW -> result.ktClass.extractRuleFlow()
-                                RULE_SET -> result.ktClass.extractRuleSet()
-                            }
-                        }
-
-                        NOTFound -> Result.failure(IllegalStateException("No DSL type found in file"))
-                    }.also {
-                        (file as PsiFileImpl).clearCaches()
-                    }
+        psiFiles.mapNotNull { file ->
+            file.findDSLTypeAbstract()
+                .getOrThrow()
+                ?.let { (ktClass, dslTypeAbstract) ->
+                    extractRuleInfo(ktClass, dslTypeAbstract).getOrThrow()
                 }
-            }
-            .forEach { item ->
-                item.onSuccess { rule -> resultList.add(rule) }
-            }
-
-        return Result.success(resultList)
+        }.also { psiFiles.forEach { (it as PsiFileImpl).clearCaches() } }
     }
 
+    private fun extractRuleInfo(ktClass: KtClass, dslType: DSLTypeAbstract): Result<RuleInfo> = when (dslType) {
+        RULE_SERVICE -> ktClass.extractRuleService()
+        RULE_FLOW -> ktClass.extractRuleFlow()
+        RULE_SET -> ktClass.extractRuleSet()
+    }
 
     private fun KtClass.extractRuleService(): Result<RuleServiceInfo> = runCatching {
         RuleServiceInfo(
