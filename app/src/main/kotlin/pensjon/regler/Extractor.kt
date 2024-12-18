@@ -75,37 +75,10 @@ class Extractor private constructor(
 
     private fun KtClass.extractServiceResponseFields(): Result<List<PropertyInfo>> = runCatching {
 
-        val abstractRuleServiceGenericParameterType = superTypeListEntries
-            .find { it.typeReference?.text?.contains(RULE_SERVICE.typeName) == true }
-            ?.typeReference
-            ?.typeElement
-            ?.typeArgumentsAsTypes
-            ?.firstOrNull()
-            ?: throw NoSuchElementException("No service response type found for $name [${containingKtFile.name}]")
-
-        val serviceResponseClass = abstractRuleServiceGenericParameterType
-            .resolveToKtClass(bindingContext).getOrThrow()
-
-        if (!serviceResponseClass.isSubClassOf(RESPONSE)) {
-            throw NoSuchElementException(
-                String.format(
-                    "%s is not subclass of %s, %s [%s]",
-                    serviceResponseClass.name,
-                    RESPONSE.typeName,
-                    name,
-                    containingKtFile.name
-                )
-            )
-        }
-
-        val primaryConstructor = serviceResponseClass.primaryConstructor
-            ?: throw NoSuchElementException(
-                String.format(
-                    "No primary constructor found for %s [%s]",
-                    serviceResponseClass.name,
-                    serviceResponseClass.containingKtFile.name
-                )
-            )
+        val serviceResponseClass = findGenericParameterForRuleServiceOrThrow()
+            .resolveToKtClass(bindingContext)
+            .getOrThrow()
+            .isSubClassOfOrThrow(RESPONSE)
 
         buildList {
             add(
@@ -115,7 +88,7 @@ class Extractor private constructor(
                     beskrivelse = "Response for $name"
                 )
             )
-            addAll(primaryConstructor.toPropertyInfo())
+            addAll(serviceResponseClass.primaryConstructorOrThrow().toPropertyInfo())
         }
     }
 

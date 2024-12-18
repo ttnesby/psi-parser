@@ -15,6 +15,15 @@ import rule.dsl.DSLTypeService
 import rule.dsl.DSLTypeService.REQUEST
 import java.io.File
 
+enum class ParsingExceptionType(val message: String) {
+    ERROR_NO_PRIMARY_CONSTRUCTOR("No primary constructor found for %s [%s]"),
+    ERROR_NO_SERVICE_REQUEST_PARAMETER("No service request parameter found in primary constructor for %s [%s]"),
+    ERROR_NO_SERVICE_RESPONSE_TYPE("No service response type found for %s [%s]"),
+    ERROR_NOT_SUBCLASS_OF_SERVICE("%s is not subclass of %s [%s]");
+}
+
+private fun bail(message: String): NoSuchElementException = NoSuchElementException(message)
+
 ///////////////////////////////////////////////////
 /** KtFile extension functions */
 ///////////////////////////////////////////////////
@@ -54,16 +63,36 @@ fun KtClass.getKDocOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
 private fun KtClass.isSubClassOf(type: DSLTypeAbstract): Boolean =
     superTypeListEntries.any { it.typeReference?.text?.contains(type.typeName) == true }
 
+fun KtClass.findGenericParameterForRuleServiceOrThrow(): KtTypeReference {
+    return superTypeListEntries
+        .find { it.typeReference?.text?.contains(DSLTypeAbstract.RULE_SERVICE.typeName) == true }
+        ?.typeReference
+        ?.typeElement
+        ?.typeArgumentsAsTypes
+        ?.firstOrNull()
+        ?: throw bail(ParsingExceptionType.ERROR_NO_SERVICE_RESPONSE_TYPE)
+}
+
 fun KtClass.isSubClassOf(type: DSLTypeService): Boolean =
     superTypeListEntries.any { it.typeReference?.text?.contains(type.typeName) == true }
 
-fun KtClass.primaryConstructorOrThrow(): KtPrimaryConstructor =
-    primaryConstructor ?: throw missingConstructorException(this)
+fun KtClass.isSubClassOfOrThrow(type: DSLTypeService): KtClass =
+    superTypeListEntries
+        .find { it.typeReference?.text?.contains(type.typeName) == true }
+        ?.let { this }
+        ?: throw bail(
+            ParsingExceptionType.ERROR_NOT_SUBCLASS_OF_SERVICE.message.format(
+                name,
+                type.typeName,
+                containingKtFile.name
+            )
+        )
 
-private fun missingConstructorException(ktClass: KtClass): NoSuchElementException =
-    NoSuchElementException(
-        "No primary constructor found for ${ktClass.name} [${ktClass.containingKtFile.name}]"
-    )
+fun KtClass.primaryConstructorOrThrow(): KtPrimaryConstructor =
+    primaryConstructor ?: throw bail(ParsingExceptionType.ERROR_NO_PRIMARY_CONSTRUCTOR)
+
+private fun KtClass.bail(exceptionType: ParsingExceptionType): NoSuchElementException =
+    bail(exceptionType.message.format(name,containingKtFile.name))
 
 ///////////////////////////////////////////////////
 /** KtPrimaryConstructor extension functions */
@@ -80,9 +109,7 @@ fun KtPrimaryConstructor.findDSLTypeServiceRequest(
 
     valueParameters
         .firstNotNullOfOrNull(findServiceRequestParameter)
-        ?: throw NoSuchElementException(
-            "No service request parameter found in primary constructor for ${containingClass()?.name} [${containingKtFile.name}]"
-        )
+        ?: throw bail(ParsingExceptionType.ERROR_NO_SERVICE_REQUEST_PARAMETER)
 }
 
 fun KtPrimaryConstructor.toPropertyInfo(): List<PropertyInfo> =
@@ -94,12 +121,12 @@ fun KtPrimaryConstructor.toPropertyInfo(): List<PropertyInfo> =
         )
     }
 
+private fun KtPrimaryConstructor.bail(exceptionType: ParsingExceptionType): NoSuchElementException =
+    bail(exceptionType.message.format(containingClass()?.name, containingKtFile.name))
 
 ///////////////////////////////////////////////////
 /** KtParameter extension functions */
 ///////////////////////////////////////////////////
-
-
 
 fun KtParameter.getKDocOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
 
