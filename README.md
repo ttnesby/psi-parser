@@ -32,6 +32,7 @@ Det er også greit å ta en titt på [intellij Platform API](https://plugins.jet
 
 `embeddable.compiler`
 - `CompilerContext.kt` - opprette et `compiler miljø` for å analysere kotlin filer.
+- `PsiKtFunctions.kt` - hjelpefunksjoner for å hente ut relevante PSI elementer.
 
 `rule.dsl`
 - `DSL.kt` - forenklet DSL fra det DSL som `pensjon-regler` bruker for å definere regler og regelflyt.
