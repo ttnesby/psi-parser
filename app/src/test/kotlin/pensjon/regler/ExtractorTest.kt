@@ -70,7 +70,7 @@ class ExtractorTest {
                     assertEquals(0, result.filterIsInstance<RuleServiceInfo>().size)
                     assertEquals(0, result.filterIsInstance<RuleFlowInfo>().size)
                     assertEquals(0, result.filterIsInstance<RuleSetInfo>().size)
-                }.onFailure { assert(false)  }
+                }.onFailure { assert(false) }
         }.onFailure { assert(false) }
     }
 
@@ -110,7 +110,9 @@ class ExtractorTest {
                     assertEquals(10, flows.size)
                     assertEquals(31, sets.size)
 
+                    //////////////////////////////
                     // asserts for regel tjeneste
+                    //////////////////////////////
 
                     val ruleService = services.first()
                     assertEquals("FastsettTrygdetidService", ruleService.navn)
@@ -123,7 +125,8 @@ class ExtractorTest {
                             beskrivelse = "Liste av beregningsvilkarPerioder, p�krevd ved uf�retrygd.",
                             type = "MutableList<BeregningsvilkarPeriode>"
 
-                        ), ruleService.inndata.last())
+                        ), ruleService.inndata.last()
+                    )
 
                     assertEquals(5, ruleService.utdata.size)
                     assertEquals(
@@ -132,31 +135,53 @@ class ExtractorTest {
                             beskrivelse = "",
                             type = "Pakkseddel"
 
-                        ), ruleService.utdata.last())
+                        ), ruleService.utdata.last()
+                    )
 
                     assertEquals(2, ruleService.flyt.elementer.size)
 
                     assertEquals(
                         URI("https://github.com/navikt/${localRoot.last()}/blob/master/fastsetttrygdetid/function/FastsettTrygdetidService.kt"),
-                        ruleService.gitHubUri)
+                        ruleService.gitHubUri
+                    )
 
+                    //////////////////////////////
                     // asserts for regel flyter
+                    //////////////////////////////
 
                     val ruleFlow = flows.first()
                     assertEquals("StartTrygdetidFlyt", ruleFlow.navn)
                     assertEquals("", ruleFlow.beskrivelse)
                     assertEquals(4, ruleFlow.inndata.size)
 
-                    assertEquals(PropertyInfo(
-                        navn = "variable",
-                        type = "TrygdetidVariable?",
-                        beskrivelse = ""
-                    ), ruleFlow.inndata.last())
+                    assertEquals(
+                        PropertyInfo(
+                            navn = "variable",
+                            type = "TrygdetidVariable?",
+                            beskrivelse = ""
+                        ), ruleFlow.inndata.last()
+                    )
 
                     assertEquals(2, ruleFlow.flyt.elementer.size)
 
+                    //////////////////////////////
+                    // asserts for FastsettTrygdetidFlyt
+                    //////////////////////////////
 
-                }.onFailure { assert(false)  }
+                    val fastsettTrygdetidFlyt = flows.find { it.navn == "FastsettTrygdetidFlyt" }!!
+                    val forgrening = fastsettTrygdetidFlyt
+                        .flyt.elementer
+                        .filterIsInstance<FlowElement.Forgrening>().first()
+
+                    assertEquals("Uføretrygd?", forgrening.navn)
+                    assertEquals("Task: Uføretrygd?", forgrening.beskrivelse)
+                    assertEquals(2, forgrening.gren.size)
+
+                    assertEquals("Ja", forgrening.gren.first().betingelse.navn)
+                    assertEquals("Nei", forgrening.gren.last().betingelse.navn)
+
+
+                }.onFailure { assert(false) }
         }.onFailure { assert(false) }
     }
 

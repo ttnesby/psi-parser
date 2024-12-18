@@ -15,6 +15,7 @@ import rule.dsl.DSLTypeService
 import rule.dsl.DSLTypeService.REQUEST
 import java.io.File
 import org.jetbrains.kotlin.lexer.KtTokens
+import pensjon.regler.Condition
 import rule.dsl.DSLTypeFlow
 
 enum class ParsingExceptionType(val message: String) {
@@ -24,7 +25,9 @@ enum class ParsingExceptionType(val message: String) {
     ERROR_NOT_SUBCLASS_OF_SERVICE("%s is not subclass of %s [%s]"),
     ERROR_NO_FLOW_PARAMETER("No flow parameter of type class found in primary constructor for %s [%s]"),
     ERROR_NO_PROPERTIES_FOUND("No properties found for %s [%s]"),
-    ERROR_NO_OVERRIDE_FUNCTION("No override function %s found for %s [%s]");
+    ERROR_NO_OVERRIDE_FUNCTION("No override function %s found for %s [%s]"),
+    ERROR_FORGRENING_NAME_MISSING("No name found for forgrening for %s [%s]"),
+    ERROR_NO_BETINGELSE_FOUND("No betingelse found for gren for %s [%s]"),;
 }
 
 private fun bail(message: String): NoSuchElementException = NoSuchElementException(message)
@@ -273,6 +276,23 @@ private fun KtCallExpression.getLambdaBlock(): Result<KtBlockExpression> = runCa
     functionLiteral.bodyExpression ?: throw IllegalStateException("Lambda body is not a block expression")
 }
 
+private fun KtCallExpression.firstArgumentOrEmpty(): String = valueArguments
+    .firstOrNull()
+    ?.text
+    ?.removeSurrounding("\"")
+    ?: ""
+
+private fun KtCallExpression.firstArgumentOrThrow(): String = valueArguments
+    .firstOrNull()
+    ?.text
+    ?.removeSurrounding("\"")
+    ?: throw bail(
+        ParsingExceptionType.ERROR_FORGRENING_NAME_MISSING.message.format(
+            containingClass()?.name,
+            containingKtFile.name
+    ))
+
+
 fun <T, R> Result<T>.flatMap(transform: (T) -> Result<R>): Result<R> {
     return fold(
         onSuccess = { value -> transform(value) },
@@ -319,8 +339,6 @@ fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Re
 // TODO - hvordan håndtere flyt/regelsett (KtDotQualifiedExpression) som er høyresiden på en property
 // TODO - NB! når KDoc er relatert til flow/ruleset/function - this.children -> this.statements
 
-//TODO - må også legge på navn til betingelse i gren: Ex betingelse("ja") { ... }, sistnevnte er allrede trukket ut
-// det er ("ja") som mangler
 fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Result<FlowElement.Flow> = runCatching {
     FlowElement.Flow(
         children.mapNotNull { child ->
@@ -330,7 +348,7 @@ fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Resul
                         child.isForgrening() -> {
                             FlowElement.Forgrening(
                                 beskrivelse = child.extractKDocOrEmpty(),
-                                navn = child.valueArguments.first().text.removeSurrounding("\""),
+                                navn = child.firstArgumentOrThrow(),
                                 gren = child.getLambdaBlock().flatMap { it.extractGrener(bindingContext) }.getOrThrow()
                             )
                         }
@@ -385,9 +403,9 @@ private fun KtBlockExpression.extractGrener(bindingContext: BindingContext): Res
     this.statements.mapNotNull { statement ->
         (statement as? KtCallExpression)?.let { gren ->
             FlowElement.Gren(
-                gren.extractKDocOrEmpty(),
-                gren.getLambdaBlock().flatMap { it.extractBetingelse() }.getOrThrow(),
-                gren.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }.getOrThrow()
+                beskrivelse = gren.extractKDocOrEmpty(),
+                betingelse = gren.getLambdaBlock().flatMap { it.extractBetingelse() }.getOrThrow(),
+                flyt = gren.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }.getOrThrow()
             )
         }
     }
@@ -396,10 +414,20 @@ private fun KtBlockExpression.extractGrener(bindingContext: BindingContext): Res
 /**
  * Extracts betingelse from a gren lambda block
  */
-private fun KtBlockExpression.extractBetingelse(): Result<String> = runCatching {
+private fun KtBlockExpression.extractBetingelse(): Result<Condition> = runCatching {
     this.statements.firstNotNullOfOrNull { statement ->
-        (statement as KtCallExpression).getLambdaBlock().map { it.text }.getOrThrow()
-    } ?: throw NoSuchElementException("No betingelse found")
+
+        val callExpression = statement as KtCallExpression
+
+        Condition(
+            navn = callExpression.firstArgumentOrEmpty(),
+            uttrykk = callExpression.getLambdaBlock().map { it.text }.getOrThrow()
+        )
+    } ?: throw bail(
+        ParsingExceptionType.ERROR_NO_BETINGELSE_FOUND.message.format(
+            containingClass()?.name,
+            containingKtFile.name
+        ))
 }
 
 

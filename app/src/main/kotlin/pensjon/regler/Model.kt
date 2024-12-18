@@ -42,6 +42,11 @@ data class PropertyInfo(
     val beskrivelse: String,
 )
 
+data class Condition(
+    val navn: String,
+    val uttrykk: String,
+)
+
 // Sealed class for flow elements
 //
 // The starting point for a rule flow is a rule service. The rule service will invoke a rule flow,
@@ -58,7 +63,7 @@ sealed class FlowElement {
     data class Forgrening(val beskrivelse: String, val navn: String, val gren: List<Gren>) :
         FlowElement()
 
-    data class Gren(val beskrivelse: String, val betingelse: String, val flyt: Flow) :
+    data class Gren(val beskrivelse: String, val betingelse: Condition, val flyt: Flow) :
         FlowElement()
 
     // reference to flow element in other files

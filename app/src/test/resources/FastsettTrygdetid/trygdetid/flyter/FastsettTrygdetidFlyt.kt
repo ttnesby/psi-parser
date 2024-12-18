@@ -1,4 +1,4 @@
-package no.nav.domain.pensjon.regler.repository.komponent.trygdetid.flyter
+package FastsettTrygdetid.trygdetid.flyter
 
 import no.nav.domain.pensjon.regler.repository.AbstractPensjonRuleflow
 import no.nav.domain.pensjon.regler.repository.komponent.stottefunksjoner.koder.TrygdetidGarantitypeEnum
@@ -19,7 +19,10 @@ class FastsettTrygdetidFlyt(
          */
         forgrening("Uføretrygd?") {
             gren {
-                betingelse { (trygdetidParametere.variable?.ytelseType == KravlinjeTypeEnum.UT) }
+                /**
+                 * Ytelse er UT
+                 */
+                betingelse("Ja") { (trygdetidParametere.variable?.ytelseType == KravlinjeTypeEnum.UT) }
                 flyt {
                     /**
                      * Task: Bestem uft for UT
@@ -32,7 +35,10 @@ class FastsettTrygdetidFlyt(
                 }
             }
             gren {
-                betingelse { (trygdetidParametere.variable?.ytelseType != KravlinjeTypeEnum.UT) }
+                /**
+                 * Ytelse er ikke UT
+                 */
+                betingelse("Nei") { (trygdetidParametere.variable?.ytelseType != KravlinjeTypeEnum.UT) }
                 flyt {
                 }
             }
@@ -56,7 +62,10 @@ class FastsettTrygdetidFlyt(
          */
         forgrening("Uførehistorikk?") {
             gren {
-                betingelse {
+                /**
+                 * Hvis avdød med uførehistorikk i etterlattesak (GJP/GJR) så skal §3-7 anvendes.
+                 */
+                betingelse("Ja") {
                     (trygdetidParametere.grunnlag?.bruker?.uforeHistorikk != null
                             && trygdetidParametere.grunnlag?.bruker?.uforeHistorikk?.uforeperiodeListe?.isEmpty() == false)
                 }
@@ -76,7 +85,7 @@ class FastsettTrygdetidFlyt(
                      */
                     forgrening("Uførehistorikk påvirker trygdetid?") {
                         gren {
-                            betingelse {
+                            betingelse("FT $3-7") {
                                 (trygdetidParametere.variable?.garantiType != null
 
                                         && trygdetidParametere.variable?.garantiType == TrygdetidGarantitypeEnum.FT_3_7)
@@ -89,7 +98,7 @@ class FastsettTrygdetidFlyt(
                             }
                         }
                         gren {
-                            betingelse {
+                            betingelse("FT $3-5") {
                                 (trygdetidParametere.variable?.garantiType != null
 
                                         && trygdetidParametere.variable?.garantiType == TrygdetidGarantitypeEnum.FT_3_5)
@@ -102,7 +111,7 @@ class FastsettTrygdetidFlyt(
                             }
                         }
                         gren {
-                            betingelse { (trygdetidParametere.variable?.garantiType == null) }
+                            betingelse("Nei") { (trygdetidParametere.variable?.garantiType == null) }
                             flyt {
                             }
                         }
@@ -110,7 +119,7 @@ class FastsettTrygdetidFlyt(
                 }
             }
             gren {
-                betingelse {
+                betingelse("Nei") {
                     !(trygdetidParametere.grunnlag?.bruker?.uforeHistorikk != null
                             && trygdetidParametere.grunnlag?.bruker?.uforeHistorikk?.uforeperiodeListe?.isEmpty() == false)
                 }
