@@ -16,6 +16,7 @@ import org.jetbrains.kotlin.config.*
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.BindingContext
 import java.io.File
+import org.jetbrains.kotlin.idea.KotlinFileType
 
 class CompilerContext private constructor(
     val configuration: CompilerConfiguration,
@@ -72,8 +73,8 @@ class CompilerContext private constructor(
                 put(
                     CommonConfigurationKeys.LANGUAGE_VERSION_SETTINGS,
                     LanguageVersionSettingsImpl(
-                        languageVersion = LanguageVersion.KOTLIN_2_0,
-                        apiVersion = ApiVersion.KOTLIN_2_0
+                        languageVersion = LanguageVersion.KOTLIN_2_1,
+                        apiVersion = ApiVersion.KOTLIN_2_1
                     )
                 )
                 // add classpath roots for the Kotlin standard library and reflection
@@ -89,6 +90,9 @@ class CompilerContext private constructor(
                         )
                     )
                 )
+
+                put(CommonConfigurationKeys.PARALLEL_BACKEND_THREADS,
+                    maxOf(1, Runtime.getRuntime().availableProcessors() - 2)) // Parallel processing
             }
 
         private fun createEnvironment(
@@ -105,6 +109,10 @@ class CompilerContext private constructor(
             private var errorCount = 0
             private var warningCount = 0
             private var infoCount = 0
+        
+            fun getErrorCount(): Int {
+                return errorCount
+            }
 
             override fun clear() {
                 errorCount = 0
@@ -126,16 +134,11 @@ class CompilerContext private constructor(
                     else -> {} // ignore other severities
                 }
             }
-
-//            fun printSummary() {
-//                println("Compilation summary:")
-//                println("- Errors: $errorCount")
-//                println("- Warnings: $warningCount")
-//                println("- Info messages: $infoCount")
-//                println()
-//            }
         }
     }
+
+    fun createKtFile(fileName: String, content: String): KtFile =
+        psiFactory.createFileFromText(fileName, KotlinFileType.INSTANCE, content) as KtFile
 
     // easy navigation between source files is done via binding context, which is a map of all symbols in the project
     // the binding context is created by the Kotlin compiler analysis phase
