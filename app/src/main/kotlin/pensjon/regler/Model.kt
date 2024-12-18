@@ -1,12 +1,5 @@
 package pensjon.regler
 
-import embeddable.compiler.formatOrEmpty
-import embeddable.compiler.getKDocOrEmpty
-import org.jetbrains.kotlin.kdoc.psi.api.KDoc
-import org.jetbrains.kotlin.psi.KtParameter
-import org.jetbrains.kotlin.psi.KtPrimaryConstructor
-import org.jetbrains.kotlin.psi.KtProperty
-import org.jetbrains.kotlin.psi.psiUtil.containingClass
 import java.io.File
 import java.net.URI
 
@@ -47,35 +40,7 @@ data class PropertyInfo(
     val navn: String,
     val type: String,
     val beskrivelse: String,
-) {
-
-    companion object {
-        fun fromParameter(parameter: KtParameter): PropertyInfo =
-            PropertyInfo(
-                navn = parameter.name ?: "",
-                type = parameter.typeReference?.text ?: "Unknown",
-                beskrivelse = "Parameter in primary constructor of ${parameter.containingClass()?.name}"
-            )
-
-        fun fromProperties(properties: List<KtProperty>): List<PropertyInfo> =
-            properties.map { prop ->
-                PropertyInfo(
-                    navn = prop.name!!,
-                    type = prop.typeReference?.text ?: "Unknown",
-                    beskrivelse = prop.children.filterIsInstance<KDoc>().firstOrNull()?.formatOrEmpty() ?: ""
-                )
-            }
-
-        fun fromPrimaryConstructor(constructor: KtPrimaryConstructor): List<PropertyInfo> =
-            constructor.valueParameters.map { param ->
-                PropertyInfo(
-                    navn = param.name ?: "",
-                    type = param.typeReference?.text ?: "Unknown",
-                    beskrivelse = param.getKDocOrEmpty()
-                )
-            }
-    }
-}
+)
 
 // Sealed class for flow elements
 //

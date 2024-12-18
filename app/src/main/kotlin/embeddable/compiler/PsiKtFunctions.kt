@@ -4,12 +4,15 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiWhiteSpace
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.psi.*
+import org.jetbrains.kotlin.psi.psiUtil.containingClass
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 import pensjon.regler.FlowElement
+import pensjon.regler.PropertyInfo
 import rule.dsl.DSLType
 import rule.dsl.DSLTypeAbstract
 import rule.dsl.DSLTypeService
+import rule.dsl.DSLTypeService.REQUEST
 import java.io.File
 
 ///////////////////////////////////////////////////
@@ -32,6 +35,16 @@ private fun findMatchingDSLTypeAbstract(ktClass: KtClass): DSLTypeAbstract? {
     }
 }
 
+
+///////////////////////////////////////////////////
+/** KDoc extension functions */
+///////////////////////////////////////////////////
+
+fun KDoc.formatOrEmpty(): String =
+    text?.lines()?.map { it.trim().removePrefix("*").trim() }?.filter { it.isNotEmpty() && it != "/" }
+        ?.joinToString("\n")?.removePrefix("/**")?.removeSuffix("*/")?.trim() ?: ""
+
+
 ///////////////////////////////////////////////////
 /** KtClass extension functions */
 ///////////////////////////////////////////////////
@@ -44,19 +57,59 @@ private fun KtClass.isSubClassOf(type: DSLTypeAbstract): Boolean =
 fun KtClass.isSubClassOf(type: DSLTypeService): Boolean =
     superTypeListEntries.any { it.typeReference?.text?.contains(type.typeName) == true }
 
+
 ///////////////////////////////////////////////////
-/** KDoc extension functions */
+/** KtPrimaryConstructor extension functions */
 ///////////////////////////////////////////////////
 
-fun KDoc.formatOrEmpty(): String =
-    text?.lines()?.map { it.trim().removePrefix("*").trim() }?.filter { it.isNotEmpty() && it != "/" }
-        ?.joinToString("\n")?.removePrefix("/**")?.removeSuffix("*/")?.trim() ?: ""
+fun KtPrimaryConstructor.findDSLTypeServiceRequest(
+    bindingContext: BindingContext
+): Result<Pair<KtParameter, KtClass>> = runCatching {
+    valueParameters
+        .firstNotNullOfOrNull { parameter ->
+            parameter
+                .typeReference
+                ?.resolveToKtClass(bindingContext)
+                ?.getOrNull()
+                ?.let { resolvedClass ->
+                    if (resolvedClass.isSubClassOf(REQUEST)) {
+                        Pair(parameter, resolvedClass)
+                    } else {
+                        null
+                    }
+                }
+        }
+        ?: throw NoSuchElementException(
+            String.format(
+                "No service request parameter found in primary constructor for %s [%s]",
+                containingClass()?.name,
+                containingKtFile.name
+            )
+        )
+}
+
+fun KtPrimaryConstructor.toPropertyInfo(): List<PropertyInfo> =
+    valueParameters.map { parameter ->
+        PropertyInfo(
+            navn = parameter.name ?: "",
+            type = parameter.typeReference?.text ?: "Unknown",
+            beskrivelse = parameter.getKDocOrEmpty()
+        )
+    }
+
 
 ///////////////////////////////////////////////////
 /** KtParameter extension functions */
 ///////////////////////////////////////////////////
 
 fun KtParameter.getKDocOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
+
+fun KtParameter.toPropertyInfo(): PropertyInfo = PropertyInfo(
+    navn = name ?: "",
+    type = typeReference?.text ?: "Unknown",
+    beskrivelse = "Parameter in primary constructor of ${containingClass()?.name}"
+)
+
 
 ///////////////////////////////////////////////////
 /** KtElement extension functions */
@@ -107,7 +160,6 @@ fun KtElement.extractKDocOrEmpty(): String =
         ?: ""
 
 
-
 ///////////////////////////////////////////////////
 /** KtProperty extension functions */
 ///////////////////////////////////////////////////
@@ -117,6 +169,13 @@ fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> = runCatching {
         ?: throw NoSuchElementException("No lambda block found in property")
 }
 
+fun List<KtProperty>.toPropertyInfo(): List<PropertyInfo> = map { property ->
+    PropertyInfo(
+        navn = property.name!!,
+        type = property.typeReference?.text ?: "Unknown",
+        beskrivelse = property.children.filterIsInstance<KDoc>().firstOrNull()?.formatOrEmpty() ?: ""
+    )
+}
 ///////////////////////////////////////////////////
 /** KtCallExpression extension functions */
 ///////////////////////////////////////////////////
@@ -166,6 +225,7 @@ fun <T, R> Result<T>.flatMap(transform: (T) -> Result<R>): Result<R> {
         onFailure = { exception -> Result.failure(exception) }
     )
 }
+
 
 ///////////////////////////////////////////////////
 /** KtBlockExpression extension functions */
@@ -287,6 +347,7 @@ private fun KtBlockExpression.extractBetingelse(): Result<String> = runCatching 
         (statement as KtCallExpression).getLambdaBlock().map { it.text }.getOrThrow()
     } ?: throw NoSuchElementException("No betingelse found")
 }
+
 
 ///////////////////////////////////////////////////
 /** KtDotQualifiedExpression extension functions */

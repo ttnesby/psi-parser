@@ -1,23 +1,17 @@
 package pensjon.regler
 
 import embeddable.compiler.*
-import rule.dsl.DSLTypeAbstract.*
-import rule.dsl.DSLTypeFlow.FLOW
-import rule.dsl.DSLTypeFlow.SERVICE
-import rule.dsl.DSLTypeService.REQUEST
-import rule.dsl.DSLTypeService.RESPONSE
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.psi.KtParameter
-import org.jetbrains.kotlin.psi.KtPrimaryConstructor
-import org.jetbrains.kotlin.psi.psiUtil.containingClass
 import org.jetbrains.kotlin.resolve.BindingContext
-import pensjon.regler.PropertyInfo.Companion.fromParameter
-import pensjon.regler.PropertyInfo.Companion.fromProperties
 import rule.dsl.DSLTypeAbstract
+import rule.dsl.DSLTypeAbstract.*
 import rule.dsl.DSLTypeFlow
+import rule.dsl.DSLTypeFlow.FLOW
+import rule.dsl.DSLTypeFlow.SERVICE
+import rule.dsl.DSLTypeService.RESPONSE
 import kotlin.io.path.absolutePathString
 
 class Extractor private constructor(
@@ -75,11 +69,12 @@ class Extractor private constructor(
             )
 
         val (parameter, serviceRequestClass) = primaryConstructor
-            .findDSLTypeServiceRequest().getOrThrow()
+            .findDSLTypeServiceRequest(bindingContext).getOrThrow()
 
-        val reqFields = serviceRequestClass.primaryConstructor?.let {
-            PropertyInfo.fromPrimaryConstructor(it)
-        } ?: throw NoSuchElementException(
+        val reqFields = serviceRequestClass
+            .primaryConstructor
+            ?.toPropertyInfo()
+            ?: throw NoSuchElementException(
             String.format(
                 "No primary constructor found for %s [%s]",
                 serviceRequestClass.name,
@@ -88,33 +83,9 @@ class Extractor private constructor(
         )
 
         buildList {
-            add(fromParameter(parameter))
+            add(parameter.toPropertyInfo())
             addAll(reqFields)
         }
-    }
-
-    private fun KtPrimaryConstructor.findDSLTypeServiceRequest(): Result<Pair<KtParameter, KtClass>> = runCatching {
-        valueParameters
-            .firstNotNullOfOrNull { parameter ->
-                parameter
-                    .typeReference
-                    ?.resolveToKtClass(bindingContext)
-                    ?.getOrNull()
-                    ?.let { resolvedClass ->
-                        if (resolvedClass.isSubClassOf(REQUEST)) {
-                            Pair(parameter, resolvedClass)
-                        } else {
-                            null
-                        }
-                    }
-            }
-            ?: throw NoSuchElementException(
-                String.format(
-                    "No service request parameter found in primary constructor for %s [%s]",
-                    containingClass()?.name,
-                    containingKtFile.name
-                )
-            )
     }
 
     private fun KtClass.extractServiceResponseFields(): Result<List<PropertyInfo>> = runCatching {
@@ -159,7 +130,7 @@ class Extractor private constructor(
                     beskrivelse = "Response for $name"
                 )
             )
-            addAll(PropertyInfo.fromPrimaryConstructor(primaryConstructor))
+            addAll(primaryConstructor.toPropertyInfo())
         }
     }
 
@@ -195,8 +166,8 @@ class Extractor private constructor(
         )
 
         buildList {
-            add(fromParameter(parameter))
-            addAll(fromProperties(parameterClass.getProperties()))
+            add(parameter.toPropertyInfo())
+            addAll(parameterClass.getProperties().toPropertyInfo())
         }
     }
 
