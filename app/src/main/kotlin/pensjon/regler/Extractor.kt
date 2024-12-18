@@ -1,12 +1,11 @@
 package pensjon.regler
 
-import embeddable.compiler.CompilerContext
-import org.example.*
-import org.example.DSLTypeAbstract.*
-import org.example.DSLTypeFlow.FLOW
-import org.example.DSLTypeFlow.SERVICE
-import org.example.DSLTypeService.REQUEST
-import org.example.DSLTypeService.RESPONSE
+import embeddable.compiler.*
+import rule.dsl.DSLTypeAbstract.*
+import rule.dsl.DSLTypeFlow.FLOW
+import rule.dsl.DSLTypeFlow.SERVICE
+import rule.dsl.DSLTypeService.REQUEST
+import rule.dsl.DSLTypeService.RESPONSE
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.KtClass
@@ -17,6 +16,8 @@ import org.jetbrains.kotlin.psi.psiUtil.containingClass
 import org.jetbrains.kotlin.resolve.BindingContext
 import pensjon.regler.PropertyInfo.Companion.fromParameter
 import pensjon.regler.PropertyInfo.Companion.fromProperties
+import rule.dsl.DSLTypeAbstract
+import rule.dsl.DSLTypeFlow
 import kotlin.io.path.absolutePathString
 
 class Extractor private constructor(

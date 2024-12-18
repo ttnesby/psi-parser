@@ -1,7 +1,7 @@
 package pensjon.regler
 
-import org.example.formatOrEmpty
-import org.example.getKDocOrEmpty
+import embeddable.compiler.formatOrEmpty
+import embeddable.compiler.getKDocOrEmpty
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtPrimaryConstructor

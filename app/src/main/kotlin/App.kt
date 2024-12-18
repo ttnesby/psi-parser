@@ -1,5 +1,5 @@
 import embeddable.compiler.CompilerContext
-import org.example.flatMap
+import embeddable.compiler.flatMap
 import org.example.generateAsciiDoc
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
