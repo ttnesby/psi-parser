@@ -3,10 +3,10 @@ import embeddable.compiler.flatMap
 import org.example.generateAsciiDoc
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
+import org.jetbrains.kotlin.utils.addToStdlib.measureTimeMillisWithResult
 import pensjon.regler.*
 import kotlin.io.path.Path
 import kotlin.io.path.isDirectory
-import kotlin.system.measureTimeMillis
 
 // TODO:
 // - logging
@@ -19,14 +19,14 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> = runCa
 
     val pathRepoRoot = Path(args[0]).also {
         if (!it.isDirectory()) {
-            throw IllegalArgumentException("Path to repository is not a directory")
+            throw IllegalArgumentException("Path to repository, $it, is not a directory")
         }
     }
     println("Repo root is: $pathRepoRoot")
 
     val pathAsciiDocOutput = Path(args[1]).also {
         if (!it.isDirectory()) {
-            throw IllegalArgumentException("Path to output folder is not a directory")
+            throw IllegalArgumentException("Path to output folder, $it, is not a directory")
         }
     }
     println("AsciiDoc output path is: $pathAsciiDocOutput\n")
@@ -42,7 +42,7 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> = runCa
         println("Found ${result.filterIsInstance<RuleFlowInfo>().size} rule flows")
         println("Found ${result.filterIsInstance<RuleSetInfo>().size} rule sets\n")
         generateAsciiDoc(services, pathAsciiDocOutput)
-    }
+    }.getOrThrow() // rethrow exception due to unit return type
 }
 
 
@@ -53,11 +53,9 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> = runCa
 fun main(args: Array<String>) {
 
     val disposable = Disposer.newDisposable()
-    val elapsed: Long
-    val exitCode: Int
 
-    elapsed = measureTimeMillis {
-        exitCode = bootstrap(args, disposable).fold(
+    val (elapsed, exitCode) = measureTimeMillisWithResult {
+        bootstrap(args, disposable).fold(
             onSuccess = { 0 },
             onFailure = { error ->
                 println("Error: ${error.message}\n")
