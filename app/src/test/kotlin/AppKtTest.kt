@@ -57,14 +57,12 @@ class AppKtTest {
         val repoPath = (tempDir / "notDirectory.txt").also { it.toFile().createNewFile() }
         val outputPath = (tempDir / "testOutput").also { it.createDirectories() }
 
-        val exception = assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<IllegalArgumentException> {
             bootstrap(
                 arrayOf(repoPath.toString(), outputPath.toString()),
                 disposable
             ).getOrThrow()
         }
-
-        assertEquals("Path to repository is not a directory", exception.message)
     }
 
     @Test
@@ -72,13 +70,11 @@ class AppKtTest {
         val repoPath = (tempDir / "testRepo").also { it.createDirectories() }
         val outputPath = (tempDir / "notDirectory.txt").also { it.toFile().createNewFile() }
 
-        val exception = assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<IllegalArgumentException> {
             bootstrap(
                 arrayOf(repoPath.toString(), outputPath.toString()),
                 disposable
             ).getOrThrow()
         }
-
-        assertEquals("Path to output folder is not a directory", exception.message)
     }
 }

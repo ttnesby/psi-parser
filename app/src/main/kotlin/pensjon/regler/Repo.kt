@@ -6,7 +6,7 @@ import java.nio.file.Path
 import kotlin.io.path.*
 
 private const val ORG_NAVIKT = "https://github.com/navikt"
-private const val BRANCH = "blob/master"
+private const val BRANCH = "blob/master/"
 
 class Repo(private val localRoot: Path) {
     private val gitHubUri: URI = URI("$ORG_NAVIKT/${localRoot.last()}/$BRANCH")
@@ -68,6 +68,14 @@ class Repo(private val localRoot: Path) {
         }
 
     fun toGithubURI(localFilePath: String): Result<URI> = runCatching {
-        URI("$gitHubUri/${Path(localFilePath).relativeTo(localRoot)}")
+        val localRootUri = localRoot.toUri()
+        val localFilePathUri = Path(localFilePath).normalize().toUri() // !issue! - appends / at the end
+        val sanitizedFilePathUri = URI(localFilePathUri.toString().removeSuffix("/"))
+
+        // URI wise relative path from localRoot to localFilePath
+        val relativePathUri = localRootUri.relativize(sanitizedFilePathUri)
+
+        // generate complete GitHub URI
+        gitHubUri.resolve(relativePathUri)
     }
 }
