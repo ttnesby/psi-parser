@@ -119,7 +119,6 @@ fun KtClass.mustBeSubClassOf(type: DSLTypeService): Result<KtClass> =
                 containingKtFile.name
             )))
 
-
 fun KtClass.requirePrimaryConstructor(): Result<KtPrimaryConstructor> =
     primaryConstructor
         ?.let { Result.success(it) }
@@ -153,16 +152,21 @@ private fun KtPrimaryConstructor.noSuchElement(exceptionType: ParsingError): NoS
 
 fun KtPrimaryConstructor.findDSLTypeServiceRequest(
     bindingContext: BindingContext
-): Result<Pair<KtParameter, KtClass>> = runCatching {
+): Result<Pair<KtParameter, KtClass>> {
 
     val findServiceRequestParameter: (KtParameter) -> Pair<KtParameter, KtClass>? = { parameter ->
-        val ktClass = parameter.typeReference?.resolveToKtClass(bindingContext)?.getOrNull()
-        if (ktClass?.isSubClassOf(REQUEST) == true) Pair(parameter, ktClass) else null
+        parameter.typeReference
+            ?.resolveToKtClass(bindingContext)
+            ?.getOrNull()
+            ?.let{ ktClass ->
+                if (ktClass.isSubClassOf(REQUEST)) Pair(parameter, ktClass) else null
+            }
     }
 
-    valueParameters
+    return valueParameters
         .firstNotNullOfOrNull(findServiceRequestParameter)
-        ?: throw noSuchElement(ParsingError.NO_SERVICE_REQUEST_PARAMETER)
+        ?.let { Result.success(it) }
+        ?: Result.failure(noSuchElement(ParsingError.NO_SERVICE_REQUEST_PARAMETER))
 }
 
 fun KtPrimaryConstructor.findFirstParameterOfTypeClass(
@@ -173,7 +177,7 @@ fun KtPrimaryConstructor.findFirstParameterOfTypeClass(
             parameter
                 .typeReference
                 ?.resolveToKtClass(bindingContext)?.getOrNull()
-                ?.let { resolved -> Pair(parameter, resolved) }
+                ?.let { aClass -> Pair(parameter, aClass) }
         }
         ?.let { Result.success(it) }
         ?: Result.failure(noSuchElement(ParsingError.NO_FLOW_PARAMETER))
@@ -337,6 +341,9 @@ fun <T, R> Result<T>.flatMap(transform: (T) -> Result<R>): Result<R> {
 /** KtBlockExpression extension functions */
 ///////////////////////////////////////////////////
 
+private fun KtBlockExpression.noSuchElement(exceptionType: ParsingError): NoSuchElementException =
+    noSuchElement(exceptionType.message.format(containingClass()?.name, containingKtFile.name))
+
 fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Result<FlowElement.Flow> = runCatching {
     FlowElement.Flow(
         children.mapNotNull { child ->
@@ -354,7 +361,7 @@ fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Re
 
                 is KtDotQualifiedExpression -> {
                     child
-                        .resolveReceiverClass(bindingContext).getOrNull()
+                        .resolveReceiverClass(bindingContext)
                         ?.let { (resolvedClass, dslTypeAbstract) ->
                             when(dslTypeAbstract) {
                                 RULE_FLOW ->
@@ -409,7 +416,7 @@ fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Resul
 
                 is KtDotQualifiedExpression -> {
                     child
-                        .resolveReceiverClass(bindingContext).getOrNull()
+                        .resolveReceiverClass(bindingContext)
                         ?.let { (resolvedClass, dslTypeAbstract) ->
                             when(dslTypeAbstract) {
                                 RULE_FLOW ->
@@ -438,36 +445,64 @@ fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Resul
 /**
  * Extracts gren elements from a forgrening lambda block
  */
-private fun KtBlockExpression.extractGrener(bindingContext: BindingContext): Result<List<FlowElement.Gren>> = runCatching {
+private fun KtBlockExpression.extractGrener(bindingContext: BindingContext): Result<List<FlowElement.Gren>> =
     this.statements.mapNotNull { statement ->
-        (statement as? KtCallExpression)?.let { gren ->
-            FlowElement.Gren(
-                beskrivelse = gren.extractKDocOrEmpty(),
-                betingelse = gren.getLambdaBlock().flatMap { it.extractBetingelse() }.getOrThrow(),
-                flyt = gren.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }.getOrThrow()
-            )
-        }
+        (statement as? KtCallExpression)
+            ?.let { gren ->
+                val block = gren.getLambdaBlock()
+                block
+                    .flatMap { it.extractBetingelse() }
+                    .flatMap { betingelse ->
+                        block
+                            .flatMap { it.extractRuleFlowFlow(bindingContext) }
+                            .map { flyt ->
+                                FlowElement.Gren(
+                                    beskrivelse = gren.extractKDocOrEmpty(),
+                                    betingelse = betingelse,
+                                    flyt = flyt
+                                )
+                            }
+                    }
+            } // here is null in mapNotNull context
+    } // here is List<Result<FlowElement.Gren>> - need to flip
+        .toResult()
+
+
+/**
+ * Combines a list of `Result` objects into a single `Result` containing a list of all successful values
+ * or a failure if any of the results is a failure.
+ *
+ * @return A `Result` wrapping a list of successful values if all results are successful,
+ * or a failure wrapping the first encountered exception if any of the results fail.
+ */
+fun <T> List<Result<T>>.toResult(): Result<List<T>> {
+    return fold(Result.success(emptyList())) { acc, element ->
+        acc.fold(
+            onSuccess = { list ->
+                element.map { value -> list + value }
+            },
+            onFailure = { Result.failure(it) }
+        )
     }
 }
 
 /**
  * Extracts betingelse from a gren lambda block
  */
-private fun KtBlockExpression.extractBetingelse(): Result<Condition> = runCatching {
+private fun KtBlockExpression.extractBetingelse(): Result<Condition> =
     this.statements.firstNotNullOfOrNull { statement ->
+        (statement as? KtCallExpression)
+            ?.let { callExpression ->
+                callExpression.getLambdaBlock()
+                    .map { block ->
+                        Condition(
+                            navn = callExpression.firstArgumentOrEmpty(),
+                            uttrykk = block.text
+                        )
+                    } // here is Result success/failure
+            }
+    } ?: Result.failure( noSuchElement(ParsingError.NO_BETINGELSE_FOUND))
 
-        val callExpression = statement as KtCallExpression
-
-        Condition(
-            navn = callExpression.firstArgumentOrEmpty(),
-            uttrykk = callExpression.getLambdaBlock().map { it.text }.getOrThrow()
-        )
-    } ?: throw noSuchElement(
-        ParsingError.NO_BETINGELSE_FOUND.message.format(
-            containingClass()?.name,
-            containingKtFile.name
-        ))
-}
 
 
 ///////////////////////////////////////////////////
@@ -476,12 +511,10 @@ private fun KtBlockExpression.extractBetingelse(): Result<Condition> = runCatchi
 
 private fun KtDotQualifiedExpression.resolveReceiverClass(
     bindingContext: BindingContext
-): Result<Pair<KtClass, DSLTypeAbstract>?> = runCatching {
+): Pair<KtClass, DSLTypeAbstract>? =
     (receiverExpression as? KtReferenceExpression)
         ?.resolveToKtClass(bindingContext)
         ?.map { ktClass ->
-            findMatchingDSLTypeAbstract(ktClass)?.let { matchingDslType ->
-                Pair(ktClass, matchingDslType)
-            }
+            findMatchingDSLTypeAbstract(ktClass)
+                ?.let { matchingDslType -> Pair(ktClass, matchingDslType) }
         }?.getOrNull()
-}
