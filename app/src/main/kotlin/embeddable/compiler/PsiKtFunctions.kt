@@ -19,32 +19,40 @@ import pensjon.regler.Condition
 import rule.dsl.DSLTypeAbstract.*
 import rule.dsl.DSLTypeFlow
 
-enum class ParsingExceptionType(val message: String) {
-    ERROR_NO_PRIMARY_CONSTRUCTOR("No primary constructor found for %s [%s]"),
-    ERROR_NO_SERVICE_REQUEST_PARAMETER("No service request parameter found in primary constructor for %s [%s]"),
-    ERROR_NO_SERVICE_RESPONSE_TYPE("No service response type found for %s [%s]"),
-    ERROR_NOT_SUBCLASS_OF_SERVICE("%s is not subclass of %s [%s]"),
-    ERROR_NO_FLOW_PARAMETER("No flow parameter of type class found in primary constructor for %s [%s]"),
-    ERROR_NO_PROPERTIES_FOUND("No properties found for %s [%s]"),
-    ERROR_NO_OVERRIDE_FUNCTION("No override function %s found for %s [%s]"),
-    ERROR_FORGRENING_NAME_MISSING("No name found for forgrening for %s [%s]"),
-    ERROR_NO_BETINGELSE_FOUND("No betingelse found for gren for %s [%s]"),;
+/**
+ * Feilhåndtering for parsing av Kotlin PSI elementer gjøres etter følgende prinsipper:
+ * 1) Hvis noe er forventet og ikke finnes brukes Kotlin Result
+ * 2) Hvis noe er valgfritt brukes Kotlin nullable
+ * 3) Hvis en funksjon bruker funksjoner som kan kaste unntak, brukes runCatching der Result<T> er avhengig av (1) eller (2)
+ *
+ */
+
+enum class ParsingError(val message: String) {
+    NO_PRIMARY_CONSTRUCTOR("No primary constructor found for %s [%s]"),
+    NO_SERVICE_REQUEST_PARAMETER("No service request parameter found in primary constructor for %s [%s]"),
+    NO_SERVICE_RESPONSE_TYPE("No service response type found for %s [%s]"),
+    NOT_SUBCLASS_OF_SERVICE("%s is not subclass of %s [%s]"),
+    NO_FLOW_PARAMETER("No flow parameter of type class found in primary constructor for %s [%s]"),
+    NO_PROPERTIES_FOUND("No properties found for %s [%s]"),
+    NO_OVERRIDE_FUNCTION("No override function %s found for %s [%s]"),
+    NO_FORGRENING_NAME_FOUND("No name found for forgrening for %s [%s]"),
+    NO_BETINGELSE_FOUND("No betingelse found for gren for %s [%s]"),;
 }
 
-private fun bail(message: String): NoSuchElementException = NoSuchElementException(message)
+private fun noSuchElement(message: String): NoSuchElementException = NoSuchElementException(message)
 
 ///////////////////////////////////////////////////
 /** KtFile extension functions */
 ///////////////////////////////////////////////////
 
-fun KtFile.findDSLTypeAbstract(): Result<Pair<KtClass, DSLTypeAbstract>?> = runCatching {
+fun KtFile.findDSLTypeAbstract(): Pair<KtClass, DSLTypeAbstract>?  {
     val firstKtClass = declarations.filterIsInstance<KtClass>().firstOrNull()
-        ?: return@runCatching null
+        ?: return null
 
     val matchingDslType = findMatchingDSLTypeAbstract(firstKtClass)
-        ?: return@runCatching null
+        ?: return null
 
-    Pair(firstKtClass, matchingDslType)
+    return Pair(firstKtClass, matchingDslType)
 }
 
 private fun findMatchingDSLTypeAbstract(ktClass: KtClass): DSLTypeAbstract? {
@@ -58,67 +66,90 @@ private fun findMatchingDSLTypeAbstract(ktClass: KtClass): DSLTypeAbstract? {
 /** KDoc extension functions */
 ///////////////////////////////////////////////////
 
+private const val DOC_START = "/**"
+private const val DOC_END = "*/"
+
 private fun KDoc.formatOrEmpty(): String =
-    text?.lines()?.map { it.trim().removePrefix("*").trim() }?.filter { it.isNotEmpty() && it != "/" }
-        ?.joinToString("\n")?.removePrefix("/**")?.removeSuffix("*/")?.trim() ?: ""
+    text?.lines()
+        ?.map { it.trim().removePrefix("*").trim() }
+        ?.filterNot { it.isBlank() || it == "/" }
+        ?.joinToString("\n")
+        ?.removePrefix(DOC_START)
+        ?.removeSuffix(DOC_END)
+        ?.trim()
+        ?: ""
 
 
 ///////////////////////////////////////////////////
 /** KtClass extension functions */
 ///////////////////////////////////////////////////
 
+// helper function to create a NoSuchElementException with a formatted message with class - and file name
+private fun KtClass.noSuchElement(exceptionType: ParsingError): NoSuchElementException =
+    noSuchElement(exceptionType.message.format(name,containingKtFile.name))
+
 fun KtClass.getKDocOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
 
 private fun KtClass.isSubClassOf(type: DSLTypeAbstract): Boolean =
     superTypeListEntries.any { it.typeReference?.text?.contains(type.typeName) == true }
 
-fun KtClass.findGenericParameterForRuleServiceOrThrow(): KtTypeReference {
-    return superTypeListEntries
+fun KtClass.findResponseTypeForRuleService(): Result<KtTypeReference> =
+    superTypeListEntries
         .find { it.typeReference?.text?.contains(RULE_SERVICE.typeName) == true }
+        // get the generic type argument for the rule service = response type
         ?.typeReference
         ?.typeElement
         ?.typeArgumentsAsTypes
         ?.firstOrNull()
-        ?: throw bail(ParsingExceptionType.ERROR_NO_SERVICE_RESPONSE_TYPE)
-}
+        ?.let { Result.success(it) }
+        ?: Result.failure(noSuchElement(ParsingError.NO_SERVICE_RESPONSE_TYPE))
+
 
 fun KtClass.isSubClassOf(type: DSLTypeService): Boolean =
     superTypeListEntries.any { it.typeReference?.text?.contains(type.typeName) == true }
 
-fun KtClass.isSubClassOfOrThrow(type: DSLTypeService): KtClass =
+fun KtClass.mustBeSubClassOf(type: DSLTypeService): Result<KtClass> =
     superTypeListEntries
         .find { it.typeReference?.text?.contains(type.typeName) == true }
-        ?.let { this }
-        ?: throw bail(
-            ParsingExceptionType.ERROR_NOT_SUBCLASS_OF_SERVICE.message.format(
+        ?.let { Result.success(this) }
+        ?: Result.failure(noSuchElement(
+            ParsingError.NOT_SUBCLASS_OF_SERVICE.message.format(
                 name,
                 type.typeName,
                 containingKtFile.name
-            )
+            )))
+
+
+fun KtClass.requirePrimaryConstructor(): Result<KtPrimaryConstructor> =
+    primaryConstructor
+        ?.let { Result.success(it) }
+        ?: Result.failure(
+            noSuchElement(ParsingError.NO_PRIMARY_CONSTRUCTOR)
         )
 
-fun KtClass.primaryConstructorOrThrow(): KtPrimaryConstructor =
-    primaryConstructor ?: throw bail(ParsingExceptionType.ERROR_NO_PRIMARY_CONSTRUCTOR)
-
-fun KtClass.findMatchingPropertyOrThrow(flowType: DSLTypeFlow): KtProperty =
+fun KtClass.findMatchingProperty(flowType: DSLTypeFlow): Result<KtProperty> =
     body?.properties
         ?.let { properties ->
             properties
                 .filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }
                 .find { it.name == flowType.typeName }
-                ?: throw bail(
-                    ParsingExceptionType.ERROR_NO_OVERRIDE_FUNCTION.message.format(
-                        flowType.typeName, name, containingKtFile.name
-                    ))
+                ?.let { Result.success(it) }
+                ?: Result.failure(
+                    noSuchElement(ParsingError.NO_OVERRIDE_FUNCTION.message
+                        .format(
+                            flowType.typeName, name, containingKtFile.name
+                        )
+                    )
+                )
         }
-        ?: throw bail(ParsingExceptionType.ERROR_NO_PROPERTIES_FOUND)
-
-private fun KtClass.bail(exceptionType: ParsingExceptionType): NoSuchElementException =
-    bail(exceptionType.message.format(name,containingKtFile.name))
+        ?: Result.failure(noSuchElement(ParsingError.NO_PROPERTIES_FOUND))
 
 ///////////////////////////////////////////////////
 /** KtPrimaryConstructor extension functions */
 ///////////////////////////////////////////////////
+
+private fun KtPrimaryConstructor.noSuchElement(exceptionType: ParsingError): NoSuchElementException =
+    noSuchElement(exceptionType.message.format(containingClass()?.name, containingKtFile.name))
 
 fun KtPrimaryConstructor.findDSLTypeServiceRequest(
     bindingContext: BindingContext
@@ -131,10 +162,12 @@ fun KtPrimaryConstructor.findDSLTypeServiceRequest(
 
     valueParameters
         .firstNotNullOfOrNull(findServiceRequestParameter)
-        ?: throw bail(ParsingExceptionType.ERROR_NO_SERVICE_REQUEST_PARAMETER)
+        ?: throw noSuchElement(ParsingError.NO_SERVICE_REQUEST_PARAMETER)
 }
 
-fun KtPrimaryConstructor.findFirstParameterOfTypeClassOrThrow(bindingContext: BindingContext): Pair<KtParameter, KtClass> =
+fun KtPrimaryConstructor.findFirstParameterOfTypeClass(
+    bindingContext: BindingContext
+): Result<Pair<KtParameter, KtClass>> =
     valueParameters
         .firstNotNullOfOrNull { parameter ->
             parameter
@@ -142,7 +175,8 @@ fun KtPrimaryConstructor.findFirstParameterOfTypeClassOrThrow(bindingContext: Bi
                 ?.resolveToKtClass(bindingContext)?.getOrNull()
                 ?.let { resolved -> Pair(parameter, resolved) }
         }
-        ?: throw bail(ParsingExceptionType.ERROR_NO_FLOW_PARAMETER)
+        ?.let { Result.success(it) }
+        ?: Result.failure(noSuchElement(ParsingError.NO_FLOW_PARAMETER))
 
 fun KtPrimaryConstructor.toPropertyInfo(): List<PropertyInfo> =
     valueParameters.map { parameter ->
@@ -152,9 +186,6 @@ fun KtPrimaryConstructor.toPropertyInfo(): List<PropertyInfo> =
             beskrivelse = parameter.getKDocOrEmpty()
         )
     }
-
-private fun KtPrimaryConstructor.bail(exceptionType: ParsingExceptionType): NoSuchElementException =
-    bail(exceptionType.message.format(containingClass()?.name, containingKtFile.name))
 
 ///////////////////////////////////////////////////
 /** KtParameter extension functions */
@@ -200,8 +231,8 @@ private fun KtElement.resolveToDeclaration(bindingContext: BindingContext): Resu
 // HIGHLY IMPORTANT: eventually resolve (KtTypeReference, KtReferenceExpression) to KtClass
 //
 fun KtElement.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> =
-    resolveToDeclaration(bindingContext).map {
-        it as? KtClass ?: throw NoSuchElementException("Declaration is not a KtClass")
+    resolveToDeclaration(bindingContext).mapCatching {
+        it as? KtClass ?: throw NoSuchElementException("Declaration is not a KtClass, but ${it.javaClass.simpleName}, [${this.containingKtFile.name}]")
     }
 
 /**
@@ -287,8 +318,8 @@ private fun KtCallExpression.firstArgumentOrThrow(): String = valueArguments
     .firstOrNull()
     ?.text
     ?.removeSurrounding("\"")
-    ?: throw bail(
-        ParsingExceptionType.ERROR_FORGRENING_NAME_MISSING.message.format(
+    ?: throw noSuchElement(
+        ParsingError.NO_FORGRENING_NAME_FOUND.message.format(
             containingClass()?.name,
             containingKtFile.name
     ))
@@ -323,7 +354,7 @@ fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Re
 
                 is KtDotQualifiedExpression -> {
                     child
-                        .resolveReceiverClass(bindingContext)
+                        .resolveReceiverClass(bindingContext).getOrNull()
                         ?.let { (resolvedClass, dslTypeAbstract) ->
                             when(dslTypeAbstract) {
                                 RULE_FLOW ->
@@ -378,7 +409,7 @@ fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Resul
 
                 is KtDotQualifiedExpression -> {
                     child
-                        .resolveReceiverClass(bindingContext)
+                        .resolveReceiverClass(bindingContext).getOrNull()
                         ?.let { (resolvedClass, dslTypeAbstract) ->
                             when(dslTypeAbstract) {
                                 RULE_FLOW ->
@@ -431,8 +462,8 @@ private fun KtBlockExpression.extractBetingelse(): Result<Condition> = runCatchi
             navn = callExpression.firstArgumentOrEmpty(),
             uttrykk = callExpression.getLambdaBlock().map { it.text }.getOrThrow()
         )
-    } ?: throw bail(
-        ParsingExceptionType.ERROR_NO_BETINGELSE_FOUND.message.format(
+    } ?: throw noSuchElement(
+        ParsingError.NO_BETINGELSE_FOUND.message.format(
             containingClass()?.name,
             containingKtFile.name
         ))
@@ -445,11 +476,12 @@ private fun KtBlockExpression.extractBetingelse(): Result<Condition> = runCatchi
 
 private fun KtDotQualifiedExpression.resolveReceiverClass(
     bindingContext: BindingContext
-): Pair<KtClass, DSLTypeAbstract>? =
+): Result<Pair<KtClass, DSLTypeAbstract>?> = runCatching {
     (receiverExpression as? KtReferenceExpression)
-        ?.resolveToKtClass(bindingContext)?.getOrNull()
-        ?.let { ktClass ->
+        ?.resolveToKtClass(bindingContext)
+        ?.map { ktClass ->
             findMatchingDSLTypeAbstract(ktClass)?.let { matchingDslType ->
                 Pair(ktClass, matchingDslType)
             }
-        }
+        }?.getOrNull()
+}
