@@ -19,6 +19,7 @@ import org.jetbrains.kotlin.lexer.KtTokens
 import pensjon.regler.Condition
 import rule.dsl.DSLTypeAbstract.*
 import rule.dsl.DSLTypeFlow
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 
 /**
  * Feilhåndtering for parsing av Kotlin PSI elementer gjøres etter følgende prinsipper:
@@ -40,7 +41,11 @@ enum class ParsingError(val message: String) {
     NO_FORGRENING_NAME_FOUND("No name found for forgrening for %s [%s]"),
     NO_BETINGELSE_FOUND("No betingelse found for gren for %s [%s]"),
     NO_LAMBDA_BLOCK_FOUND("No lambda block found in property for %s [%s]"),
-    NO_NAMED_REFERENCE_CE("No named reference for called expression, %s [%s]");
+    NO_NAMED_REFERENCE_CE("No named reference for called expression, %s [%s]"),
+    UNRESOLVED_DESCRIPTOR("Could not resolve descriptor: %s [%s]"),
+    UNRESOLVED_DECLARATION("Could not resolve to declaration: %s [%s]"),
+    DECLARATION_IS_NOT_KTCLASS("Declaration is not a KtClass, but %s, [%s]"),
+    ;
 }
 
 private fun noSuchElement(message: String): NoSuchElementException = NoSuchElementException(message)
@@ -212,35 +217,55 @@ fun KtParameter.toPropertyInfo(): PropertyInfo = PropertyInfo(
 /** KtElement extension functions */
 ///////////////////////////////////////////////////
 
-// HIGHLY IMPORTANT: eventually resolve different types to PsiElement
-// This includes a `warp` to whatever sourcefile declaring the PsiElement,
-// Key point - DescriptorToSourceUtils.getSourceFromDescriptor, thanks to BindingContext
-//
-private fun KtElement.resolveToDeclaration(bindingContext: BindingContext): Result<PsiElement> = runCatching {
-    when (
-        val descriptor = when (this) {
-            is KtNameReferenceExpression -> bindingContext[BindingContext.REFERENCE_TARGET, this]
+private fun KtElement.noSuchElement(exceptionType: ParsingError): NoSuchElementException =
+    noSuchElement(exceptionType.message.format(this.text, containingKtFile.name))
 
-            is KtTypeReference -> bindingContext.get(BindingContext.TYPE, this)?.constructor?.declarationDescriptor
-
-            is KtReferenceExpression -> bindingContext.getType(this)?.constructor?.declarationDescriptor
-
-            else -> throw IllegalArgumentException(
-                "Unsupported element type: ${this.javaClass.simpleName} for binding context resolution"
+fun KtElement.resolveDescriptor(bindingContext: BindingContext): Result<DeclarationDescriptor?> =
+        when (this) {
+            is KtNameReferenceExpression -> Result.success(
+                bindingContext[BindingContext.REFERENCE_TARGET, this]
+            )
+            is KtTypeReference -> Result.success(
+                bindingContext.get(BindingContext.TYPE, this)
+                    ?.constructor
+                    ?.declarationDescriptor
+            )
+            is KtReferenceExpression -> Result.success(
+                bindingContext.getType(this)
+                    ?.constructor
+                    ?.declarationDescriptor
+            )
+            else -> Result.failure(
+                IllegalArgumentException(
+                    "Unsupported element type: ${this.javaClass.simpleName} for binding context resolution"
+                )
             )
         }
-    ) {
-        null -> throw NoSuchElementException("Could not resolve descriptor: ${this.text} [${this.containingKtFile.name}]")
-        else -> DescriptorToSourceUtils.getSourceFromDescriptor(descriptor)
-            ?: throw NoSuchElementException("Could not resolve to declaration: ${this.text} [${this.containingKtFile.name}]")
-    }
-}
+
+private fun KtElement.resolveToDeclaration(bindingContext: BindingContext): Result<PsiElement> =
+    resolveDescriptor(bindingContext)
+        .flatMap { descriptor ->
+            descriptor
+                ?.let {
+                    DescriptorToSourceUtils
+                        .getSourceFromDescriptor(descriptor)
+                        ?.let { Result.success(it) }
+                        ?: Result.failure(noSuchElement(ParsingError.UNRESOLVED_DECLARATION))
+                } ?: Result.failure(noSuchElement(ParsingError.UNRESOLVED_DESCRIPTOR))
+
+        }
 
 // HIGHLY IMPORTANT: eventually resolve (KtTypeReference, KtReferenceExpression) to KtClass
 //
 fun KtElement.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> =
-    resolveToDeclaration(bindingContext).mapCatching {
-        it as? KtClass ?: throw NoSuchElementException("Declaration is not a KtClass, but ${it.javaClass.simpleName}, [${this.containingKtFile.name}]")
+    resolveToDeclaration(bindingContext)
+        .flatMap {
+            (it as? KtClass)
+                ?.let { Result.success(it) }
+                ?: Result.failure(noSuchElement(ParsingError.DECLARATION_IS_NOT_KTCLASS.message.format(
+                    it.javaClass.simpleName,
+                    this.containingKtFile.name
+                )))
     }
 
 /**
