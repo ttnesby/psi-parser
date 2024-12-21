@@ -1,5 +1,6 @@
 package embeddable.compiler
 
+import org.jetbrains.annotations.TestOnly
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiWhiteSpace
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
@@ -35,6 +36,7 @@ enum class ParsingError(val message: String) {
     NO_FLOW_PARAMETER("No flow parameter of type class found in primary constructor for %s [%s]"),
     NO_PROPERTIES_FOUND("No properties found for %s [%s]"),
     NO_OVERRIDE_FUNCTION("No override function %s found for %s [%s]"),
+    EMPTY_RULE_SERVICE_FLOW("Rule service flow is empty for %s [%s]"),
     NO_FORGRENING_NAME_FOUND("No name found for forgrening for %s [%s]"),
     NO_BETINGELSE_FOUND("No betingelse found for gren for %s [%s]"),;
 }
@@ -329,14 +331,6 @@ private fun KtCallExpression.firstArgumentOrThrow(): String = valueArguments
     ))
 
 
-fun <T, R> Result<T>.flatMap(transform: (T) -> Result<R>): Result<R> {
-    return fold(
-        onSuccess = { value -> transform(value) },
-        onFailure = { exception -> Result.failure(exception) }
-    )
-}
-
-
 ///////////////////////////////////////////////////
 /** KtBlockExpression extension functions */
 ///////////////////////////////////////////////////
@@ -344,8 +338,7 @@ fun <T, R> Result<T>.flatMap(transform: (T) -> Result<R>): Result<R> {
 private fun KtBlockExpression.noSuchElement(exceptionType: ParsingError): NoSuchElementException =
     noSuchElement(exceptionType.message.format(containingClass()?.name, containingKtFile.name))
 
-fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Result<FlowElement.Flow> = runCatching {
-    FlowElement.Flow(
+fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Result<FlowElement.Flow> =
         children.mapNotNull { child ->
             when (child) {
                 is KtCallExpression -> {
@@ -356,7 +349,16 @@ fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Re
                                 beskrivelse = child.extractKDocOrEmpty(),
                                 fil = file
                             )
-                        }.getOrNull()
+                        }
+                        // TODO - must add required functions
+                        // @TestOnly - temporary handling missing in binding context
+                        .fold(
+                            onSuccess = { Result.success(it)},
+                            onFailure = {
+                                println("Warning: Missing func in binding context ${it.message}")
+                                null
+                            }
+                        )
                 }
 
                 is KtDotQualifiedExpression -> {
@@ -365,21 +367,34 @@ fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Re
                         ?.let { (resolvedClass, dslTypeAbstract) ->
                             when(dslTypeAbstract) {
                                 RULE_FLOW ->
-                                    FlowElement.RuleFlow(
-                                        navn = resolvedClass.name ?: "Unknown",
-                                        beskrivelse = child.extractKDocOrEmpty(),
-                                        fil = File(resolvedClass.containingKtFile.name)
-                                    )
+                                    Result.success(
+                                        FlowElement.RuleFlow(
+                                            navn = resolvedClass.name ?: "Unknown",
+                                            beskrivelse = child.extractKDocOrEmpty(),
+                                            fil = File(resolvedClass.containingKtFile.name)
+                                        ))
                                 else -> null
-                            }
-                        }
+                            } // null or Result
+                        } // null ok
                 }
 
                 else -> null
-            }
+            } // null ok
         }
-    )
-}
+            .let { flyt ->
+                if (flyt.isEmpty()) {
+                    println("Warning: empty flow for current flow extraction logic, ${containingClass()?.name} [${containingKtFile.name}]")
+                    Result.success(FlowElement.Flow(emptyList()))
+                    // later when extraction logic is complete
+                    // Result.failure(noSuchElement(ParsingError.EMPTY_RULE_SERVICE_FLOW))
+                }
+                else {
+                    flyt.toResult().map { FlowElement.Flow(it) }
+                }
+            }
+
+
+
 
 // TODO - hvordan håndtere flyt/regelsett (KtDotQualifiedExpression) som er høyresiden på en property
 // TODO - NB! når KDoc er relatert til flow/ruleset/function - this.children -> this.statements
@@ -463,28 +478,9 @@ private fun KtBlockExpression.extractGrener(bindingContext: BindingContext): Res
                                 )
                             }
                     }
-            } // here is null in mapNotNull context
-    } // here is List<Result<FlowElement.Gren>> - need to flip
+            } // null ok
+    } // List<Result<FlowElement.Gren>> - need Result<List<FlowElement.Gren>>
         .toResult()
-
-
-/**
- * Combines a list of `Result` objects into a single `Result` containing a list of all successful values
- * or a failure if any of the results is a failure.
- *
- * @return A `Result` wrapping a list of successful values if all results are successful,
- * or a failure wrapping the first encountered exception if any of the results fail.
- */
-fun <T> List<Result<T>>.toResult(): Result<List<T>> {
-    return fold(Result.success(emptyList())) { acc, element ->
-        acc.fold(
-            onSuccess = { list ->
-                element.map { value -> list + value }
-            },
-            onFailure = { Result.failure(it) }
-        )
-    }
-}
 
 /**
  * Extracts betingelse from a gren lambda block
@@ -500,7 +496,7 @@ private fun KtBlockExpression.extractBetingelse(): Result<Condition> =
                             uttrykk = block.text
                         )
                     } // here is Result success/failure
-            }
+            } // null in firstNotNullOf context
     } ?: Result.failure( noSuchElement(ParsingError.NO_BETINGELSE_FOUND))
 
 
@@ -518,3 +514,39 @@ private fun KtDotQualifiedExpression.resolveReceiverClass(
             findMatchingDSLTypeAbstract(ktClass)
                 ?.let { matchingDslType -> Pair(ktClass, matchingDslType) }
         }?.getOrNull()
+
+
+///////////////////////////////////////////////////
+/** helper functions */
+///////////////////////////////////////////////////
+
+/**
+ * Transforms the success value of a Result<T> using the provided transformation function, or propagates the failure.
+ *
+ * @param transform A function that takes the success value of the current Result<T> and returns a new Result<R>.
+ * @return A Result<R> that is the result of applying the transform function if the current Result is successful,
+ *         or propagates the failure if the current Result is a failure.
+ */
+
+fun <T, R> Result<T>.flatMap(transform: (T) -> Result<R>): Result<R> {
+    return fold(
+        onSuccess = { value -> transform(value) },
+        onFailure = { exception -> Result.failure(exception) }
+    )
+}
+
+/**
+ * Combines a list of `Result` objects into a single `Result` containing a list of all successful values
+ * or a failure if any of the results is a failure.
+ *
+ * @return A `Result` wrapping a list of successful values if all results are successful,
+ * or a failure wrapping the first encountered exception if any of the results fail.
+ */
+fun <T> List<Result<T>>.toResult(): Result<List<T>> {
+    return fold(Result.success(emptyList())) { acc, element ->
+        acc.fold(
+            onSuccess = { list -> element.map { value -> list + value } },
+            onFailure = { Result.failure(it) }
+        )
+    }
+}

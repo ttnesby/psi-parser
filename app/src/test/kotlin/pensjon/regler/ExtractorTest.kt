@@ -181,7 +181,10 @@ class ExtractorTest {
                     assertEquals("Nei", forgrening.gren.last().betingelse.navn)
 
 
-                }.onFailure { assert(false) }
+                }.onFailure {
+                    println("${it.message} \n ${it.stackTraceToString()}")
+                    assert(false)
+                }
         }.onFailure { assert(false) }
     }
 
