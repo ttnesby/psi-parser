@@ -38,7 +38,9 @@ enum class ParsingError(val message: String) {
     NO_OVERRIDE_FUNCTION("No override function %s found for %s [%s]"),
     EMPTY_RULE_SERVICE_FLOW("Rule service flow is empty for %s [%s]"),
     NO_FORGRENING_NAME_FOUND("No name found for forgrening for %s [%s]"),
-    NO_BETINGELSE_FOUND("No betingelse found for gren for %s [%s]"),;
+    NO_BETINGELSE_FOUND("No betingelse found for gren for %s [%s]"),
+    NO_LAMBDA_BLOCK_FOUND("No lambda block found in property for %s [%s]"),
+    NO_NAMED_REFERENCE_CE("No named reference for called expression, %s [%s]");
 }
 
 private fun noSuchElement(message: String): NoSuchElementException = NoSuchElementException(message)
@@ -259,10 +261,15 @@ fun KtElement.extractKDocOrEmpty(): String =
 /** KtProperty extension functions */
 ///////////////////////////////////////////////////
 
-fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> = runCatching {
-    (initializer as? KtLambdaExpression)?.bodyExpression
-        ?: throw NoSuchElementException("No lambda block found in property")
-}
+private fun KtProperty.noSuchElement(exceptionType: ParsingError): NoSuchElementException =
+    noSuchElement(exceptionType.message.format(containingClass()?.name, containingKtFile.name))
+
+fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> =
+    (initializer as? KtLambdaExpression)
+        ?.bodyExpression
+        ?.let { Result.success(it)}
+        ?: Result.failure(noSuchElement(ParsingError.NO_LAMBDA_BLOCK_FOUND))
+
 
 fun List<KtProperty>.toPropertyInfo(): List<PropertyInfo> = map { property ->
     PropertyInfo(
@@ -275,18 +282,24 @@ fun List<KtProperty>.toPropertyInfo(): List<PropertyInfo> = map { property ->
 /** KtCallExpression extension functions */
 ///////////////////////////////////////////////////
 
+private fun KtCallExpression.noSuchElement(exceptionType: ParsingError): NoSuchElementException =
+    noSuchElement(exceptionType.message.format(containingClass()?.name, containingKtFile.name))
+
 // HIGHLY IMPORTANT: eventually KtNameReferenceExpression resolve to function declaration
 //
 private fun KtCallExpression.resolveFunctionDeclaration(
     bindingContext: BindingContext,
-): Result<Pair<String, File>> = runCatching {
-    val namedReference = this.calleeExpression as? KtNameReferenceExpression ?: throw NoSuchElementException(
-        "Call expression does not have a named reference"
-    )
+): Result<Pair<String, File>> =
+        (this.calleeExpression as? KtNameReferenceExpression)
+        ?.let { namedReference ->
+            namedReference
+                .resolveToDeclaration(bindingContext)
+                .map { declaration ->
+                    Pair(namedReference.text, File(declaration.containingFile.name))
+                }
+        }
+        ?: Result.failure(noSuchElement(ParsingError.NO_NAMED_REFERENCE_CE))
 
-    namedReference.resolveToDeclaration(bindingContext)
-        .map { declaration -> Pair(namedReference.text, File(declaration.containingFile.name)) }.getOrThrow()
-}
 
 private fun KtCallExpression.isForgrening(): Boolean =
     (calleeExpression as? KtNameReferenceExpression)?.getReferencedName() == DSLType.FORGRENING.typeName
