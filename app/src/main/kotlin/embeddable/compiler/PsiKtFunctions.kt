@@ -57,7 +57,7 @@ fun KtFile.findDSLTypeAbstract(): Pair<KtClass, DSLTypeAbstract>? =
     declarations
         .filterIsInstance<KtClass>()
         .firstOrNull()
-        ?.findMatchingDSLTypeAbstract()
+        ?.matchingDSLTypeAbstractOrNull()
 
 
 ///////////////////////////////////////////////////
@@ -65,13 +65,15 @@ fun KtFile.findDSLTypeAbstract(): Pair<KtClass, DSLTypeAbstract>? =
 ///////////////////////////////////////////////////
 
 private const val DOC_START = "/**"
+private const val DOC_PREFIX = "*"
 private const val DOC_END = "*/"
+private const val NEW_LINE = "\n"
 
 private fun KDoc.formatOrEmpty(): String =
     text?.lines()
-        ?.map { it.trim().removePrefix("*").trim() }
-        ?.filterNot { it.isBlank() || it == "/" }
-        ?.joinToString("\n")
+        ?.map { line -> line.trim().removePrefix(DOC_PREFIX).trim() }
+        ?.filterNot { line -> line.isBlank() || line == "/" }
+        ?.joinToString(NEW_LINE)
         ?.removePrefix(DOC_START)
         ?.removeSuffix(DOC_END)
         ?.trim()
@@ -86,12 +88,11 @@ private fun KDoc.formatOrEmpty(): String =
 private fun KtClass.noSuchElement(exceptionType: ParsingError): NoSuchElementException =
     noSuchElement(exceptionType.message.format(name, containingKtFile.name))
 
-private fun KtClass.findMatchingDSLTypeAbstract(): Pair<KtClass, DSLTypeAbstract>? =
+private fun KtClass.matchingDSLTypeAbstractOrNull(): Pair<KtClass, DSLTypeAbstract>? =
     DSLTypeAbstract
         .entries
         .firstOrNull { dslType -> isSubClassOf(dslType) }
         ?.let { dslType -> Pair(this, dslType) }
-
 
 fun KtClass.getKDocOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
 
@@ -102,20 +103,22 @@ fun KtClass.findResponseTypeForRuleService(): Result<KtTypeReference> =
     superTypeListEntries
         .find { it.typeReference?.text?.contains(RULE_SERVICE.typeName) == true }
         // get the generic type argument for the rule service = response type
+        // TODO need hierarchy for knowing type of error
         ?.typeReference
         ?.typeElement
         ?.typeArgumentsAsTypes
         ?.firstOrNull()
-        ?.let { Result.success(it) }
+        ?.let { ktTypeReference ->  Result.success(ktTypeReference) }
         ?: Result.failure(noSuchElement(ParsingError.NO_SERVICE_RESPONSE_TYPE))
 
 
 fun KtClass.isSubClassOf(type: DSLTypeService): Boolean =
-    superTypeListEntries.any { it.typeReference?.text?.contains(type.typeName) == true }
+    superTypeListEntries.any { ktSuperTypeListEntry ->
+        ktSuperTypeListEntry.typeReference?.text?.contains(type.typeName) == true }
 
 fun KtClass.mustBeSubClassOf(type: DSLTypeService): Result<KtClass> =
     superTypeListEntries
-        .find { it.typeReference?.text?.contains(type.typeName) == true }
+        .find { ktSuperTypeListEntry ->  ktSuperTypeListEntry.typeReference?.text?.contains(type.typeName) == true }
         ?.let { Result.success(this) }
         ?: Result.failure(
             noSuchElement(
@@ -130,9 +133,7 @@ fun KtClass.mustBeSubClassOf(type: DSLTypeService): Result<KtClass> =
 fun KtClass.requirePrimaryConstructor(): Result<KtPrimaryConstructor> =
     primaryConstructor
         ?.let { Result.success(it) }
-        ?: Result.failure(
-            noSuchElement(ParsingError.NO_PRIMARY_CONSTRUCTOR)
-        )
+        ?: Result.failure(noSuchElement(ParsingError.NO_PRIMARY_CONSTRUCTOR))
 
 fun KtClass.findMatchingProperty(flowType: DSLTypeFlow): Result<KtProperty> =
     body?.properties
@@ -220,7 +221,7 @@ fun KtParameter.toPropertyInfo(): PropertyInfo = PropertyInfo(
 private fun KtElement.noSuchElement(exceptionType: ParsingError): NoSuchElementException =
     noSuchElement(exceptionType.message.format(this.text, containingKtFile.name))
 
-fun KtElement.resolveDescriptor(bindingContext: BindingContext): Result<DeclarationDescriptor?> =
+fun KtElement.resolveToDescriptor(bindingContext: BindingContext): Result<DeclarationDescriptor?> =
     when (this) {
         is KtNameReferenceExpression -> Result.success(
             bindingContext[BindingContext.REFERENCE_TARGET, this]
@@ -246,16 +247,15 @@ fun KtElement.resolveDescriptor(bindingContext: BindingContext): Result<Declarat
     }
 
 private fun KtElement.resolveToDeclaration(bindingContext: BindingContext): Result<PsiElement> =
-    resolveDescriptor(bindingContext)
+    resolveToDescriptor(bindingContext)
         .flatMap { descriptor ->
             descriptor
                 ?.let {
                     DescriptorToSourceUtils
                         .getSourceFromDescriptor(descriptor)
-                        ?.let { Result.success(it) }
+                        ?.let { psiElement -> Result.success(psiElement) }
                         ?: Result.failure(noSuchElement(ParsingError.UNRESOLVED_DECLARATION))
                 } ?: Result.failure(noSuchElement(ParsingError.UNRESOLVED_DESCRIPTOR))
-
         }
 
 // HIGHLY IMPORTANT: eventually resolve (KtTypeReference, KtReferenceExpression) to KtClass
@@ -557,7 +557,7 @@ private fun KtDotQualifiedExpression.resolveReceiverClass(
 ): Pair<KtClass, DSLTypeAbstract>? =
     (receiverExpression as? KtReferenceExpression)
         ?.resolveToKtClass(bindingContext)
-        ?.map { ktClass -> ktClass.findMatchingDSLTypeAbstract() }
+        ?.map { ktClass -> ktClass.matchingDSLTypeAbstractOrNull() }
         ?.getOrNull()
 
 
