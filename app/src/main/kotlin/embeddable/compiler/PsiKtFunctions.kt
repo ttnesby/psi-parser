@@ -1,25 +1,24 @@
 package embeddable.compiler
 
-import org.jetbrains.annotations.TestOnly
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiWhiteSpace
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
+import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.containingClass
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
+import pensjon.regler.Condition
 import pensjon.regler.FlowElement
 import pensjon.regler.PropertyInfo
 import rule.dsl.DSLType
 import rule.dsl.DSLTypeAbstract
+import rule.dsl.DSLTypeAbstract.*
+import rule.dsl.DSLTypeFlow
 import rule.dsl.DSLTypeService
 import rule.dsl.DSLTypeService.REQUEST
 import java.io.File
-import org.jetbrains.kotlin.lexer.KtTokens
-import pensjon.regler.Condition
-import rule.dsl.DSLTypeAbstract.*
-import rule.dsl.DSLTypeFlow
-import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 
 /**
  * Feilhåndtering for parsing av Kotlin PSI elementer gjøres etter følgende prinsipper:
@@ -54,21 +53,11 @@ private fun noSuchElement(message: String): NoSuchElementException = NoSuchEleme
 /** KtFile extension functions */
 ///////////////////////////////////////////////////
 
-fun KtFile.findDSLTypeAbstract(): Pair<KtClass, DSLTypeAbstract>?  {
-    val firstKtClass = declarations.filterIsInstance<KtClass>().firstOrNull()
-        ?: return null
-
-    val matchingDslType = findMatchingDSLTypeAbstract(firstKtClass)
-        ?: return null
-
-    return Pair(firstKtClass, matchingDslType)
-}
-
-private fun findMatchingDSLTypeAbstract(ktClass: KtClass): DSLTypeAbstract? {
-    return DSLTypeAbstract.entries.firstOrNull { dslType ->
-        ktClass.isSubClassOf(dslType)
-    }
-}
+fun KtFile.findDSLTypeAbstract(): Pair<KtClass, DSLTypeAbstract>? =
+    declarations
+        .filterIsInstance<KtClass>()
+        .firstOrNull()
+        ?.findMatchingDSLTypeAbstract()
 
 
 ///////////////////////////////////////////////////
@@ -95,7 +84,14 @@ private fun KDoc.formatOrEmpty(): String =
 
 // helper function to create a NoSuchElementException with a formatted message with class - and file name
 private fun KtClass.noSuchElement(exceptionType: ParsingError): NoSuchElementException =
-    noSuchElement(exceptionType.message.format(name,containingKtFile.name))
+    noSuchElement(exceptionType.message.format(name, containingKtFile.name))
+
+private fun KtClass.findMatchingDSLTypeAbstract(): Pair<KtClass, DSLTypeAbstract>? =
+    DSLTypeAbstract
+        .entries
+        .firstOrNull { dslType -> isSubClassOf(dslType) }
+        ?.let { dslType -> Pair(this, dslType) }
+
 
 fun KtClass.getKDocOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
 
@@ -121,12 +117,15 @@ fun KtClass.mustBeSubClassOf(type: DSLTypeService): Result<KtClass> =
     superTypeListEntries
         .find { it.typeReference?.text?.contains(type.typeName) == true }
         ?.let { Result.success(this) }
-        ?: Result.failure(noSuchElement(
-            ParsingError.NOT_SUBCLASS_OF_SERVICE.message.format(
-                name,
-                type.typeName,
-                containingKtFile.name
-            )))
+        ?: Result.failure(
+            noSuchElement(
+                ParsingError.NOT_SUBCLASS_OF_SERVICE.message.format(
+                    name,
+                    type.typeName,
+                    containingKtFile.name
+                )
+            )
+        )
 
 fun KtClass.requirePrimaryConstructor(): Result<KtPrimaryConstructor> =
     primaryConstructor
@@ -143,10 +142,11 @@ fun KtClass.findMatchingProperty(flowType: DSLTypeFlow): Result<KtProperty> =
                 .find { it.name == flowType.typeName }
                 ?.let { Result.success(it) }
                 ?: Result.failure(
-                    noSuchElement(ParsingError.NO_OVERRIDE_FUNCTION.message
-                        .format(
-                            flowType.typeName, name, containingKtFile.name
-                        )
+                    noSuchElement(
+                        ParsingError.NO_OVERRIDE_FUNCTION.message
+                            .format(
+                                flowType.typeName, name, containingKtFile.name
+                            )
                     )
                 )
         }
@@ -167,7 +167,7 @@ fun KtPrimaryConstructor.findDSLTypeServiceRequest(
         parameter.typeReference
             ?.resolveToKtClass(bindingContext)
             ?.getOrNull()
-            ?.let{ ktClass ->
+            ?.let { ktClass ->
                 if (ktClass.isSubClassOf(REQUEST)) Pair(parameter, ktClass) else null
             }
     }
@@ -221,26 +221,29 @@ private fun KtElement.noSuchElement(exceptionType: ParsingError): NoSuchElementE
     noSuchElement(exceptionType.message.format(this.text, containingKtFile.name))
 
 fun KtElement.resolveDescriptor(bindingContext: BindingContext): Result<DeclarationDescriptor?> =
-        when (this) {
-            is KtNameReferenceExpression -> Result.success(
-                bindingContext[BindingContext.REFERENCE_TARGET, this]
+    when (this) {
+        is KtNameReferenceExpression -> Result.success(
+            bindingContext[BindingContext.REFERENCE_TARGET, this]
+        )
+
+        is KtTypeReference -> Result.success(
+            bindingContext.get(BindingContext.TYPE, this)
+                ?.constructor
+                ?.declarationDescriptor
+        )
+
+        is KtReferenceExpression -> Result.success(
+            bindingContext.getType(this)
+                ?.constructor
+                ?.declarationDescriptor
+        )
+
+        else -> Result.failure(
+            IllegalArgumentException(
+                "Unsupported element type: ${this.javaClass.simpleName} for binding context resolution"
             )
-            is KtTypeReference -> Result.success(
-                bindingContext.get(BindingContext.TYPE, this)
-                    ?.constructor
-                    ?.declarationDescriptor
-            )
-            is KtReferenceExpression -> Result.success(
-                bindingContext.getType(this)
-                    ?.constructor
-                    ?.declarationDescriptor
-            )
-            else -> Result.failure(
-                IllegalArgumentException(
-                    "Unsupported element type: ${this.javaClass.simpleName} for binding context resolution"
-                )
-            )
-        }
+        )
+    }
 
 private fun KtElement.resolveToDeclaration(bindingContext: BindingContext): Result<PsiElement> =
     resolveDescriptor(bindingContext)
@@ -259,14 +262,18 @@ private fun KtElement.resolveToDeclaration(bindingContext: BindingContext): Resu
 //
 fun KtElement.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> =
     resolveToDeclaration(bindingContext)
-        .flatMap {
-            (it as? KtClass)
-                ?.let { Result.success(it) }
-                ?: Result.failure(noSuchElement(ParsingError.DECLARATION_IS_NOT_KTCLASS.message.format(
-                    it.javaClass.simpleName,
-                    this.containingKtFile.name
-                )))
-    }
+        .flatMap { psiElement ->
+            (psiElement as? KtClass)
+                ?.let { ktClass -> Result.success(ktClass) }
+                ?: Result.failure(
+                    noSuchElement(
+                        ParsingError.DECLARATION_IS_NOT_KTCLASS.message.format(
+                            psiElement.javaClass.simpleName,
+                            this.containingKtFile.name
+                        )
+                    )
+                )
+        }
 
 /**
  * KDoc er enten et barn av PsiElementet eller ligger som et søsken-element umiddelbart før dette
@@ -292,7 +299,7 @@ private fun KtProperty.noSuchElement(exceptionType: ParsingError): NoSuchElement
 fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> =
     (initializer as? KtLambdaExpression)
         ?.bodyExpression
-        ?.let { Result.success(it)}
+        ?.let { Result.success(it) }
         ?: Result.failure(noSuchElement(ParsingError.NO_LAMBDA_BLOCK_FOUND))
 
 
@@ -315,7 +322,7 @@ private fun KtCallExpression.noSuchElement(exceptionType: ParsingError): NoSuchE
 private fun KtCallExpression.resolveFunctionDeclaration(
     bindingContext: BindingContext,
 ): Result<Pair<String, File>> =
-        (this.calleeExpression as? KtNameReferenceExpression)
+    (this.calleeExpression as? KtNameReferenceExpression)
         ?.let { namedReference ->
             namedReference
                 .resolveToDeclaration(bindingContext)
@@ -366,7 +373,8 @@ private fun KtCallExpression.firstArgumentOrThrow(): String = valueArguments
         ParsingError.NO_FORGRENING_NAME_FOUND.message.format(
             containingClass()?.name,
             containingKtFile.name
-    ))
+        )
+    )
 
 
 ///////////////////////////////////////////////////
@@ -377,61 +385,60 @@ private fun KtBlockExpression.noSuchElement(exceptionType: ParsingError): NoSuch
     noSuchElement(exceptionType.message.format(containingClass()?.name, containingKtFile.name))
 
 fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Result<FlowElement.Flow> =
-        children.mapNotNull { child ->
-            when (child) {
-                is KtCallExpression -> {
-                    child.resolveFunctionDeclaration(bindingContext)
-                        .map { (name, file) ->
-                            FlowElement.Function(
-                                navn = name,
-                                beskrivelse = child.extractKDocOrEmpty(),
-                                fil = file
-                            )
-                        }
-                        // TODO - must add required functions
-                        // @TestOnly - temporary handling missing in binding context
-                        .fold(
-                            onSuccess = { Result.success(it)},
-                            onFailure = {
-                                println("Warning: Missing func in binding context ${it.message}")
-                                null
-                            }
+    children.mapNotNull { child ->
+        when (child) {
+            is KtCallExpression -> {
+                child.resolveFunctionDeclaration(bindingContext)
+                    .map { (name, file) ->
+                        FlowElement.Function(
+                            navn = name,
+                            beskrivelse = child.extractKDocOrEmpty(),
+                            fil = file
                         )
-                }
-
-                is KtDotQualifiedExpression -> {
-                    child
-                        .resolveReceiverClass(bindingContext)
-                        ?.let { (resolvedClass, dslTypeAbstract) ->
-                            when(dslTypeAbstract) {
-                                RULE_FLOW ->
-                                    Result.success(
-                                        FlowElement.RuleFlow(
-                                            navn = resolvedClass.name ?: "Unknown",
-                                            beskrivelse = child.extractKDocOrEmpty(),
-                                            fil = File(resolvedClass.containingKtFile.name)
-                                        ))
-                                else -> null
-                            } // null or Result
-                        } // null ok
-                }
-
-                else -> null
-            } // null ok
-        }
-            .let { flyt ->
-                if (flyt.isEmpty()) {
-                    println("Warning: empty flow for current flow extraction logic, ${containingClass()?.name} [${containingKtFile.name}]")
-                    Result.success(FlowElement.Flow(emptyList()))
-                    // later when extraction logic is complete
-                    // Result.failure(noSuchElement(ParsingError.EMPTY_RULE_SERVICE_FLOW))
-                }
-                else {
-                    flyt.toResult().map { FlowElement.Flow(it) }
-                }
+                    }
+                    // TODO - must add required functions
+                    // @TestOnly - temporary handling missing in binding context
+                    .fold(
+                        onSuccess = { Result.success(it) },
+                        onFailure = {
+                            println("Warning: Missing func in binding context ${it.message}")
+                            null
+                        }
+                    )
             }
 
+            is KtDotQualifiedExpression -> {
+                child
+                    .resolveReceiverClass(bindingContext)
+                    ?.let { (resolvedClass, dslTypeAbstract) ->
+                        when (dslTypeAbstract) {
+                            RULE_FLOW ->
+                                Result.success(
+                                    FlowElement.RuleFlow(
+                                        navn = resolvedClass.name ?: "Unknown",
+                                        beskrivelse = child.extractKDocOrEmpty(),
+                                        fil = File(resolvedClass.containingKtFile.name)
+                                    )
+                                )
 
+                            else -> null
+                        } // null or Result
+                    } // null ok
+            }
+
+            else -> null
+        } // null ok
+    }
+        .let { flyt ->
+            if (flyt.isEmpty()) {
+                println("Warning: empty flow for current flow extraction logic, ${containingClass()?.name} [${containingKtFile.name}]")
+                Result.success(FlowElement.Flow(emptyList()))
+                // later when extraction logic is complete
+                // Result.failure(noSuchElement(ParsingError.EMPTY_RULE_SERVICE_FLOW))
+            } else {
+                flyt.toResult().map { FlowElement.Flow(it) }
+            }
+        }
 
 
 // TODO - hvordan håndtere flyt/regelsett (KtDotQualifiedExpression) som er høyresiden på en property
@@ -455,7 +462,8 @@ fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Resul
                             FlowElement.Gren(
                                 beskrivelse = child.extractKDocOrEmpty(),
                                 betingelse = child.getLambdaBlock().flatMap { it.extractBetingelse() }.getOrThrow(),
-                                flyt = child.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }.getOrThrow()
+                                flyt = child.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }
+                                    .getOrThrow()
                             )
                         }
 
@@ -471,19 +479,21 @@ fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Resul
                     child
                         .resolveReceiverClass(bindingContext)
                         ?.let { (resolvedClass, dslTypeAbstract) ->
-                            when(dslTypeAbstract) {
+                            when (dslTypeAbstract) {
                                 RULE_FLOW ->
                                     FlowElement.RuleFlow(
                                         navn = resolvedClass.name ?: "Unknown",
                                         beskrivelse = child.extractKDocOrEmpty(),
                                         fil = File(resolvedClass.containingKtFile.name)
                                     )
+
                                 RULE_SET ->
                                     FlowElement.RuleSet(
                                         navn = resolvedClass.name ?: "Unknown",
                                         beskrivelse = child.extractKDocOrEmpty(),
                                         fil = File(resolvedClass.containingKtFile.name)
                                     )
+
                                 else -> null
                             }
                         }
@@ -535,8 +545,7 @@ private fun KtBlockExpression.extractBetingelse(): Result<Condition> =
                         )
                     } // here is Result success/failure
             } // null in firstNotNullOf context
-    } ?: Result.failure( noSuchElement(ParsingError.NO_BETINGELSE_FOUND))
-
+    } ?: Result.failure(noSuchElement(ParsingError.NO_BETINGELSE_FOUND))
 
 
 ///////////////////////////////////////////////////
@@ -548,10 +557,8 @@ private fun KtDotQualifiedExpression.resolveReceiverClass(
 ): Pair<KtClass, DSLTypeAbstract>? =
     (receiverExpression as? KtReferenceExpression)
         ?.resolveToKtClass(bindingContext)
-        ?.map { ktClass ->
-            findMatchingDSLTypeAbstract(ktClass)
-                ?.let { matchingDslType -> Pair(ktClass, matchingDslType) }
-        }?.getOrNull()
+        ?.map { ktClass -> ktClass.findMatchingDSLTypeAbstract() }
+        ?.getOrNull()
 
 
 ///////////////////////////////////////////////////
