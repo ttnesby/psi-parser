@@ -407,6 +407,15 @@ private fun KtCallExpression.extractGren(bindingContext: BindingContext): Result
                 }
         }
 
+private fun KtCallExpression.extractBetingelse(): Result<Condition> =
+    getLambdaBlock()
+        .map { ktBlockExpression: KtBlockExpression ->
+            Condition(
+                navn = firstArgumentOrEmpty(),
+                uttrykk = ktBlockExpression.text
+            )
+        }
+
 private fun KtCallExpression.extractFlyt(bindingContext: BindingContext): Result<FlowElement.Flow> =
     getLambdaBlock()
         .flatMap { ktBlockExpression ->
@@ -497,7 +506,9 @@ fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Resul
                 is KtCallExpression -> {
                     child.resolveToDSLTypeBranch()
                         ?.let { dslTypeBranch ->
-                            child.extractBranch(bindingContext, dslTypeBranch).getOrThrow()
+                            child
+                                .extractBranch(bindingContext, dslTypeBranch)
+                                .getOrThrow()
                         }
                 }
 
@@ -535,43 +546,17 @@ fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Resul
  * Extracts gren elements from a forgrening lambda block
  */
 private fun KtBlockExpression.extractGrener(bindingContext: BindingContext): Result<List<FlowElement.Gren>> =
-    this.statements.mapNotNull { statement ->
-        (statement as? KtCallExpression)
-            ?.let { gren ->
-                val block = gren.getLambdaBlock()
-                block
-                    .flatMap { it.extractBetingelse() }
-                    .flatMap { betingelse ->
-                        block
-                            .flatMap { it.extractRuleFlowFlow(bindingContext) }
-                            .map { flyt ->
-                                FlowElement.Gren(
-                                    beskrivelse = gren.extractDocOrEmpty(),
-                                    betingelse = betingelse,
-                                    flyt = flyt
-                                )
-                            }
-                    }
-            } // null ok
-    } // List<Result<FlowElement.Gren>> - need Result<List<FlowElement.Gren>>
+    this.statements
+        .mapNotNull { statement -> (statement as? KtCallExpression)?.extractGren(bindingContext) }
         .toResult()
 
 /**
  * Extracts betingelse from a gren lambda block
  */
 private fun KtBlockExpression.extractBetingelse(): Result<Condition> =
-    this.statements.firstNotNullOfOrNull { statement ->
-        (statement as? KtCallExpression)
-            ?.let { callExpression ->
-                callExpression.getLambdaBlock()
-                    .map { block ->
-                        Condition(
-                            navn = callExpression.firstArgumentOrEmpty(),
-                            uttrykk = block.text
-                        )
-                    } // here is Result success/failure
-            } // null in firstNotNullOf context
-    } ?: Result.failure(noSuchElement(ParsingError.NO_BETINGELSE_FOUND))
+    this.statements
+        .firstNotNullOfOrNull { statement -> (statement as? KtCallExpression)?.extractBetingelse() }
+        ?: Result.failure(noSuchElement(ParsingError.NO_BETINGELSE_FOUND))
 
 
 ///////////////////////////////////////////////////
