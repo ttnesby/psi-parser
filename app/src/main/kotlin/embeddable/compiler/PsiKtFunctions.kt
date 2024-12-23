@@ -362,16 +362,17 @@ private fun KtCallExpression.getLambdaBlock(): Result<KtBlockExpression> = runCa
     functionLiteral.bodyExpression ?: throw IllegalStateException("Lambda body is not a block expression")
 }
 
-private fun KtCallExpression.firstArgumentOrEmpty(): String = valueArguments
-    .firstOrNull()
-    ?.text
-    ?.removeSurrounding("\"")
-    ?: ""
+private fun KtCallExpression.firstArgumentOrEmpty(): String =
+    valueArguments
+        .firstOrNull()
+        ?.text
+        ?.removeSurrounding("\"")
+        ?: ""
 
 private fun KtCallExpression.firstArgument(): Result<String> =
     valueArguments
         .firstOrNull()
-        ?.let { Result.success(text.removeSurrounding("\"")) }
+        ?.let { arg -> Result.success(arg.text.removeSurrounding("\"")) }
         ?: Result.failure(noSuchElement(ParsingError.NO_FORGRENING_NAME_FOUND))
 
 private fun KtCallExpression.extractForgrening(bindingContext: BindingContext): Result<FlowElement.Forgrening> =
@@ -414,12 +415,12 @@ private fun KtCallExpression.extractFlyt(bindingContext: BindingContext): Result
 
 private fun KtCallExpression.extractBranch(
     bindingContext: BindingContext,
-    dslTypeBranch: DSLTypeBranch): Result<FlowElement> = when (dslTypeBranch) {
-        FORGRENING -> extractForgrening(bindingContext)
-        GREN -> extractGren(bindingContext)
-        FLYT -> extractFlyt(bindingContext)
-    }
-
+    dslTypeBranch: DSLTypeBranch
+): Result<FlowElement> = when (dslTypeBranch) {
+    FORGRENING -> extractForgrening(bindingContext)
+    GREN -> extractGren(bindingContext)
+    FLYT -> extractFlyt(bindingContext)
+}
 
 
 ///////////////////////////////////////////////////
