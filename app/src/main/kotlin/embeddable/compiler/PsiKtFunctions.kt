@@ -27,6 +27,7 @@ import java.io.File
  */
 
 enum class ParsingError(val message: String) {
+    NO_CLASS_NAME("No class name for %s [%s]"),
     NO_PRIMARY_CONSTRUCTOR("No primary constructor found for %s [%s]"),
     NO_SERVICE_REQUEST_PARAMETER("No service request parameter found in primary constructor for %s [%s]"),
     NO_SERVICE_RESPONSE_TYPE("No service response type found for %s [%s]"),
@@ -140,6 +141,31 @@ fun KtClass.findMatchingProperty(flowType: DSLTypeFlow): Result<KtProperty> =
                 )
         }
         ?: Result.failure(noSuchElement(ParsingError.NO_PROPERTIES_FOUND))
+
+private fun KtClass.requireName(): Result<String> =
+    name
+        ?.let { Result.success(it) }
+        ?: Result.failure(noSuchElement(ParsingError.NO_CLASS_NAME))
+
+private fun KtClass.extractRuleFlowReference(): Result<FlowElement.RuleFlow> =
+    requireName()
+        .map { name ->
+            FlowElement.RuleFlow(
+                navn = name,
+                beskrivelse = extractDocOrEmpty(),
+                fil = File(containingKtFile.name)
+            )
+        }
+
+private fun KtClass.extractRuleSetReference(): Result<FlowElement.RuleSet> =
+    requireName()
+        .map { name ->
+            FlowElement.RuleSet(
+                navn = name,
+                beskrivelse = extractDocOrEmpty(),
+                fil = File(containingKtFile.name)
+            )
+        }
 
 
 ///////////////////////////////////////////////////
@@ -422,14 +448,34 @@ private fun KtCallExpression.extractFlyt(bindingContext: BindingContext): Result
             ktBlockExpression.extractRuleFlowFlow(bindingContext)
         }
 
-private fun KtCallExpression.extractBranch(
-    bindingContext: BindingContext,
-    dslTypeBranch: DSLTypeBranch
-): Result<FlowElement> = when (dslTypeBranch) {
-    FORGRENING -> extractForgrening(bindingContext)
-    GREN -> extractGren(bindingContext)
-    FLYT -> extractFlyt(bindingContext)
-}
+private fun KtCallExpression.extractBranch(bindingContext: BindingContext): Result<FlowElement>? =
+    resolveToDSLTypeBranch()
+        ?.let { dslTypeBranch ->
+            when (dslTypeBranch) {
+                FORGRENING -> extractForgrening(bindingContext)
+                GREN -> extractGren(bindingContext)
+                FLYT -> extractFlyt(bindingContext)
+            }
+        }
+
+private fun KtCallExpression.extractFunctionReference(bindingContext: BindingContext): Result<FlowElement.Function>? =
+    resolveFunctionDeclaration(bindingContext)
+        .map { (name, file) ->
+            FlowElement.Function(
+                navn = name,
+                beskrivelse = extractDocOrEmpty(),
+                fil = file
+            )
+        }
+        // TODO - must add required functions
+        // @TestOnly - temporary handling missing in binding context
+        .fold(
+            onSuccess = { Result.success(it) },
+            onFailure = {
+                println("Warning: Missing func in binding context ${it.message}")
+                null
+            }
+        )
 
 
 ///////////////////////////////////////////////////
@@ -442,47 +488,10 @@ private fun KtBlockExpression.noSuchElement(exceptionType: ParsingError): NoSuch
 fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Result<FlowElement.Flow> =
     children.mapNotNull { child ->
         when (child) {
-            is KtCallExpression -> {
-                child.resolveFunctionDeclaration(bindingContext)
-                    .map { (name, file) ->
-                        FlowElement.Function(
-                            navn = name,
-                            beskrivelse = child.extractDocOrEmpty(),
-                            fil = file
-                        )
-                    }
-                    // TODO - must add required functions
-                    // @TestOnly - temporary handling missing in binding context
-                    .fold(
-                        onSuccess = { Result.success(it) },
-                        onFailure = {
-                            println("Warning: Missing func in binding context ${it.message}")
-                            null
-                        }
-                    )
-            }
-
-            is KtDotQualifiedExpression -> {
-                child
-                    .resolveReceiverClass(bindingContext)
-                    ?.let { (resolvedClass, dslTypeAbstract) ->
-                        when (dslTypeAbstract) {
-                            RULE_FLOW ->
-                                Result.success(
-                                    FlowElement.RuleFlow(
-                                        navn = resolvedClass.name ?: "Unknown",
-                                        beskrivelse = child.extractDocOrEmpty(),
-                                        fil = File(resolvedClass.containingKtFile.name)
-                                    )
-                                )
-
-                            else -> null
-                        } // null or Result
-                    } // null ok
-            }
-
+            is KtCallExpression -> child.extractFunctionReference(bindingContext)
+            is KtDotQualifiedExpression -> child.extractFlowReference(bindingContext)
             else -> null
-        } // null ok
+        }
     }
         .let { flyt ->
             if (flyt.isEmpty()) {
@@ -499,48 +508,24 @@ fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Re
 // TODO - hvordan håndtere flyt/regelsett (KtDotQualifiedExpression) som er høyresiden på en property
 // TODO - NB! når KDoc er relatert til flow/ruleset/function - this.children -> this.statements
 
-fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Result<FlowElement.Flow> = runCatching {
-    FlowElement.Flow(
-        children.mapNotNull { child ->
-            when (child) {
-                is KtCallExpression -> {
-                    child.resolveToDSLTypeBranch()
-                        ?.let { dslTypeBranch ->
-                            child
-                                .extractBranch(bindingContext, dslTypeBranch)
-                                .getOrThrow()
-                        }
-                }
-
-                is KtDotQualifiedExpression -> {
-                    child
-                        .resolveReceiverClass(bindingContext)
-                        ?.let { (resolvedClass, dslTypeAbstract) ->
-                            when (dslTypeAbstract) {
-                                RULE_FLOW ->
-                                    FlowElement.RuleFlow(
-                                        navn = resolvedClass.name ?: "Unknown",
-                                        beskrivelse = child.extractDocOrEmpty(),
-                                        fil = File(resolvedClass.containingKtFile.name)
-                                    )
-
-                                RULE_SET ->
-                                    FlowElement.RuleSet(
-                                        navn = resolvedClass.name ?: "Unknown",
-                                        beskrivelse = child.extractDocOrEmpty(),
-                                        fil = File(resolvedClass.containingKtFile.name)
-                                    )
-
-                                else -> null
-                            }
-                        }
-                }
-
-                else -> null
+fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Result<FlowElement.Flow> =
+    children.mapNotNull { child ->
+        when (child) {
+            is KtCallExpression -> child.extractBranch(bindingContext)
+            is KtDotQualifiedExpression -> child.extractFlowReference(bindingContext)
+            else -> null
+        }
+    }
+        .let { flyt ->
+            if (flyt.isEmpty()) {
+                println("Warning: empty flow with current flow extraction logic, ${containingClass()?.name} [${containingKtFile.name}]")
+                Result.success(FlowElement.Flow(emptyList()))
+                // later when extraction logic is complete
+                // Result.failure(noSuchElement(ParsingError.EMPTY_RULE_SERVICE_FLOW))
+            } else {
+                flyt.toResult().map { FlowElement.Flow(it) }
             }
-        })
-
-}
+        }
 
 /**
  * Extracts gren elements from a forgrening lambda block
@@ -571,6 +556,16 @@ private fun KtDotQualifiedExpression.resolveReceiverClass(
         ?.map { ktClass -> ktClass.matchingDSLTypeAbstractOrNull() }
         ?.getOrNull()
 
+
+private fun KtDotQualifiedExpression.extractFlowReference(bindingContext: BindingContext): Result<FlowElement>? =
+    resolveReceiverClass(bindingContext)
+        ?.let { (resolvedClass, dslTypeAbstract) ->
+            when (dslTypeAbstract) {
+                RULE_FLOW -> resolvedClass.extractRuleFlowReference()
+                RULE_SET -> resolvedClass.extractRuleSetReference()
+                RULE_SERVICE -> null
+            }
+        }
 
 ///////////////////////////////////////////////////
 /** helper functions */
