@@ -61,7 +61,7 @@ class Extractor private constructor(
 
     private fun KtClass.extractServiceRequestFields(): Result<List<PropertyInfo>> =
         requirePrimaryConstructor()
-            .flatMap { it.findDSLTypeServiceRequest(bindingContext) }
+            .flatMap { it.findParameterDSLTypeServiceRequest(bindingContext) }
             .flatMap { (parameter, serviceRequestClass) ->
                 serviceRequestClass
                     .requirePrimaryConstructor()

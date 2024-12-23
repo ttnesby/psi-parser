@@ -29,6 +29,7 @@ enum class ParsingError(val message: String) {
     NO_PRIMARY_CONSTRUCTOR("No primary constructor found for %s [%s]"),
     NO_SERVICE_REQUEST_PARAMETER("No service request parameter found in primary constructor for %s [%s]"),
     NO_SERVICE_RESPONSE_TYPE("No service response type found for %s [%s]"),
+    NO_GENERIC_TYPE_REFERENCE("No generic type reference found for %s [%s]"),
     NOT_SUBCLASS_OF_SERVICE("%s is not subclass of %s [%s]"),
     NO_FLOW_PARAMETER("No flow parameter of type class found in primary constructor for %s [%s]"),
     NO_PROPERTIES_FOUND("No properties found for %s [%s]"),
@@ -94,23 +95,17 @@ private fun KtClass.matchingDSLTypeAbstractOrNull(): Pair<KtClass, DSLTypeAbstra
 fun KtClass.docOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
 
 private fun KtClass.isSubClassOf(type: DSLTypeSuperClass): Boolean =
-    superTypeListEntries.any { it.typeReference?.text?.contains(type.typeName) == true }
+    superTypeListEntries.any { it.isClassOf(type) }
 
 fun KtClass.findResponseTypeForRuleService(): Result<KtTypeReference> =
     superTypeListEntries
-        .find { it.typeReference?.text?.contains(RULE_SERVICE.typeName) == true }
-        // get the generic type argument for the rule service = response type
-        // TODO need hierarchy for knowing type of error
-        ?.typeReference
-        ?.typeElement
-        ?.typeArgumentsAsTypes
-        ?.firstOrNull()
-        ?.let { ktTypeReference ->  Result.success(ktTypeReference) }
+        .find { it.isClassOf(RULE_SERVICE) }
+        ?.genericTypeReference()
         ?: Result.failure(noSuchElement(ParsingError.NO_SERVICE_RESPONSE_TYPE))
 
 fun KtClass.mustBeSubClassOf(type: DSLTypeService): Result<KtClass> =
     superTypeListEntries
-        .find { ktSuperTypeListEntry ->  ktSuperTypeListEntry.typeReference?.text?.contains(type.typeName) == true }
+        .find { it.isClassOf(type) }
         ?.let { Result.success(this) }
         ?: Result.failure(
             noSuchElement(
@@ -145,6 +140,26 @@ fun KtClass.findMatchingProperty(flowType: DSLTypeFlow): Result<KtProperty> =
         }
         ?: Result.failure(noSuchElement(ParsingError.NO_PROPERTIES_FOUND))
 
+
+///////////////////////////////////////////////////
+/** KtSuperTypeListEntry extension functions */
+///////////////////////////////////////////////////
+
+private fun KtSuperTypeListEntry.noSuchElement(exceptionType: ParsingError): NoSuchElementException =
+    noSuchElement(exceptionType.message.format(name, containingKtFile.name))
+
+private fun KtSuperTypeListEntry.isClassOf(type: DSLTypeSuperClass): Boolean =
+    typeReference?.text?.contains(type.typeName) == true
+
+private fun KtSuperTypeListEntry.genericTypeReference(): Result<KtTypeReference> =
+    typeReference
+        ?.typeElement
+        ?.typeArgumentsAsTypes
+        ?.firstOrNull()
+        ?.let { Result.success(it) }
+        ?: Result.failure(noSuchElement(ParsingError.NO_GENERIC_TYPE_REFERENCE))
+
+
 ///////////////////////////////////////////////////
 /** KtPrimaryConstructor extension functions */
 ///////////////////////////////////////////////////
@@ -152,7 +167,7 @@ fun KtClass.findMatchingProperty(flowType: DSLTypeFlow): Result<KtProperty> =
 private fun KtPrimaryConstructor.noSuchElement(exceptionType: ParsingError): NoSuchElementException =
     noSuchElement(exceptionType.message.format(containingClass()?.name, containingKtFile.name))
 
-fun KtPrimaryConstructor.findDSLTypeServiceRequest(
+fun KtPrimaryConstructor.findParameterDSLTypeServiceRequest(
     bindingContext: BindingContext
 ): Result<Pair<KtParameter, KtClass>> {
 
