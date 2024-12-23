@@ -37,6 +37,7 @@ enum class ParsingError(val message: String) {
     NO_PROPERTIES_FOUND("No properties found for %s [%s]"),
     NO_OVERRIDE_FUNCTION("No override function %s found for %s [%s]"),
     EMPTY_RULE_SERVICE_FLOW("Rule service flow is empty for %s [%s]"),
+    NO_LAMBDA_ARGUMENTS("No lambda arguments found in call expression for %s [%s]"),
     NO_FORGRENING_NAME_FOUND("No name found for forgrening for %s [%s]"),
     NO_BETINGELSE_FOUND("No betingelse found for gren for %s [%s]"),
     NO_LAMBDA_BLOCK_FOUND("No lambda block found in property for %s [%s]"),
@@ -371,22 +372,21 @@ private fun KtCallExpression.resolveToDSLTypeBranch(): DSLTypeBranch? =
         ?.getReferencedName()
         ?.let { name -> DSLTypeBranch.fromString(name) }
 
-private fun KtCallExpression.getLambdaBlock(): Result<KtBlockExpression> = runCatching {
-    // Look for lambda arguments
-    if (this.lambdaArguments.isEmpty()) {
-        throw IllegalStateException("No lambda arguments found in call expression")
-    }
-
-    // Get the first lambda argument
-    // What if there are multiple lambda arguments?
-    val lambdaArg = this.lambdaArguments.first()
-
-    // Get the function literal (lambda) expression
-    val functionLiteral = lambdaArg.getLambdaExpression() ?: throw IllegalStateException("Lambda expression not found")
-
-    // Get the body block
-    functionLiteral.bodyExpression ?: throw IllegalStateException("Lambda body is not a block expression")
-}
+private fun KtCallExpression.getLambdaBlock(): Result<KtBlockExpression> =
+    lambdaArguments // can it be multiple lambda args?
+        .firstOrNull()
+        ?.let { lambdaArg ->
+            lambdaArg
+                .getLambdaExpression()
+                ?.let { functionLiteral ->
+                    functionLiteral
+                        .bodyExpression
+                        ?.let { ktBlockExpression ->
+                            Result.success(ktBlockExpression)
+                        } // do we need to raise high resolution failure?
+                } // do we need to raise high resolution failure?
+        }
+        ?: Result.failure(noSuchElement(ParsingError.NO_LAMBDA_ARGUMENTS))
 
 private fun KtCallExpression.firstArgumentOrEmpty(): String =
     valueArguments
