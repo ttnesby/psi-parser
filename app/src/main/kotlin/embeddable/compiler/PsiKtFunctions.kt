@@ -288,7 +288,7 @@ fun KtElement.resolveToKtClass(bindingContext: BindingContext): Result<KtClass> 
  * elementet. Det lages en sekvens som starter fra forrige søsken-element og fortsetter til forrige
  * søsken-element for hver iterasjon. Filtrerer ut PsiWhiteSpace og KDoc-elementer og sekvensen stopper når et element er hverken KDoc eller PsiWhiteSpace.
  */
-fun KtElement.extractKDocOrEmpty(): String =
+fun KtElement.extractDocOrEmpty(): String =
     generateSequence(this.prevSibling) { it.prevSibling }
         .takeWhile { it is PsiWhiteSpace || it is KDoc }
         .firstOrNull { it is KDoc }?.let {
@@ -368,16 +368,58 @@ private fun KtCallExpression.firstArgumentOrEmpty(): String = valueArguments
     ?.removeSurrounding("\"")
     ?: ""
 
-private fun KtCallExpression.firstArgumentOrThrow(): String = valueArguments
-    .firstOrNull()
-    ?.text
-    ?.removeSurrounding("\"")
-    ?: throw noSuchElement(
-        ParsingError.NO_FORGRENING_NAME_FOUND.message.format(
-            containingClass()?.name,
-            containingKtFile.name
-        )
-    )
+private fun KtCallExpression.firstArgument(): Result<String> =
+    valueArguments
+        .firstOrNull()
+        ?.let { Result.success(text.removeSurrounding("\"")) }
+        ?: Result.failure(noSuchElement(ParsingError.NO_FORGRENING_NAME_FOUND))
+
+private fun KtCallExpression.extractForgrening(bindingContext: BindingContext): Result<FlowElement.Forgrening> =
+    firstArgument()
+        .flatMap { name ->
+            getLambdaBlock()
+                .flatMap { ktBlockExpression ->
+                    ktBlockExpression.extractGrener(bindingContext)
+                        .map { grener ->
+                            FlowElement.Forgrening(
+                                beskrivelse = extractDocOrEmpty(),
+                                navn = name,
+                                gren = grener
+                            )
+                        }
+                }
+        }
+
+private fun KtCallExpression.extractGren(bindingContext: BindingContext): Result<FlowElement.Gren> =
+    getLambdaBlock()
+        .flatMap { ktBlockExpression ->
+            ktBlockExpression.extractBetingelse()
+                .flatMap { betingelse ->
+                    ktBlockExpression.extractRuleFlowFlow(bindingContext)
+                        .map { flyt ->
+                            FlowElement.Gren(
+                                beskrivelse = extractDocOrEmpty(),
+                                betingelse = betingelse,
+                                flyt = flyt
+                            )
+                        }
+                }
+        }
+
+private fun KtCallExpression.extractFlyt(bindingContext: BindingContext): Result<FlowElement.Flow> =
+    getLambdaBlock()
+        .flatMap { ktBlockExpression ->
+            ktBlockExpression.extractRuleFlowFlow(bindingContext)
+        }
+
+private fun KtCallExpression.extractBranch(
+    bindingContext: BindingContext,
+    dslTypeBranch: DSLTypeBranch): Result<FlowElement> = when (dslTypeBranch) {
+        FORGRENING -> extractForgrening(bindingContext)
+        GREN -> extractGren(bindingContext)
+        FLYT -> extractFlyt(bindingContext)
+    }
+
 
 
 ///////////////////////////////////////////////////
@@ -395,7 +437,7 @@ fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Re
                     .map { (name, file) ->
                         FlowElement.Function(
                             navn = name,
-                            beskrivelse = child.extractKDocOrEmpty(),
+                            beskrivelse = child.extractDocOrEmpty(),
                             fil = file
                         )
                     }
@@ -419,7 +461,7 @@ fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Re
                                 Result.success(
                                     FlowElement.RuleFlow(
                                         navn = resolvedClass.name ?: "Unknown",
-                                        beskrivelse = child.extractKDocOrEmpty(),
+                                        beskrivelse = child.extractDocOrEmpty(),
                                         fil = File(resolvedClass.containingKtFile.name)
                                     )
                                 )
@@ -454,26 +496,7 @@ fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Resul
                 is KtCallExpression -> {
                     child.resolveToDSLTypeBranch()
                         ?.let { dslTypeBranch ->
-                            when (dslTypeBranch) {
-                                FORGRENING -> {
-                                    FlowElement.Forgrening(
-                                        beskrivelse = child.extractKDocOrEmpty(),
-                                        navn = child.firstArgumentOrThrow(),
-                                        gren = child.getLambdaBlock().flatMap { it.extractGrener(bindingContext) }.getOrThrow()
-                                    )
-                                }
-                                GREN -> {
-                                    FlowElement.Gren(
-                                        beskrivelse = child.extractKDocOrEmpty(),
-                                        betingelse = child.getLambdaBlock().flatMap { it.extractBetingelse() }.getOrThrow(),
-                                        flyt = child.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }
-                                            .getOrThrow()
-                                    )
-                                }
-                                FLYT -> {
-                                    child.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }.getOrThrow()
-                                }
-                            }
+                            child.extractBranch(bindingContext, dslTypeBranch).getOrThrow()
                         }
                 }
 
@@ -485,14 +508,14 @@ fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Resul
                                 RULE_FLOW ->
                                     FlowElement.RuleFlow(
                                         navn = resolvedClass.name ?: "Unknown",
-                                        beskrivelse = child.extractKDocOrEmpty(),
+                                        beskrivelse = child.extractDocOrEmpty(),
                                         fil = File(resolvedClass.containingKtFile.name)
                                     )
 
                                 RULE_SET ->
                                     FlowElement.RuleSet(
                                         navn = resolvedClass.name ?: "Unknown",
-                                        beskrivelse = child.extractKDocOrEmpty(),
+                                        beskrivelse = child.extractDocOrEmpty(),
                                         fil = File(resolvedClass.containingKtFile.name)
                                     )
 
@@ -522,7 +545,7 @@ private fun KtBlockExpression.extractGrener(bindingContext: BindingContext): Res
                             .flatMap { it.extractRuleFlowFlow(bindingContext) }
                             .map { flyt ->
                                 FlowElement.Gren(
-                                    beskrivelse = gren.extractKDocOrEmpty(),
+                                    beskrivelse = gren.extractDocOrEmpty(),
                                     betingelse = betingelse,
                                     flyt = flyt
                                 )
