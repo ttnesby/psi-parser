@@ -11,7 +11,6 @@ import rule.dsl.DSLTypeFlow
 import rule.dsl.DSLTypeFlow.FLOW
 import rule.dsl.DSLTypeFlow.SERVICE
 import rule.dsl.DSLTypeService.RESPONSE
-import kotlin.io.path.absolutePathString
 
 class Extractor private constructor(
     private val repo: Repo,
@@ -33,24 +32,31 @@ class Extractor private constructor(
             psiFiles.forEach { (it as PsiFileImpl).clearCaches() }
         }.toResult()
 
-
-
     private fun extractRuleInfo(ktClass: KtClass, dslType: DSLTypeAbstract): Result<RuleInfo> = when (dslType) {
         RULE_SERVICE -> ktClass.extractRuleService()
         RULE_FLOW -> ktClass.extractRuleFlow()
         RULE_SET -> ktClass.extractRuleSet()
     }
 
-    private fun KtClass.extractRuleService(): Result<RuleServiceInfo> = runCatching {
-        RuleServiceInfo(
-            navn = name!!,
-            beskrivelse = docOrEmpty(),
-            inndata = extractServiceRequestFields().getOrThrow(),
-            utdata = extractServiceResponseFields().getOrThrow(),
-            flyt = extractFlow(SERVICE).getOrThrow(),
-            gitHubUri = repo.toGithubURI(containingKtFile.name).getOrThrow()
-        )
-    }
+    private fun KtClass.extractRuleService(): Result<RuleServiceInfo> =
+        requireName().flatMap { name ->
+            extractServiceRequestFields().flatMap { requestFields ->
+                extractServiceResponseFields().flatMap { responseFields ->
+                    extractFlow(SERVICE).flatMap { flyt ->
+                        repo.toGithubURI(containingKtFile.name).map { gitHubUri ->
+                            RuleServiceInfo(
+                                navn = name,
+                                beskrivelse = docOrEmpty(),
+                                inndata = requestFields,
+                                utdata = responseFields,
+                                flyt = flyt,
+                                gitHubUri = gitHubUri
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
     private fun KtClass.extractServiceRequestFields(): Result<List<PropertyInfo>> =
         requirePrimaryConstructor()
@@ -89,15 +95,22 @@ class Extractor private constructor(
                     }
             }
 
-    private fun KtClass.extractRuleFlow(): Result<RuleFlowInfo> = runCatching {
-        RuleFlowInfo(
-            navn = name!!,
-            beskrivelse = docOrEmpty(),
-            inndata = extractFlowRequestFields().getOrThrow(),
-            flyt = extractFlow(FLOW).getOrThrow(),
-            gitHubUri = repo.toGithubURI(containingKtFile.name).getOrThrow()
-        )
-    }
+    private fun KtClass.extractRuleFlow(): Result<RuleFlowInfo> =
+        requireName().flatMap { name ->
+            extractFlowRequestFields().flatMap { requestFields ->
+                extractFlow(FLOW).flatMap { flyt ->
+                    repo.toGithubURI(containingKtFile.name).map { gitHubUri ->
+                        RuleFlowInfo(
+                            navn = name,
+                            beskrivelse = docOrEmpty(),
+                            inndata = requestFields,
+                            flyt = flyt,
+                            gitHubUri = gitHubUri
+                        )
+                    }
+                }
+            }
+        }
 
     private fun KtClass.extractFlowRequestFields(): Result<List<PropertyInfo>> =
         requirePrimaryConstructor()
@@ -119,13 +132,16 @@ class Extractor private constructor(
                 }
             }
 
-    private fun KtClass.extractRuleSet(): Result<RuleSetInfo> = runCatching {
-        RuleSetInfo(
-            navn = name!!,
-            beskrivelse = docOrEmpty(),
-            inndata = emptyList(),
-            flyt = FlowElement.Flow(emptyList()),
-            gitHubUri = repo.toGithubURI(containingKtFile.name).getOrThrow()
-        )
-    }
+    private fun KtClass.extractRuleSet(): Result<RuleSetInfo> =
+        requireName().flatMap { name ->
+            repo.toGithubURI(containingKtFile.name).map { gitHubUri ->
+                RuleSetInfo(
+                    navn = name,
+                    beskrivelse = docOrEmpty(),
+                    inndata = emptyList(),
+                    flyt = FlowElement.Flow(emptyList()),
+                    gitHubUri = gitHubUri
+                )
+            }
+        }
 }

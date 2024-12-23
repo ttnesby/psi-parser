@@ -143,7 +143,7 @@ fun KtClass.findMatchingProperty(flowType: DSLTypeFlow): Result<KtProperty> =
         }
         ?: Result.failure(noSuchElement(ParsingError.NO_PROPERTIES_FOUND))
 
-private fun KtClass.requireName(): Result<String> =
+fun KtClass.requireName(): Result<String> =
     name
         ?.let { Result.success(it) }
         ?: Result.failure(noSuchElement(ParsingError.NO_CLASS_NAME))
