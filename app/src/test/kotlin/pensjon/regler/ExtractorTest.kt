@@ -5,7 +5,6 @@ import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -14,6 +13,7 @@ import java.io.InputStreamReader
 import java.net.URI
 import java.nio.file.Path
 import kotlin.io.path.Path
+import kotlin.io.path.absolutePathString
 import kotlin.io.path.div
 import kotlin.io.path.isDirectory
 
@@ -56,22 +56,26 @@ class ExtractorTest {
 
         val localRoot = repoRoot / "app" / "src" / "test" / "resources" / "DONOTEXIST"
         val repo = Repo(localRoot)
+        val compilerContext = CompilerContext.new(disposable = disposable).getOrThrow()
+        val psiFiles = repo.files()
+            .map { fileInfo ->
+                compilerContext.createKtFile(fileInfo.file.absolutePathString(), fileInfo.content)
+            }
+        val bindingContext = compilerContext.buildBindingContext(psiFiles).getOrThrow()
 
         val extractor = Extractor.new(
             repo = repo,
-            context = CompilerContext.new(disposable = disposable).getOrThrow()
+            psiFiles = psiFiles,
+            bindingContext = bindingContext
         )
-        assertTrue(extractor.isSuccess)
         assertEquals(0, repo.sourceRoots.size)
 
-        extractor.map {
-            it.toModel()
-                .map { result ->
-                    assertEquals(0, result.filterIsInstance<RuleServiceInfo>().size)
-                    assertEquals(0, result.filterIsInstance<RuleFlowInfo>().size)
-                    assertEquals(0, result.filterIsInstance<RuleSetInfo>().size)
-                }.onFailure { assert(false) }
+        extractor.toModel().map { result ->
+            assertEquals(0, result.filterIsInstance<RuleServiceInfo>().size)
+            assertEquals(0, result.filterIsInstance<RuleFlowInfo>().size)
+            assertEquals(0, result.filterIsInstance<RuleSetInfo>().size)
         }.onFailure { assert(false) }
+
     }
 
     @Test
@@ -92,101 +96,103 @@ class ExtractorTest {
                     )
         }
 
+        val compilerContext = CompilerContext.new(disposable = disposable).getOrThrow()
+        val psiFiles = repo.files()
+            .map { fileInfo ->
+                compilerContext.createKtFile(fileInfo.file.absolutePathString(), fileInfo.content)
+            }
+        val bindingContext = compilerContext.buildBindingContext(psiFiles).getOrThrow()
+
         val extractor = Extractor.new(
             repo = repo,
-            context = CompilerContext.new(disposable = disposable).getOrThrow()
+            psiFiles = psiFiles,
+            bindingContext = bindingContext
         )
-        assertTrue(extractor.isSuccess)
         assertEquals(9, repo.sourceRoots.size)
 
-        extractor.map {
-            it.toModel()
-                .map { result ->
-                    val services = result.filterIsInstance<RuleServiceInfo>()
-                    val flows = result.filterIsInstance<RuleFlowInfo>()
-                    val sets = result.filterIsInstance<RuleSetInfo>()
+        extractor.toModel().map { result ->
+            val services = result.filterIsInstance<RuleServiceInfo>()
+            val flows = result.filterIsInstance<RuleFlowInfo>()
+            val sets = result.filterIsInstance<RuleSetInfo>()
 
-                    assertEquals(1, services.size)
-                    assertEquals(10, flows.size)
-                    assertEquals(31, sets.size)
+            assertEquals(1, services.size)
+            assertEquals(10, flows.size)
+            assertEquals(31, sets.size)
 
-                    //////////////////////////////
-                    // asserts for regel tjeneste
-                    //////////////////////////////
+            //////////////////////////////
+            // asserts for regel tjeneste
+            //////////////////////////////
 
-                    val ruleService = services.first()
-                    assertEquals("FastsettTrygdetidService", ruleService.navn)
-                    assertEquals("", ruleService.beskrivelse)
+            val ruleService = services.first()
+            assertEquals("FastsettTrygdetidService", ruleService.navn)
+            assertEquals("", ruleService.beskrivelse)
 
-                    assertEquals(11, ruleService.inndata.size)
-                    assertEquals(
-                        PropertyInfo(
-                            navn = "beregningsvilkarPeriodeListe",
-                            beskrivelse = "Liste av beregningsvilkarPerioder, p�krevd ved uf�retrygd.",
-                            type = "MutableList<BeregningsvilkarPeriode>"
+            assertEquals(11, ruleService.inndata.size)
+            assertEquals(
+                PropertyInfo(
+                    navn = "beregningsvilkarPeriodeListe",
+                    beskrivelse = "Liste av beregningsvilkarPerioder, p�krevd ved uf�retrygd.",
+                    type = "MutableList<BeregningsvilkarPeriode>"
 
-                        ), ruleService.inndata.last()
-                    )
+                ), ruleService.inndata.last()
+            )
 
-                    assertEquals(5, ruleService.utdata.size)
-                    assertEquals(
-                        PropertyInfo(
-                            navn = "pakkseddel",
-                            beskrivelse = "",
-                            type = "Pakkseddel"
+            assertEquals(5, ruleService.utdata.size)
+            assertEquals(
+                PropertyInfo(
+                    navn = "pakkseddel",
+                    beskrivelse = "",
+                    type = "Pakkseddel"
 
-                        ), ruleService.utdata.last()
-                    )
+                ), ruleService.utdata.last()
+            )
 
-                    assertEquals(2, ruleService.flyt.elementer.size)
+            assertEquals(2, ruleService.flyt.elementer.size)
 
-                    assertEquals(
-                        URI("https://github.com/navikt/${localRoot.last()}/blob/master/fastsetttrygdetid/function/FastsettTrygdetidService.kt"),
-                        ruleService.gitHubUri
-                    )
+            assertEquals(
+                URI("https://github.com/navikt/${localRoot.last()}/blob/master/fastsetttrygdetid/function/FastsettTrygdetidService.kt"),
+                ruleService.gitHubUri
+            )
 
-                    //////////////////////////////
-                    // asserts for regel flyter
-                    //////////////////////////////
+            //////////////////////////////
+            // asserts for regel flyter
+            //////////////////////////////
 
-                    val ruleFlow = flows.first()
-                    assertEquals("StartTrygdetidFlyt", ruleFlow.navn)
-                    assertEquals("", ruleFlow.beskrivelse)
-                    assertEquals(4, ruleFlow.inndata.size)
+            val ruleFlow = flows.first()
+            assertEquals("StartTrygdetidFlyt", ruleFlow.navn)
+            assertEquals("", ruleFlow.beskrivelse)
+            assertEquals(4, ruleFlow.inndata.size)
 
-                    assertEquals(
-                        PropertyInfo(
-                            navn = "variable",
-                            type = "TrygdetidVariable?",
-                            beskrivelse = ""
-                        ), ruleFlow.inndata.last()
-                    )
+            assertEquals(
+                PropertyInfo(
+                    navn = "variable",
+                    type = "TrygdetidVariable?",
+                    beskrivelse = ""
+                ), ruleFlow.inndata.last()
+            )
 
-                    assertEquals(2, ruleFlow.flyt.elementer.size)
+            assertEquals(2, ruleFlow.flyt.elementer.size)
 
-                    //////////////////////////////
-                    // asserts for FastsettTrygdetidFlyt
-                    //////////////////////////////
+            //////////////////////////////
+            // asserts for FastsettTrygdetidFlyt
+            //////////////////////////////
 
-                    val fastsettTrygdetidFlyt = flows.find { it.navn == "FastsettTrygdetidFlyt" }!!
-                    val forgrening = fastsettTrygdetidFlyt
-                        .flyt.elementer
-                        .filterIsInstance<FlowElement.Forgrening>().first()
+            val fastsettTrygdetidFlyt = flows.find { it.navn == "FastsettTrygdetidFlyt" }!!
+            val forgrening = fastsettTrygdetidFlyt
+                .flyt.elementer
+                .filterIsInstance<FlowElement.Forgrening>().first()
 
-                    assertEquals("Uføretrygd?", forgrening.navn)
-                    assertEquals("Task: Uføretrygd?", forgrening.beskrivelse)
-                    assertEquals(2, forgrening.gren.size)
+            assertEquals("Uføretrygd?", forgrening.navn)
+            assertEquals("Task: Uføretrygd?", forgrening.beskrivelse)
+            assertEquals(2, forgrening.gren.size)
 
-                    assertEquals("Ja", forgrening.gren.first().betingelse.navn)
-                    assertEquals("Nei", forgrening.gren.last().betingelse.navn)
+            assertEquals("Ja", forgrening.gren.first().betingelse.navn)
+            assertEquals("Nei", forgrening.gren.last().betingelse.navn)
 
 
-                }.onFailure {
-                    println("${it.message} \n ${it.stackTraceToString()}")
-                    assert(false)
-                }
-        }.onFailure { assert(false) }
+        }.onFailure {
+            println("${it.message} \n ${it.stackTraceToString()}")
+            assert(false)
+        }
     }
-
-
 }

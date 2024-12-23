@@ -3,78 +3,121 @@ import embeddable.compiler.flatMap
 import org.example.generateAsciiDoc
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
+import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.utils.addToStdlib.measureTimeMillisWithResult
 import pensjon.regler.*
+import java.nio.file.Path
 import kotlin.io.path.Path
+import kotlin.io.path.absolutePathString
 import kotlin.io.path.isDirectory
 
 // TODO:
 // - logging
 
+private const val USAGE_ERROR = "Usage: <path to repository> <path to output folder>"
+private const val REPO_ERROR = "Path to repository is not a directory"
+private const val OUTPUT_ERROR = "Path to output folder is not a directory"
+
+private fun validateArguments(args: Array<String>) {
+    if (args.size != 2) throw IllegalArgumentException(USAGE_ERROR)
+}
+
+private fun logRepoPath(path: Path): Path {
+    println("Repo root is: $path")
+    return path
+}
+
+private fun logAsciiDocOutput(path: Path): Path {
+    println("AsciiDoc output path is: $path \n")
+    return path
+}
+
+private fun initializeCompilerContext(disposable: Disposable): Result<CompilerContext> =
+    CompilerContext.new(disposable = disposable)
+
+private fun buildAndLogPsiFiles(compilerContext: CompilerContext, repo: Repo): List<KtFile> {
+    val psiFiles = repo.files().map { fileInfo ->
+        compilerContext.createKtFile(fileInfo.file.absolutePathString(), fileInfo.content)
+    }
+    println("Building binding context for ${psiFiles.size} files\n")
+    return psiFiles
+}
+
+private fun logExtractionResults(result: List<RuleInfo>) {
+    println("Found ${result.filterIsInstance<RuleServiceInfo>().size} rule services")
+    println("Found ${result.filterIsInstance<RuleFlowInfo>().size} rule flows")
+    println("Found ${result.filterIsInstance<RuleSetInfo>().size} rule sets\n")
+}
+
+private fun validateDirectoryPath(path: String, errorMessage: String): Path {
+    return Path(path).also {
+        if (!it.isDirectory()) throw IllegalArgumentException(errorMessage)
+    }
+}
+
 fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
     runCatching {
-        if (args.size != 2) {
-            throw IllegalArgumentException("Usage: <path to repository> <path to output folder>")
-        }
-
-        val pathRepoRoot = Path(args[0]).also {
-            if (!it.isDirectory()) throw IllegalArgumentException("Path to repository, $it, is not a directory")
-        }
-        println("Repo root is: $pathRepoRoot")
-
-        val pathAsciiDocOutput = Path(args[1]).also {
-            if (!it.isDirectory()) throw IllegalArgumentException("Path to output folder, $it, is not a directory")
-        }
-        println("AsciiDoc output path is: $pathAsciiDocOutput\n")
-
-        Pair(pathRepoRoot, pathAsciiDocOutput)
-
-    }.map { (repoRoot, asciiDocOutput) ->
-
-        Extractor.new(
-            repo = Repo(repoRoot),
-            context = CompilerContext.new(disposable = disposable).getOrThrow()
-        ).flatMap {
-            it.toModel()
-        }.map { result ->
-            val services = result.filterIsInstance<RuleServiceInfo>()
-            println("Found ${services.size} rule services")
-            println("Found ${result.filterIsInstance<RuleFlowInfo>().size} rule flows")
-            println("Found ${result.filterIsInstance<RuleSetInfo>().size} rule sets\n")
-            generateAsciiDoc(services, asciiDocOutput)
-        }
+        validateArguments(args)
+        val repoRoot = logRepoPath(validateDirectoryPath(args[0], REPO_ERROR))
+        val asciiDocOutputPath = logAsciiDocOutput(validateDirectoryPath(args[1], OUTPUT_ERROR))
+        repoRoot to asciiDocOutputPath
     }
+        .flatMap { (repoRoot, asciiDocOutput) ->
+            initializeCompilerContext(disposable)
+                .flatMap { compilerContext ->
+                    val repo = Repo(repoRoot)
+                    val psiFiles = buildAndLogPsiFiles(compilerContext, repo)
 
+                    compilerContext.buildBindingContext(psiFiles)
+                        .map { bindingContext ->
+                            Extractor.new(repo, psiFiles, bindingContext)
+                        }
+                }
+                .flatMap { extractor ->
+                    extractor.toModel()
+                }
+                .map { result ->
+                    logExtractionResults(result)
+                    generateAsciiDoc(result.filterIsInstance<RuleServiceInfo>(), asciiDocOutput)
+                }
+        }
 
 /**
  * arg[0] - sti til repository (C:\\data\\pensjon-regler)
  * arg[2] - sti til output mappe for AsciiDoc filer
  */
+
+private const val EXIT_CODE_SUCCESS = 0
+private const val EXIT_CODE_FAILURE = 1
+
 fun main(args: Array<String>) {
 
     val disposable = Disposer.newDisposable()
 
     val (elapsed, exitCode) = measureTimeMillisWithResult {
         bootstrap(args, disposable).fold(
-            onSuccess = { 0 },
+            onSuccess = { EXIT_CODE_SUCCESS },
             onFailure = { error ->
                 println("Error: ${error.message}\n")
                 println("Error: ${error.stackTraceToString()}\n")
-                1
+                EXIT_CODE_FAILURE
             }
         )
     }
 
-    println(
-        "Elapsed time: ${
-            String.format(
-                "%d min, %d sec",
-                (elapsed / 1000) / 60,
-                (elapsed / 1000) % 60
-            )
-        }"
+    println("Elapsed time: ${formatElapsedTime(elapsed)}")
+
+    cleanupAndExit(disposable, exitCode)
+}
+
+private fun formatElapsedTime(elapsed: Long): String =
+    String.format(
+        "%d min, %d sec",
+        (elapsed / 1000) / 60,
+        (elapsed / 1000) % 60
     )
 
+private fun cleanupAndExit(disposable: Disposable, exitCode: Int) {
     disposable.dispose()
     println("Exiting with code: $exitCode\n")
     kotlin.system.exitProcess(exitCode)

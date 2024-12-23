@@ -15,21 +15,12 @@ import kotlin.io.path.absolutePathString
 
 class Extractor private constructor(
     private val repo: Repo,
-    //private val context: CompilerContext,
     private val psiFiles: List<KtFile>,
     private val bindingContext: BindingContext
 ) {
     companion object {
-        fun new(repo: Repo, context: CompilerContext): Result<Extractor> = runCatching {
-
-            val psiFiles = repo.files().map { fileInfo ->
-                context.createKtFile(fileInfo.file.absolutePathString(), fileInfo.content)
-            }
-            println("Building binding context for ${psiFiles.size} files\n")
-            val bindingContext = context.buildBindingContext(psiFiles).getOrThrow()
-
+        fun new(repo: Repo, psiFiles: List<KtFile>, bindingContext: BindingContext): Extractor =
             Extractor(repo, psiFiles, bindingContext)
-        }
     }
 
     fun toModel(): Result<List<RuleInfo>> =
