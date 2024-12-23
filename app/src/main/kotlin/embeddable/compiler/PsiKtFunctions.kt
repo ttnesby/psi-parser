@@ -14,6 +14,7 @@ import pensjon.regler.FlowElement
 import pensjon.regler.PropertyInfo
 import rule.dsl.*
 import rule.dsl.DSLTypeAbstract.*
+import rule.dsl.DSLTypeBranch.*
 import rule.dsl.DSLTypeService.REQUEST
 import java.io.File
 
@@ -339,15 +340,10 @@ private fun KtCallExpression.resolveFunctionDeclaration(
         }
         ?: Result.failure(noSuchElement(ParsingError.NO_NAMED_REFERENCE_CE))
 
-
-private fun KtCallExpression.isForgrening(): Boolean =
-    (calleeExpression as? KtNameReferenceExpression)?.getReferencedName() == DSLTypeBranch.FORGRENING.typeName
-
-private fun KtCallExpression.isGren(): Boolean =
-    (calleeExpression as? KtNameReferenceExpression)?.getReferencedName() == DSLTypeBranch.GREN.typeName
-
-private fun KtCallExpression.isFlyt(): Boolean =
-    (calleeExpression as? KtNameReferenceExpression)?.getReferencedName() == DSLTypeBranch.FLYT.typeName
+private fun KtCallExpression.resolveToDSLTypeBranch(): DSLTypeBranch? =
+    (calleeExpression as? KtNameReferenceExpression)
+        ?.getReferencedName()
+        ?.let { name -> DSLTypeBranch.fromString(name) }
 
 private fun KtCallExpression.getLambdaBlock(): Result<KtBlockExpression> = runCatching {
     // Look for lambda arguments
@@ -438,7 +434,7 @@ fun KtBlockExpression.extractRuleServiceFlow(bindingContext: BindingContext): Re
     }
         .let { flyt ->
             if (flyt.isEmpty()) {
-                println("Warning: empty flow for current flow extraction logic, ${containingClass()?.name} [${containingKtFile.name}]")
+                println("Warning: empty flow with current flow extraction logic, ${containingClass()?.name} [${containingKtFile.name}]")
                 Result.success(FlowElement.Flow(emptyList()))
                 // later when extraction logic is complete
                 // Result.failure(noSuchElement(ParsingError.EMPTY_RULE_SERVICE_FLOW))
@@ -456,30 +452,29 @@ fun KtBlockExpression.extractRuleFlowFlow(bindingContext: BindingContext): Resul
         children.mapNotNull { child ->
             when (child) {
                 is KtCallExpression -> {
-                    when {
-                        child.isForgrening() -> {
-                            FlowElement.Forgrening(
-                                beskrivelse = child.extractKDocOrEmpty(),
-                                navn = child.firstArgumentOrThrow(),
-                                gren = child.getLambdaBlock().flatMap { it.extractGrener(bindingContext) }.getOrThrow()
-                            )
+                    child.resolveToDSLTypeBranch()
+                        ?.let { dslTypeBranch ->
+                            when (dslTypeBranch) {
+                                FORGRENING -> {
+                                    FlowElement.Forgrening(
+                                        beskrivelse = child.extractKDocOrEmpty(),
+                                        navn = child.firstArgumentOrThrow(),
+                                        gren = child.getLambdaBlock().flatMap { it.extractGrener(bindingContext) }.getOrThrow()
+                                    )
+                                }
+                                GREN -> {
+                                    FlowElement.Gren(
+                                        beskrivelse = child.extractKDocOrEmpty(),
+                                        betingelse = child.getLambdaBlock().flatMap { it.extractBetingelse() }.getOrThrow(),
+                                        flyt = child.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }
+                                            .getOrThrow()
+                                    )
+                                }
+                                FLYT -> {
+                                    child.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }.getOrThrow()
+                                }
+                            }
                         }
-
-                        child.isGren() -> {
-                            FlowElement.Gren(
-                                beskrivelse = child.extractKDocOrEmpty(),
-                                betingelse = child.getLambdaBlock().flatMap { it.extractBetingelse() }.getOrThrow(),
-                                flyt = child.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }
-                                    .getOrThrow()
-                            )
-                        }
-
-                        child.isFlyt() -> {
-                            child.getLambdaBlock().flatMap { it.extractRuleFlowFlow(bindingContext) }.getOrThrow()
-                        }
-
-                        else -> null
-                    }
                 }
 
                 is KtDotQualifiedExpression -> {

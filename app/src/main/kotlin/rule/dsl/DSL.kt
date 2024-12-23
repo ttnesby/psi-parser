@@ -7,6 +7,10 @@ enum class DSLTypeBranch(val typeName: String) {
     FLYT("flyt");
 
     override fun toString(): String = typeName
+
+    companion object {
+        fun fromString(typeName: String): DSLTypeBranch? = entries.find { it.typeName == typeName }
+    }
 }
 
 enum class DSLTypeFlow(val typeName: String) {
