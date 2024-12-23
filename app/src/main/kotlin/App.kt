@@ -11,39 +11,39 @@ import kotlin.io.path.isDirectory
 // TODO:
 // - logging
 
-fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> = runCatching {
+fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
+    runCatching {
+        if (args.size != 2) {
+            throw IllegalArgumentException("Usage: <path to repository> <path to output folder>")
+        }
 
-    if (args.size != 2) {
-        throw IllegalArgumentException("Usage: <path to repository> <path to output folder>")
-    }
+        val pathRepoRoot = Path(args[0]).also {
+            if (!it.isDirectory()) throw IllegalArgumentException("Path to repository, $it, is not a directory")
+        }
+        println("Repo root is: $pathRepoRoot")
 
-    val pathRepoRoot = Path(args[0]).also {
-        if (!it.isDirectory()) {
-            throw IllegalArgumentException("Path to repository, $it, is not a directory")
+        val pathAsciiDocOutput = Path(args[1]).also {
+            if (!it.isDirectory()) throw IllegalArgumentException("Path to output folder, $it, is not a directory")
+        }
+        println("AsciiDoc output path is: $pathAsciiDocOutput\n")
+
+        Pair(pathRepoRoot, pathAsciiDocOutput)
+
+    }.map { (repoRoot, asciiDocOutput) ->
+
+        Extractor.new(
+            repo = Repo(repoRoot),
+            context = CompilerContext.new(disposable = disposable).getOrThrow()
+        ).flatMap {
+            it.toModel()
+        }.map { result ->
+            val services = result.filterIsInstance<RuleServiceInfo>()
+            println("Found ${services.size} rule services")
+            println("Found ${result.filterIsInstance<RuleFlowInfo>().size} rule flows")
+            println("Found ${result.filterIsInstance<RuleSetInfo>().size} rule sets\n")
+            generateAsciiDoc(services, asciiDocOutput)
         }
     }
-    println("Repo root is: $pathRepoRoot")
-
-    val pathAsciiDocOutput = Path(args[1]).also {
-        if (!it.isDirectory()) {
-            throw IllegalArgumentException("Path to output folder, $it, is not a directory")
-        }
-    }
-    println("AsciiDoc output path is: $pathAsciiDocOutput\n")
-
-    Extractor.new(
-        repo = Repo(pathRepoRoot),
-        context = CompilerContext.new(disposable = disposable).getOrThrow()
-    ).flatMap {
-        it.toModel()
-    }.map { result ->
-        val services = result.filterIsInstance<RuleServiceInfo>()
-        println("Found ${services.size} rule services")
-        println("Found ${result.filterIsInstance<RuleFlowInfo>().size} rule flows")
-        println("Found ${result.filterIsInstance<RuleSetInfo>().size} rule sets\n")
-        generateAsciiDoc(services, pathAsciiDocOutput)
-    }.getOrThrow() // rethrow exception due to unit return type
-}
 
 
 /**

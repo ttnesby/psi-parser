@@ -32,15 +32,17 @@ class Extractor private constructor(
         }
     }
 
-    fun toModel(): Result<List<RuleInfo>> = runCatching {
-
+    fun toModel(): Result<List<RuleInfo>> =
         psiFiles.mapNotNull { file ->
             file.findDSLTypeAbstract()
                 ?.let { (ktClass, dslTypeAbstract) ->
-                    extractRuleInfo(ktClass, dslTypeAbstract).getOrThrow()
-                } // null is ok here due to mapNotNull
-        }.also { psiFiles.forEach { (it as PsiFileImpl).clearCaches() } }
-    }
+                    extractRuleInfo(ktClass, dslTypeAbstract)
+                }
+        }.also {
+            psiFiles.forEach { (it as PsiFileImpl).clearCaches() }
+        }.toResult()
+
+
 
     private fun extractRuleInfo(ktClass: KtClass, dslType: DSLTypeAbstract): Result<RuleInfo> = when (dslType) {
         RULE_SERVICE -> ktClass.extractRuleService()
