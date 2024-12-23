@@ -1,6 +1,7 @@
 package rule.dsl
 
-enum class DSLType(val typeName: String) {
+
+enum class DSLTypeBranch(val typeName: String) {
     FORGRENING("forgrening"),
     GREN("gren"),
     FLYT("flyt");
@@ -15,14 +16,18 @@ enum class DSLTypeFlow(val typeName: String) {
     override fun toString(): String = typeName
 }
 
-enum class DSLTypeService(val typeName: String) {
+sealed interface DSLTypeSuperClass {
+    val typeName: String
+}
+
+enum class DSLTypeService(override val typeName: String) : DSLTypeSuperClass {
     REQUEST("ServiceRequest"),
     RESPONSE("ServiceResponse");
 
     override fun toString(): String = typeName
 }
 
-enum class DSLTypeAbstract(val typeName: String) {
+enum class DSLTypeAbstract(override val typeName: String) : DSLTypeSuperClass{
     RULE_SERVICE("AbstractPensjonRuleService"),
     RULE_FLOW("AbstractPensjonRuleflow"),
     RULE_SET("AbstractPensjonRuleset");

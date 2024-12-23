@@ -51,7 +51,7 @@ class Extractor private constructor(
     private fun KtClass.extractRuleService(): Result<RuleServiceInfo> = runCatching {
         RuleServiceInfo(
             navn = name!!,
-            beskrivelse = getKDocOrEmpty(),
+            beskrivelse = docOrEmpty(),
             inndata = extractServiceRequestFields().getOrThrow(),
             utdata = extractServiceResponseFields().getOrThrow(),
             flyt = extractFlow(SERVICE).getOrThrow(),
@@ -99,7 +99,7 @@ class Extractor private constructor(
     private fun KtClass.extractRuleFlow(): Result<RuleFlowInfo> = runCatching {
         RuleFlowInfo(
             navn = name!!,
-            beskrivelse = getKDocOrEmpty(),
+            beskrivelse = docOrEmpty(),
             inndata = extractFlowRequestFields().getOrThrow(),
             flyt = extractFlow(FLOW).getOrThrow(),
             gitHubUri = repo.toGithubURI(containingKtFile.name).getOrThrow()
@@ -129,7 +129,7 @@ class Extractor private constructor(
     private fun KtClass.extractRuleSet(): Result<RuleSetInfo> = runCatching {
         RuleSetInfo(
             navn = name!!,
-            beskrivelse = getKDocOrEmpty(),
+            beskrivelse = docOrEmpty(),
             inndata = emptyList(),
             flyt = FlowElement.Flow(emptyList()),
             gitHubUri = repo.toGithubURI(containingKtFile.name).getOrThrow()

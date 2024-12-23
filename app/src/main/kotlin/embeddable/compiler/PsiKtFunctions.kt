@@ -12,11 +12,8 @@ import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 import pensjon.regler.Condition
 import pensjon.regler.FlowElement
 import pensjon.regler.PropertyInfo
-import rule.dsl.DSLType
-import rule.dsl.DSLTypeAbstract
+import rule.dsl.*
 import rule.dsl.DSLTypeAbstract.*
-import rule.dsl.DSLTypeFlow
-import rule.dsl.DSLTypeService
 import rule.dsl.DSLTypeService.REQUEST
 import java.io.File
 
@@ -94,9 +91,9 @@ private fun KtClass.matchingDSLTypeAbstractOrNull(): Pair<KtClass, DSLTypeAbstra
         .firstOrNull { dslType -> isSubClassOf(dslType) }
         ?.let { dslType -> Pair(this, dslType) }
 
-fun KtClass.getKDocOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
+fun KtClass.docOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
 
-private fun KtClass.isSubClassOf(type: DSLTypeAbstract): Boolean =
+private fun KtClass.isSubClassOf(type: DSLTypeSuperClass): Boolean =
     superTypeListEntries.any { it.typeReference?.text?.contains(type.typeName) == true }
 
 fun KtClass.findResponseTypeForRuleService(): Result<KtTypeReference> =
@@ -110,11 +107,6 @@ fun KtClass.findResponseTypeForRuleService(): Result<KtTypeReference> =
         ?.firstOrNull()
         ?.let { ktTypeReference ->  Result.success(ktTypeReference) }
         ?: Result.failure(noSuchElement(ParsingError.NO_SERVICE_RESPONSE_TYPE))
-
-
-fun KtClass.isSubClassOf(type: DSLTypeService): Boolean =
-    superTypeListEntries.any { ktSuperTypeListEntry ->
-        ktSuperTypeListEntry.typeReference?.text?.contains(type.typeName) == true }
 
 fun KtClass.mustBeSubClassOf(type: DSLTypeService): Result<KtClass> =
     superTypeListEntries
@@ -197,7 +189,7 @@ fun KtPrimaryConstructor.toPropertyInfo(): List<PropertyInfo> =
         PropertyInfo(
             navn = parameter.name ?: "",
             type = parameter.typeReference?.text ?: "Unknown",
-            beskrivelse = parameter.getKDocOrEmpty()
+            beskrivelse = parameter.docOrEmpty()
         )
     }
 
@@ -205,7 +197,7 @@ fun KtPrimaryConstructor.toPropertyInfo(): List<PropertyInfo> =
 /** KtParameter extension functions */
 ///////////////////////////////////////////////////
 
-fun KtParameter.getKDocOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
+fun KtParameter.docOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
 
 fun KtParameter.toPropertyInfo(): PropertyInfo = PropertyInfo(
     navn = name ?: "",
@@ -334,13 +326,13 @@ private fun KtCallExpression.resolveFunctionDeclaration(
 
 
 private fun KtCallExpression.isForgrening(): Boolean =
-    (calleeExpression as? KtNameReferenceExpression)?.getReferencedName() == DSLType.FORGRENING.typeName
+    (calleeExpression as? KtNameReferenceExpression)?.getReferencedName() == DSLTypeBranch.FORGRENING.typeName
 
 private fun KtCallExpression.isGren(): Boolean =
-    (calleeExpression as? KtNameReferenceExpression)?.getReferencedName() == DSLType.GREN.typeName
+    (calleeExpression as? KtNameReferenceExpression)?.getReferencedName() == DSLTypeBranch.GREN.typeName
 
 private fun KtCallExpression.isFlyt(): Boolean =
-    (calleeExpression as? KtNameReferenceExpression)?.getReferencedName() == DSLType.FLYT.typeName
+    (calleeExpression as? KtNameReferenceExpression)?.getReferencedName() == DSLTypeBranch.FLYT.typeName
 
 private fun KtCallExpression.getLambdaBlock(): Result<KtBlockExpression> = runCatching {
     // Look for lambda arguments
