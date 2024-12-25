@@ -26,30 +26,30 @@ class Extractor private constructor(
         psiFiles.mapNotNull { file ->
             file.findDSLTypeAbstract()
                 ?.let { (ktClass, dslTypeAbstract) ->
-                    extractRuleInfo(ktClass, dslTypeAbstract)
+                    ktClass.extractRuleInfo(dslTypeAbstract)
                 }
         }.also {
             psiFiles.forEach { (it as PsiFileImpl).clearCaches() }
         }.toResult()
 
-    private fun extractRuleInfo(ktClass: KtClass, dslType: DSLTypeAbstract): Result<RuleInfo> = when (dslType) {
-        RULE_SERVICE -> ktClass.extractRuleService()
-        RULE_FLOW -> ktClass.extractRuleFlow()
-        RULE_SET -> ktClass.extractRuleSet()
+    private fun KtClass.extractRuleInfo(dslType: DSLTypeAbstract): Result<RuleInfo> = when (dslType) {
+        RULE_SERVICE -> extractRuleService()
+        RULE_FLOW -> extractRuleFlow()
+        RULE_SET -> extractRuleSet()
     }
 
     private fun KtClass.extractRuleService(): Result<RuleServiceInfo> =
         requireName().flatMap { name ->
             extractServiceRequestFields().flatMap { requestFields ->
                 extractServiceResponseFields().flatMap { responseFields ->
-                    extractFlow(SERVICE).flatMap { flyt ->
+                    extractFlow(SERVICE).flatMap { flow ->
                         repo.toGithubURI(containingKtFile.name).map { gitHubUri ->
                             RuleServiceInfo(
                                 navn = name,
                                 beskrivelse = docOrEmpty(),
                                 inndata = requestFields,
                                 utdata = responseFields,
-                                flyt = flyt,
+                                flyt = flow,
                                 gitHubUri = gitHubUri
                             )
                         }
@@ -60,51 +60,51 @@ class Extractor private constructor(
 
     private fun KtClass.extractServiceRequestFields(): Result<List<PropertyInfo>> =
         requirePrimaryConstructor()
-            .flatMap { it.findParameterDSLTypeServiceRequest(bindingContext) }
-            .flatMap { (parameter, serviceRequestClass) ->
+            .flatMap { primConstr ->
+                primConstr.findParameterDSLTypeServiceRequest(bindingContext)
+            }.flatMap { (parameter, serviceRequestClass) ->
                 serviceRequestClass
-                    .requirePrimaryConstructor()
-                    .map { it.toPropertyInfo() }
-                    .map { requestProperties ->
+                    .requirePrimaryConstructor().map { primConstr ->
                         buildList {
                             add(parameter.toPropertyInfo())
-                            addAll(requestProperties)
+                            addAll(primConstr.toPropertyInfo())
                         }
                     }
-            }
+        }
 
     private fun KtClass.extractServiceResponseFields(): Result<List<PropertyInfo>> =
         findResponseTypeForRuleService()
-            .flatMap { it.resolveToKtClass(bindingContext) }
-            .flatMap { it.mustBeSubClassOf(RESPONSE) }
-            .flatMap { serviceResponseClass ->
+            .flatMap { typeReference ->
+                typeReference.resolveToKtClass(bindingContext)
+            }.flatMap { aClass ->
+                aClass.mustBeSubClassOf(RESPONSE)
+            }.flatMap { serviceResponseClass ->
                 serviceResponseClass
-                    .requirePrimaryConstructor()
-                    .map { it.toPropertyInfo() }
-                    .map { responseProperties ->
+                    .requirePrimaryConstructor().map { primConstr ->
                         buildList {
                             add(
+                                // TODO - fix - require name
                                 PropertyInfo(
                                     navn = serviceResponseClass.name!!,
                                     type = serviceResponseClass.name!!,
                                     beskrivelse = "Response for $name"
                                 )
                             )
-                            addAll(responseProperties)
+                            addAll(primConstr.toPropertyInfo())
                         }
                     }
-            }
+        }
 
     private fun KtClass.extractRuleFlow(): Result<RuleFlowInfo> =
         requireName().flatMap { name ->
             extractFlowRequestFields().flatMap { requestFields ->
-                extractFlow(FLOW).flatMap { flyt ->
+                extractFlow(FLOW).flatMap { flow ->
                     repo.toGithubURI(containingKtFile.name).map { gitHubUri ->
                         RuleFlowInfo(
                             navn = name,
                             beskrivelse = docOrEmpty(),
                             inndata = requestFields,
-                            flyt = flyt,
+                            flyt = flow,
                             gitHubUri = gitHubUri
                         )
                     }
@@ -113,24 +113,24 @@ class Extractor private constructor(
         }
 
     private fun KtClass.extractFlowRequestFields(): Result<List<PropertyInfo>> =
-        requirePrimaryConstructor()
-            .flatMap { it.findFirstParameterOfTypeClass(bindingContext) }
-            .map { (parameter, aClass) ->
-                buildList {
-                    add(parameter.toPropertyInfo())
-                    addAll(aClass.getProperties().toPropertyInfo())
-                }
+        requirePrimaryConstructor().flatMap { primConstr ->
+            primConstr.findFirstParameterOfTypeClass(bindingContext)
+        }.map { (parameter, aClass) ->
+            buildList {
+                add(parameter.toPropertyInfo())
+                addAll(aClass.getProperties().toPropertyInfo())
             }
+        }
 
     private fun KtClass.extractFlow(flowType: DSLTypeFlow): Result<FlowElement.Flow> =
-        findMatchingProperty(flowType)
-            .flatMap { it.getLambdaBlock() }
-            .flatMap { block ->
-                when (flowType) {
-                    SERVICE -> block.extractRuleServiceFlow(bindingContext)
-                    FLOW -> block.extractRuleFlowFlow(bindingContext)
-                }
+        findMatchingProperty(flowType).flatMap { property ->
+            property.getLambdaBlock()
+        }.flatMap { block ->
+            when (flowType) {
+                SERVICE -> block.extractRuleServiceFlow(bindingContext)
+                FLOW -> block.extractRuleFlowFlow(bindingContext)
             }
+        }
 
     private fun KtClass.extractRuleSet(): Result<RuleSetInfo> =
         requireName().flatMap { name ->
