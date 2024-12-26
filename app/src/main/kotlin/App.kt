@@ -68,10 +68,9 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
                     val repo = Repo(repoRoot)
                     val psiFiles = buildAndLogPsiFiles(compilerContext, repo)
 
-                    compilerContext.buildBindingContext(psiFiles)
-                        .map { bindingContext ->
-                            Extractor.new(repo, psiFiles, bindingContext)
-                        }
+                    compilerContext.buildBindingContext(psiFiles).map { bindingContext ->
+                        Extractor.new(repo, psiFiles, bindingContext)
+                    }
                 }
                 .flatMap { extractor ->
                     extractor.toModel()

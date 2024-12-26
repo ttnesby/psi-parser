@@ -64,13 +64,17 @@ class Extractor private constructor(
                 primConstr.findParameterDSLTypeServiceRequest(bindingContext)
             }.flatMap { (parameter, serviceRequestClass) ->
                 serviceRequestClass
-                    .requirePrimaryConstructor().map { primConstr ->
-                        buildList {
-                            add(parameter.toPropertyInfo())
-                            addAll(primConstr.toPropertyInfo())
+                    .requirePrimaryConstructor().flatMap { primConstr ->
+                        primConstr.toPropertyInfo().flatMap { properties ->
+                            parameter.toPropertyInfo().map { property ->
+                                buildList {
+                                    add(property)
+                                    addAll(properties)
+                                }
+                            }
                         }
                     }
-        }
+            }
 
     private fun KtClass.extractServiceResponseFields(): Result<List<PropertyInfo>> =
         findResponseTypeForRuleService()
@@ -80,20 +84,17 @@ class Extractor private constructor(
                 aClass.mustBeSubClassOf(RESPONSE)
             }.flatMap { serviceResponseClass ->
                 serviceResponseClass
-                    .requirePrimaryConstructor().map { primConstr ->
-                        buildList {
-                            add(
-                                // TODO - fix - require name
-                                PropertyInfo(
-                                    navn = serviceResponseClass.name!!,
-                                    type = serviceResponseClass.name!!,
-                                    beskrivelse = "Response for $name"
-                                )
-                            )
-                            addAll(primConstr.toPropertyInfo())
+                    .requirePrimaryConstructor().flatMap { primConstr ->
+                        primConstr.toPropertyInfo().flatMap { properties ->
+                            serviceResponseClass.toPropertyInfo().map { property ->
+                                buildList {
+                                    add(property)
+                                    addAll(properties)
+                                }
+                            }
                         }
                     }
-        }
+            }
 
     private fun KtClass.extractRuleFlow(): Result<RuleFlowInfo> =
         requireName().flatMap { name ->
@@ -115,10 +116,14 @@ class Extractor private constructor(
     private fun KtClass.extractFlowRequestFields(): Result<List<PropertyInfo>> =
         requirePrimaryConstructor().flatMap { primConstr ->
             primConstr.findFirstParameterOfTypeClass(bindingContext)
-        }.map { (parameter, aClass) ->
-            buildList {
-                add(parameter.toPropertyInfo())
-                addAll(aClass.getProperties().toPropertyInfo())
+        }.flatMap { (parameter, aClass) ->
+            parameter.toPropertyInfo().flatMap { property ->
+                aClass.getProperties().toPropertyInfo().map { properties ->
+                    buildList {
+                        add(property)
+                        addAll(properties)
+                    }
+                }
             }
         }
 
