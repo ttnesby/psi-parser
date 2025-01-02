@@ -4,6 +4,8 @@ import embeddable.compiler.*
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
+import result.addons.flatMap
+import result.addons.toResult
 import rule.dsl.DSLTypeAbstract
 import rule.dsl.DSLTypeAbstract.*
 import rule.dsl.DSLTypeFlow

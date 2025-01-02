@@ -8,6 +8,7 @@ import org.jetbrains.kotlin.psi.KtReferenceExpression
 import org.jetbrains.kotlin.psi.KtTypeReference
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
+import result.addons.flatMap
 
 /**
  * A utility object for resolving Kotlin PSI elements (`KtElement`) to their corresponding descriptors or declarations
