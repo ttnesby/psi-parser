@@ -29,7 +29,7 @@ import java.io.File
 /** KtFile extension functions */
 ///////////////////////////////////////////////////
 
-fun KtFile.findDSLTypeAbstract(): Pair<KtClass, DSLTypeAbstract>? =
+fun KtFile.firstDSLTypeAbstractOrNull(): Pair<KtClass, DSLTypeAbstract>? =
     declarations
         .filterIsInstance<KtClass>()
         .firstOrNull()
@@ -207,8 +207,8 @@ fun KtElement.resolveToKtClass(): Result<KtClass> =
             ?.let { ktClass ->
                 Result.success(ktClass)
             } ?: Result.failure(
-            illegalState("Declaration is not a KtClass, but ${psiElement.javaClass.simpleName}")
-        )
+                illegalState("Declaration is not a KtClass, but ${psiElement.javaClass.simpleName}")
+            )
     }
 
 /**
@@ -288,7 +288,7 @@ private fun KtCallExpression.resolveToDSLTypeBranch(): DSLTypeBranch? =
         ?.let { name -> DSLTypeBranch.fromString(name) }
 
 private fun KtCallExpression.getLambdaBlock(): Result<KtBlockExpression> =
-    lambdaArguments // can it be multiple lambda args?
+    lambdaArguments // is multiple lambda args possible?
         .firstOrNull()
         ?.let { lambdaArg ->
             lambdaArg

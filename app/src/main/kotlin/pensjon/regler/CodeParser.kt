@@ -24,7 +24,7 @@ class CodeParser private constructor(
 
     fun toModel(): Result<List<RuleInfo>> =
         psiFiles.mapNotNull { file ->
-            file.findDSLTypeAbstract()
+            file.firstDSLTypeAbstractOrNull()
                 ?.let { (ktClass, dslTypeAbstract) ->
                     ktClass.extractRuleInfo(dslTypeAbstract)
                 }
