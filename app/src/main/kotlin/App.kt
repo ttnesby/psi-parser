@@ -1,12 +1,12 @@
 import embeddable.compiler.BindingContextResolver
 import embeddable.compiler.CompilerContext
-import embeddable.compiler.flatMap
 import org.example.generateAsciiDoc
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.utils.addToStdlib.measureTimeMillisWithResult
 import pensjon.regler.*
+import result.addons.flatMap
 import java.nio.file.Path
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
