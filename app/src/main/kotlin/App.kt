@@ -18,30 +18,17 @@ private const val USAGE_ERROR = "Usage: <path to repository> <path to output fol
 private const val REPO_ERROR = "Path to repository is not a directory"
 private const val OUTPUT_ERROR = "Path to output folder is not a directory"
 
-private fun validateArguments(args: Array<String>) {
-    if (args.size != 2) throw IllegalArgumentException(USAGE_ERROR)
-}
-
-private fun logRepoPath(path: Path): Path {
-    println("Repo root is: $path")
-    return path
-}
-
-private fun logAsciiDocOutput(path: Path): Path {
-    println("AsciiDoc output path is: $path \n")
-    return path
-}
-
-private fun initializeCompilerContext(disposable: Disposable): Result<CompilerContext> =
-    CompilerContext.new(disposable = disposable)
-
-private fun buildAndLogPsiFiles(compilerContext: CompilerContext, repo: Repo): List<KtFile> {
-    val psiFiles = repo.files().map { fileInfo ->
-        compilerContext.createKtFile(fileInfo.file.absolutePathString(), fileInfo.content)
+private fun validateDirectoryPath(path: String, errorMessage: String): Path =
+    Path(path).also {
+        if (!it.isDirectory()) throw IllegalArgumentException(errorMessage)
     }
-    println("Building binding context for ${psiFiles.size} files\n")
-    return psiFiles
-}
+
+private fun buildAndLogPsiFiles(compilerContext: CompilerContext, repo: Repo): List<KtFile> =
+    repo.files().map { fileInfo ->
+        compilerContext.createKtFile(fileInfo.file.absolutePathString(), fileInfo.content)
+    }.also {
+        println("Building binding context for ${it.size} files\n")
+    }
 
 private fun logExtractionResults(result: List<RuleInfo>) {
     println("Found ${result.filterIsInstance<RuleServiceInfo>().size} rule services")
@@ -49,21 +36,19 @@ private fun logExtractionResults(result: List<RuleInfo>) {
     println("Found ${result.filterIsInstance<RuleSetInfo>().size} rule sets\n")
 }
 
-private fun validateDirectoryPath(path: String, errorMessage: String): Path {
-    return Path(path).also {
-        if (!it.isDirectory()) throw IllegalArgumentException(errorMessage)
-    }
-}
-
 fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
     runCatching {
-        validateArguments(args)
-        val repoRoot = logRepoPath(validateDirectoryPath(args[0], REPO_ERROR))
-        val asciiDocOutputPath = logAsciiDocOutput(validateDirectoryPath(args[1], OUTPUT_ERROR))
+        if (args.size != 2) throw IllegalArgumentException(USAGE_ERROR)
+
+        val repoRoot = validateDirectoryPath(args[0], REPO_ERROR)
+            .also { println("Repo root is: $it") }
+        val asciiDocOutputPath = validateDirectoryPath(args[1], OUTPUT_ERROR)
+            .also { println("AsciiDoc output path is: $it \n") }
+
         repoRoot to asciiDocOutputPath
     }
         .flatMap { (repoRoot, asciiDocOutput) ->
-            initializeCompilerContext(disposable)
+            CompilerContext.new(disposable = disposable)
                 .flatMap { compilerContext ->
                     val repo = Repo(repoRoot)
                     val psiFiles = buildAndLogPsiFiles(compilerContext, repo)
