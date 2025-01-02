@@ -4,7 +4,6 @@ import embeddable.compiler.*
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
-import org.jetbrains.kotlin.resolve.BindingContext
 import rule.dsl.DSLTypeAbstract
 import rule.dsl.DSLTypeAbstract.*
 import rule.dsl.DSLTypeFlow
@@ -15,11 +14,10 @@ import rule.dsl.DSLTypeService.RESPONSE
 class CodeParser private constructor(
     private val repo: Repo,
     private val psiFiles: List<KtFile>,
-    private val bindingContext: BindingContext
 ) {
     companion object {
-        fun new(repo: Repo, psiFiles: List<KtFile>, bindingContext: BindingContext): CodeParser =
-            CodeParser(repo, psiFiles, bindingContext)
+        fun new(repo: Repo, psiFiles: List<KtFile>): CodeParser =
+            CodeParser(repo, psiFiles)
     }
 
     fun toModel(): Result<List<RuleInfo>> =
@@ -61,7 +59,7 @@ class CodeParser private constructor(
     private fun KtClass.extractServiceRequestFields(): Result<List<PropertyInfo>> =
         requirePrimaryConstructor()
             .flatMap { primConstr ->
-                primConstr.findParameterDSLTypeServiceRequest(bindingContext)
+                primConstr.findParameterDSLTypeServiceRequest()
             }.flatMap { (parameter, serviceRequestClass) ->
                 serviceRequestClass
                     .requirePrimaryConstructor().flatMap { primConstr ->
@@ -79,7 +77,7 @@ class CodeParser private constructor(
     private fun KtClass.extractServiceResponseFields(): Result<List<PropertyInfo>> =
         findResponseTypeForRuleService()
             .flatMap { typeReference ->
-                typeReference.resolveToKtClass(bindingContext)
+                typeReference.resolveToKtClass()
             }.flatMap { aClass ->
                 aClass.mustBeSubClassOf(RESPONSE)
             }.flatMap { serviceResponseClass ->
@@ -115,7 +113,7 @@ class CodeParser private constructor(
 
     private fun KtClass.extractFlowRequestFields(): Result<List<PropertyInfo>> =
         requirePrimaryConstructor().flatMap { primConstr ->
-            primConstr.findFirstParameterOfTypeClass(bindingContext)
+            primConstr.findFirstParameterOfTypeClass()
         }.flatMap { (parameter, aClass) ->
             parameter.toPropertyInfo().flatMap { property ->
                 aClass.getProperties().toPropertyInfo().map { properties ->
@@ -132,8 +130,8 @@ class CodeParser private constructor(
             property.getLambdaBlock()
         }.flatMap { block ->
             when (flowType) {
-                SERVICE -> block.extractRuleServiceFlow(bindingContext)
-                FLOW -> block.extractRuleFlowFlow(bindingContext)
+                SERVICE -> block.extractRuleServiceFlow()
+                FLOW -> block.extractRuleFlowFlow()
             }
         }
 

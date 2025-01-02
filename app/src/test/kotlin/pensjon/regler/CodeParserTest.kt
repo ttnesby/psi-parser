@@ -1,5 +1,6 @@
 package pensjon.regler
 
+import embeddable.compiler.BindingContextResolver
 import embeddable.compiler.CompilerContext
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
@@ -63,10 +64,12 @@ class CodeParserTest {
             }
         val bindingContext = compilerContext.buildBindingContext(psiFiles).getOrThrow()
 
+        // singleton for binding resolution
+        BindingContextResolver.initialize(bindingContext)
+
         val codeParser = CodeParser.new(
             repo = repo,
             psiFiles = psiFiles,
-            bindingContext = bindingContext
         )
         assertEquals(0, repo.sourceRoots.size)
 
@@ -103,10 +106,12 @@ class CodeParserTest {
             }
         val bindingContext = compilerContext.buildBindingContext(psiFiles).getOrThrow()
 
+        // singleton for binding resolution
+        BindingContextResolver.initialize(bindingContext)
+
         val codeParser = CodeParser.new(
             repo = repo,
             psiFiles = psiFiles,
-            bindingContext = bindingContext
         )
         assertEquals(9, repo.sourceRoots.size)
 

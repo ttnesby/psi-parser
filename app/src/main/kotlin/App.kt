@@ -1,3 +1,4 @@
+import embeddable.compiler.BindingContextResolver
 import embeddable.compiler.CompilerContext
 import embeddable.compiler.flatMap
 import org.example.generateAsciiDoc
@@ -31,7 +32,7 @@ private fun buildAndLogPsiFiles(compilerContext: CompilerContext, repo: Repo): L
     }
 
 private fun logExtractionResults(result: List<RuleInfo>) {
-    println("Found ${result.filterIsInstance<RuleServiceInfo>().size} rule services")
+    println("\nFound ${result.filterIsInstance<RuleServiceInfo>().size} rule services")
     println("Found ${result.filterIsInstance<RuleFlowInfo>().size} rule flows")
     println("Found ${result.filterIsInstance<RuleSetInfo>().size} rule sets\n")
 }
@@ -54,7 +55,9 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
                     val psiFiles = buildAndLogPsiFiles(compilerContext, repo)
 
                     compilerContext.buildBindingContext(psiFiles).map { bindingContext ->
-                        CodeParser.new(repo, psiFiles, bindingContext)
+                        // singleton for binding resolution
+                        BindingContextResolver.initialize(bindingContext)
+                        CodeParser.new(repo, psiFiles)
                     }
                 }
                 .flatMap { codeParser ->
