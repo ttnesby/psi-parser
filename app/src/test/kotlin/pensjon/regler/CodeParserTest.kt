@@ -17,7 +17,7 @@ import kotlin.io.path.absolutePathString
 import kotlin.io.path.div
 import kotlin.io.path.isDirectory
 
-class ExtractorTest {
+class CodeParserTest {
 
     companion object {
         private lateinit var repoRoot: Path
@@ -63,14 +63,14 @@ class ExtractorTest {
             }
         val bindingContext = compilerContext.buildBindingContext(psiFiles).getOrThrow()
 
-        val extractor = Extractor.new(
+        val codeParser = CodeParser.new(
             repo = repo,
             psiFiles = psiFiles,
             bindingContext = bindingContext
         )
         assertEquals(0, repo.sourceRoots.size)
 
-        extractor.toModel().map { result ->
+        codeParser.toModel().map { result ->
             assertEquals(0, result.filterIsInstance<RuleServiceInfo>().size)
             assertEquals(0, result.filterIsInstance<RuleFlowInfo>().size)
             assertEquals(0, result.filterIsInstance<RuleSetInfo>().size)
@@ -103,14 +103,14 @@ class ExtractorTest {
             }
         val bindingContext = compilerContext.buildBindingContext(psiFiles).getOrThrow()
 
-        val extractor = Extractor.new(
+        val codeParser = CodeParser.new(
             repo = repo,
             psiFiles = psiFiles,
             bindingContext = bindingContext
         )
         assertEquals(9, repo.sourceRoots.size)
 
-        extractor.toModel().map { result ->
+        codeParser.toModel().map { result ->
             val services = result.filterIsInstance<RuleServiceInfo>()
             val flows = result.filterIsInstance<RuleFlowInfo>()
             val sets = result.filterIsInstance<RuleSetInfo>()

@@ -54,11 +54,11 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
                     val psiFiles = buildAndLogPsiFiles(compilerContext, repo)
 
                     compilerContext.buildBindingContext(psiFiles).map { bindingContext ->
-                        Extractor.new(repo, psiFiles, bindingContext)
+                        CodeParser.new(repo, psiFiles, bindingContext)
                     }
                 }
-                .flatMap { extractor ->
-                    extractor.toModel()
+                .flatMap { codeParser ->
+                    codeParser.toModel()
                 }
                 .map { result ->
                     logExtractionResults(result)

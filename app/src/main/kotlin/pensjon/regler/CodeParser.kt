@@ -12,14 +12,14 @@ import rule.dsl.DSLTypeFlow.FLOW
 import rule.dsl.DSLTypeFlow.SERVICE
 import rule.dsl.DSLTypeService.RESPONSE
 
-class Extractor private constructor(
+class CodeParser private constructor(
     private val repo: Repo,
     private val psiFiles: List<KtFile>,
     private val bindingContext: BindingContext
 ) {
     companion object {
-        fun new(repo: Repo, psiFiles: List<KtFile>, bindingContext: BindingContext): Extractor =
-            Extractor(repo, psiFiles, bindingContext)
+        fun new(repo: Repo, psiFiles: List<KtFile>, bindingContext: BindingContext): CodeParser =
+            CodeParser(repo, psiFiles, bindingContext)
     }
 
     fun toModel(): Result<List<RuleInfo>> =
