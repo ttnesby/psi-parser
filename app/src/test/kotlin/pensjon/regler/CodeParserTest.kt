@@ -165,10 +165,12 @@ class CodeParserTest {
 
         assertEquals(2, ruleService.flyt.elementer.size)
 
-        assertEquals(
-            URI("https://github.com/navikt/${localRoot.last()}/blob/master/fastsetttrygdetid/function/FastsettTrygdetidService.kt"),
-            ruleService.gitHubUri
+        val expectedUri = String.format(
+            "https://github.com/navikt/%s/blob/master/fastsetttrygdetid/function/FastsettTrygdetidService.kt",
+                    localRoot.last()
         )
+
+        assertEquals(URI(expectedUri), ruleService.gitHubUri)
     }
 
     private fun `verify rule flow StartTrygdetidFlyt`(ruleFlow: RuleFlowInfo) {
