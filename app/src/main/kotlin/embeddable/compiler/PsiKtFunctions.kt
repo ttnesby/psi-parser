@@ -379,7 +379,7 @@ private fun KtCallExpression.extractFunctionReference(): Result<FlowElement.Func
         .fold(
             onSuccess = { Result.success(it) },
             onFailure = {
-                println("Warning: Missing func in binding context ${it.message}")
+                println("Warning: Missing func ${(this.calleeExpression as? KtNameReferenceExpression)?.getReferencedName()} in binding context ${it.message}")
                 null
             }
         )
@@ -392,7 +392,7 @@ private fun KtCallExpression.extractFunctionReference(): Result<FlowElement.Func
 fun KtBlockExpression.extractRuleServiceFlow(): Result<FlowElement.Flow> =
     children.mapNotNull { child ->
         when (child) {
-            is KtCallExpression -> child.extractFunctionReference()
+            is KtCallExpression -> child.extractBranch() ?: child.extractFunctionReference()
             is KtDotQualifiedExpression -> child.extractFlowReference()
             else -> null
         }
@@ -416,14 +416,14 @@ fun KtBlockExpression.extractRuleServiceFlow(): Result<FlowElement.Flow> =
 fun KtBlockExpression.extractRuleFlowFlow(): Result<FlowElement.Flow> =
     children.mapNotNull { child ->
         when (child) {
-            is KtCallExpression -> child.extractBranch()
+            is KtCallExpression -> child.extractBranch() ?: child.extractFunctionReference()
             is KtDotQualifiedExpression -> child.extractFlowReference()
             else -> null
         }
     }
         .let { flyt ->
             if (flyt.isEmpty()) {
-                println("Warning: empty flow with current flow extraction logic, ${containingClass()?.name} [${containingKtFile.name}]")
+                //println("Warning: empty flow with current flow extraction logic, ${containingClass()?.name} [${containingKtFile.name}]")
                 Result.success(FlowElement.Flow(emptyList()))
                 // later when extraction logic is complete
                 // Result.failure(noSuchElement(ParsingError.EMPTY_RULE_SERVICE_FLOW))
