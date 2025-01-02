@@ -53,7 +53,7 @@ class CodeParserTest {
     }
 
     @Test
-    fun `test new Extractor for non-existing Path`() {
+    fun `test new CodeParser for non-existing Path`() {
 
         val localRoot = repoRoot / "app" / "src" / "test" / "resources" / "DONOTEXIST"
         val repo = Repo(localRoot)
@@ -82,7 +82,7 @@ class CodeParserTest {
     }
 
     @Test
-    fun `test new Extractor for FastsettTrygdetid`() {
+    fun `test new CodeParser for FastsettTrygdetid`() {
 
         val localRoot = repoRoot / "app" / "src" / "test" / "resources" / "FastsettTrygdetid"
         val repo = Repo(localRoot).defineSourceRoots { path ->
@@ -124,80 +124,83 @@ class CodeParserTest {
             assertEquals(10, flows.size)
             assertEquals(31, sets.size)
 
-            //////////////////////////////
-            // asserts for regel tjeneste
-            //////////////////////////////
+            `verify rule service FastsettTrygdetidService`(
+                services.find { it.navn == "FastsettTrygdetidService" }!!,
+                localRoot)
 
-            val ruleService = services.first()
-            assertEquals("FastsettTrygdetidService", ruleService.navn)
-            assertEquals("", ruleService.beskrivelse)
+            `verify rule flow StartTrygdetidFlyt`(flows.find { it.navn == "StartTrygdetidFlyt" }!!)
 
-            assertEquals(11, ruleService.inndata.size)
-            assertEquals(
-                PropertyInfo(
-                    navn = "beregningsvilkarPeriodeListe",
-                    beskrivelse = "Liste av beregningsvilkarPerioder, p�krevd ved uf�retrygd.",
-                    type = "MutableList<BeregningsvilkarPeriode>"
-
-                ), ruleService.inndata.last()
-            )
-
-            assertEquals(5, ruleService.utdata.size)
-            assertEquals(
-                PropertyInfo(
-                    navn = "pakkseddel",
-                    beskrivelse = "",
-                    type = "Pakkseddel"
-
-                ), ruleService.utdata.last()
-            )
-
-            assertEquals(2, ruleService.flyt.elementer.size)
-
-            assertEquals(
-                URI("https://github.com/navikt/${localRoot.last()}/blob/master/fastsetttrygdetid/function/FastsettTrygdetidService.kt"),
-                ruleService.gitHubUri
-            )
-
-            //////////////////////////////
-            // asserts for regel flyter
-            //////////////////////////////
-
-            val ruleFlow = flows.first()
-            assertEquals("StartTrygdetidFlyt", ruleFlow.navn)
-            assertEquals("", ruleFlow.beskrivelse)
-            assertEquals(4, ruleFlow.inndata.size)
-
-            assertEquals(
-                PropertyInfo(
-                    navn = "variable",
-                    type = "TrygdetidVariable?",
-                    beskrivelse = ""
-                ), ruleFlow.inndata.last()
-            )
-
-            assertEquals(2, ruleFlow.flyt.elementer.size)
-
-            //////////////////////////////
-            // asserts for FastsettTrygdetidFlyt
-            //////////////////////////////
-
-            val fastsettTrygdetidFlyt = flows.find { it.navn == "FastsettTrygdetidFlyt" }!!
-            val forgrening = fastsettTrygdetidFlyt
-                .flyt.elementer
-                .filterIsInstance<FlowElement.Forgrening>().first()
-
-            assertEquals("Uføretrygd?", forgrening.navn)
-            assertEquals("Task: Uføretrygd?", forgrening.beskrivelse)
-            assertEquals(2, forgrening.gren.size)
-
-            assertEquals("Ja", forgrening.gren.first().betingelse.navn)
-            assertEquals("Nei", forgrening.gren.last().betingelse.navn)
-
+            `verify rule flow FastsettTrygdetidFlyt`(flows.find { it.navn == "FastsettTrygdetidFlyt" }!!)
 
         }.onFailure {
             println("${it.message} \n ${it.stackTraceToString()}")
             assert(false)
         }
+    }
+
+    private fun `verify rule service FastsettTrygdetidService`(ruleService: RuleServiceInfo, localRoot: Path) {
+
+        assertEquals("FastsettTrygdetidService", ruleService.navn)
+        assertEquals("", ruleService.beskrivelse)
+
+        assertEquals(11, ruleService.inndata.size)
+        assertEquals(
+            PropertyInfo(
+                navn = "beregningsvilkarPeriodeListe",
+                beskrivelse = "Liste av beregningsvilkarPerioder, p�krevd ved uf�retrygd.",
+                type = "MutableList<BeregningsvilkarPeriode>"
+
+            ), ruleService.inndata.last()
+        )
+
+        assertEquals(5, ruleService.utdata.size)
+        assertEquals(
+            PropertyInfo(
+                navn = "pakkseddel",
+                beskrivelse = "",
+                type = "Pakkseddel"
+
+            ), ruleService.utdata.last()
+        )
+
+        assertEquals(2, ruleService.flyt.elementer.size)
+
+        assertEquals(
+            URI("https://github.com/navikt/${localRoot.last()}/blob/master/fastsetttrygdetid/function/FastsettTrygdetidService.kt"),
+            ruleService.gitHubUri
+        )
+    }
+
+    private fun `verify rule flow StartTrygdetidFlyt`(ruleFlow: RuleFlowInfo) {
+
+        assertEquals("StartTrygdetidFlyt", ruleFlow.navn)
+        assertEquals("", ruleFlow.beskrivelse)
+        assertEquals(4, ruleFlow.inndata.size)
+
+        assertEquals(
+            PropertyInfo(
+                navn = "variable",
+                type = "TrygdetidVariable?",
+                beskrivelse = ""
+            ), ruleFlow.inndata.last()
+        )
+
+        assertEquals(2, ruleFlow.flyt.elementer.size)
+    }
+
+    private fun `verify rule flow FastsettTrygdetidFlyt`(ruleFlow: RuleFlowInfo) {
+
+        assertEquals("FastsettTrygdetidFlyt", ruleFlow.navn)
+
+        val forgrening = ruleFlow
+            .flyt.elementer
+            .filterIsInstance<FlowElement.Forgrening>().first()
+
+        assertEquals("Uføretrygd?", forgrening.navn)
+        assertEquals("Task: Uføretrygd?", forgrening.beskrivelse)
+        assertEquals(2, forgrening.gren.size)
+
+        assertEquals("Ja", forgrening.gren.first().betingelse.navn)
+        assertEquals("Nei", forgrening.gren.last().betingelse.navn)
     }
 }
