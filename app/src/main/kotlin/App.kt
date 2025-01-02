@@ -27,8 +27,6 @@ private fun validateDirectoryPath(path: String, errorMessage: String): Path =
 private fun buildAndLogPsiFiles(compilerContext: CompilerContext, repo: Repo): List<KtFile> =
     repo.files().map { fileInfo ->
         compilerContext.createKtFile(fileInfo.file.absolutePathString(), fileInfo.content)
-    }.also {
-        println("Building binding context for ${it.size} files\n")
     }
 
 private fun logExtractionResults(result: List<RuleInfo>) {
@@ -54,10 +52,17 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
                     val repo = Repo(repoRoot)
                     val psiFiles = buildAndLogPsiFiles(compilerContext, repo)
 
-                    compilerContext.buildBindingContext(psiFiles).map { bindingContext ->
-                        // singleton for binding resolution
-                        BindingContextResolver.initialize(bindingContext)
+                    print("Building binding context for ${psiFiles.size} files - ... ")
+
+                    val (elapsed, bindingContextResult) = measureTimeMillisWithResult {
+                        compilerContext.buildBindingContext(psiFiles)
+                    }
+
+                    bindingContextResult.map { bindingContext ->
+                        println(" done in ${formatElapsedTime(elapsed)}\n")
+                        BindingContextResolver.initialize(bindingContext) // singleton for static binding context
                         CodeParser.new(repo, psiFiles)
+
                     }
                 }
                 .flatMap { codeParser ->
