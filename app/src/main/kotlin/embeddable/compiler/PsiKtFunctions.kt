@@ -385,13 +385,11 @@ private fun KtCallExpression.extractBetingelse(): Result<Condition> =
         )
     }
 
-private fun KtCallExpression.extractBranch(): Result<FlowElement>? =
+private fun KtCallExpression.extractForgreningOrNull(): Result<FlowElement>? =
     findDSLTypeBranchOrNull()
         ?.let { dslTypeBranch ->
             when (dslTypeBranch) {
                 FORGRENING -> extractForgrening()
-//                GREN -> extractGren()
-//                FLYT -> extractFlyt()
             }
         }
 
@@ -425,7 +423,7 @@ private fun KtCallExpression.extractFunctionReference(): Result<FlowElement.Func
 fun KtBlockExpression.extractFlowElements(): Result<FlowElement.Flow> =
     children.mapNotNull { child ->
         when (child) {
-            is KtCallExpression -> child.extractBranch() ?: child.extractFunctionReference()
+            is KtCallExpression -> child.extractForgreningOrNull() ?: child.extractFunctionReference()
             is KtDotQualifiedExpression -> child.extractFlowReference()
             else -> null
         }
