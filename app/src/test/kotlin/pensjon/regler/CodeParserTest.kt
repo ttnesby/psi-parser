@@ -163,7 +163,7 @@ class CodeParserTest {
             ), ruleService.utdata.last()
         )
 
-        assertEquals(2, ruleService.flyt.elementer.size)
+        assertEquals(4, ruleService.flyt.elementer.size)
 
         val expectedUri = String.format(
             "https://github.com/navikt/%s/blob/master/fastsetttrygdetid/function/FastsettTrygdetidService.kt",

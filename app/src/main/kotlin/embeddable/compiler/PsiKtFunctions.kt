@@ -277,7 +277,7 @@ private fun KtProperty.toPropertyInfo(): Result<PropertyInfo> =
 
 private fun KtExpression.extractInitializerExpression(): Result<FlowElement>? =
     when (this) {
-        is KtCallExpression -> extractFunctionReference()
+        is KtCallExpression -> extractFunctionReference(extractDocOrEmpty())
         is KtDotQualifiedExpression -> extractFlowReference()
         else -> null
     }
@@ -418,12 +418,12 @@ private fun KtCallExpression.extractForgreningOrNull(): Result<FlowElement>? =
             }
         }
 
-private fun KtCallExpression.extractFunctionReference(): Result<FlowElement.Function>? =
+private fun KtCallExpression.extractFunctionReference(doc: String): Result<FlowElement.Function>? =
     resolveFunctionDeclaration()
         .map { (name, file) ->
             FlowElement.Function(
                 navn = name,
-                beskrivelse = extractDocOrEmpty(),
+                beskrivelse = doc,
                 fil = file
             )
         }
@@ -442,6 +442,7 @@ private fun KtCallExpression.extractFunctionReference(): Result<FlowElement.Func
 /** KtBlockExpression extension functions */
 ///////////////////////////////////////////////////
 
+// TODO - se test, feil på StartTrygdetidFlyt linje 137, bindingContext issue?
 // TODO - se StartVilkårsprøvYtelseFlyt linje 204, hva skal vi gjøre her?
 // TODO - NB! når KDoc er relatert til flow/ruleset/function - this.children -> this.statements
 
@@ -450,7 +451,8 @@ fun KtBlockExpression.extractFlowElements(): Result<FlowElement.Flow> =
         when (child) {
             is KtBinaryExpression -> child.extractInitializer()
             is KtProperty -> child.extractInitializer()
-            is KtCallExpression -> child.extractForgreningOrNull() ?: child.extractFunctionReference()
+            is KtCallExpression ->
+                child.extractForgreningOrNull() ?: child.extractFunctionReference(extractDocOrEmpty())
             is KtDotQualifiedExpression -> child.extractFlowReference()
             is KtWhileExpression -> child.extractWhile() // see FaktoromregnInntekterBatchFlyt as example
             else -> null
@@ -458,10 +460,10 @@ fun KtBlockExpression.extractFlowElements(): Result<FlowElement.Flow> =
     }
         .let { flyt ->
             if (flyt.isEmpty()) {
-//                println("Warning: empty flow with current flow extraction logic, ${containingClass()?.name} [${containingKtFile.name}]")
-//                Result.success(FlowElement.Flow(emptyList()))
+                println(illegalState("Warning: empty flow with current flow extraction logic").message)
+                Result.success(FlowElement.Flow(emptyList()))
                 // later when extraction logic is complete
-                Result.failure(illegalState("Empty FlowElements.Flow"))
+                //Result.failure(illegalState("Empty FlowElements.Flow"))
             } else {
                 flyt.toResult().map { FlowElement.Flow(it) }
             }
