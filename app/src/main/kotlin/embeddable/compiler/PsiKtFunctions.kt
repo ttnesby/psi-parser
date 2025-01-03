@@ -440,7 +440,7 @@ private fun KtCallExpression.extractFunctionReference(): Result<FlowElement.Func
 /** KtBlockExpression extension functions */
 ///////////////////////////////////////////////////
 
-// TODO - hvordan håndtere flyt/regelsett (KtDotQualifiedExpression) som er høyresiden på en property
+// TODO - se StartVilkårsprøvYtelseFlyt linje 204, hva skal vi gjøre her?
 // TODO - NB! når KDoc er relatert til flow/ruleset/function - this.children -> this.statements
 
 fun KtBlockExpression.extractFlowElements(): Result<FlowElement.Flow> =
