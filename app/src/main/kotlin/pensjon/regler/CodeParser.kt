@@ -128,7 +128,7 @@ class CodeParser private constructor(
         }
 
     private fun KtClass.extractFlow(flowType: DSLTypeFlow): Result<FlowElement.Flow> =
-        findMatchingProperty(flowType).flatMap { property ->
+        findFlowProperty(flowType).flatMap { property ->
             property.getLambdaBlock()
         }.flatMap { block ->
             when (flowType) {

@@ -33,7 +33,7 @@ fun KtFile.firstDSLTypeAbstractOrNull(): Pair<KtClass, DSLTypeAbstract>? =
     declarations
         .filterIsInstance<KtClass>()
         .firstOrNull()
-        ?.matchingDSLTypeAbstractOrNull()
+        ?.findDSLTypeAbstractOrNull()
 
 
 ///////////////////////////////////////////////////
@@ -60,7 +60,7 @@ private fun KDoc.formatOrEmpty(): String =
 /** KtClass extension functions */
 ///////////////////////////////////////////////////
 
-private fun KtClass.matchingDSLTypeAbstractOrNull(): Pair<KtClass, DSLTypeAbstract>? =
+private fun KtClass.findDSLTypeAbstractOrNull(): Pair<KtClass, DSLTypeAbstract>? =
     DSLTypeAbstract
         .entries
         .firstOrNull { dslType -> isSubClassOf(dslType) }
@@ -74,7 +74,7 @@ private fun KtClass.isSubClassOf(type: DSLTypeSuperClass): Boolean =
 fun KtClass.findResponseTypeForRuleService(): Result<KtTypeReference> =
     superTypeListEntries
         .find { it.isClassOf(RULE_SERVICE) }
-        ?.genericTypeReference()
+        ?.findGenericTypeReference()
         ?: Result.failure(illegalState("No service response type found"))
 
 fun KtClass.mustBeSubClassOf(type: DSLTypeService): Result<KtClass> =
@@ -88,20 +88,13 @@ fun KtClass.requirePrimaryConstructor(): Result<KtPrimaryConstructor> =
         ?.let { Result.success(it) }
         ?: Result.failure(illegalState("No primary constructor found"))
 
-fun KtClass.findMatchingProperty(flowType: DSLTypeFlow): Result<KtProperty> =
-    body
-        ?.properties
-        ?.let { properties ->
-            properties
-                .filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }
-                .find { it.name == flowType.typeName }
-                ?.let {
-                    Result.success(it)
-                } ?: Result.failure(illegalState("No override function ${flowType.typeName} found"))
-        } ?: Result.failure(illegalState("No properties found"))
+fun KtClass.requireProperties(): Result<List<KtProperty>> =
+    body?.properties?.let { Result.success(it) } ?: Result.failure(illegalState("No properties found"))
 
-fun KtClass.requireName(): Result<String> =
-    name?.let { Result.success(it) } ?: Result.failure(illegalState("No class name"))
+fun KtClass.findFlowProperty(flowType: DSLTypeFlow): Result<KtProperty> =
+    requireProperties().flatMap { properties ->
+        properties.findFlowProperty(flowType)
+    }
 
 private fun KtClass.toRuleFlowReference(): Result<FlowElement.RuleFlow> =
     requireName().map { name ->
@@ -138,7 +131,7 @@ fun KtClass.toPropertyInfo(): Result<PropertyInfo> =
 private fun KtSuperTypeListEntry.isClassOf(type: DSLTypeSuperClass): Boolean =
     typeReference?.text?.contains(type.typeName) == true
 
-private fun KtSuperTypeListEntry.genericTypeReference(): Result<KtTypeReference> =
+private fun KtSuperTypeListEntry.findGenericTypeReference(): Result<KtTypeReference> =
     typeReference
         ?.typeElement
         ?.typeArgumentsAsTypes
@@ -150,15 +143,12 @@ private fun KtSuperTypeListEntry.genericTypeReference(): Result<KtTypeReference>
 /** KtPrimaryConstructor extension functions */
 ///////////////////////////////////////////////////
 
+// TODO - er det rimelig å anta at service request param er 1. param av typen klasse?
+
 fun KtPrimaryConstructor.findParameterDSLTypeServiceRequest(): Result<Pair<KtParameter, KtClass>> =
-    valueParameters
-        .firstNotNullOfOrNull {
-            it.hasTypeClass()?.let { pair ->
-                if (pair.second.isSubClassOf(REQUEST)) pair else null
-            }
-        }
-        ?.let { Result.success(it) }
-        ?: Result.failure(illegalState("No service request parameter found in primary constructor"))
+    findFirstParameterOfTypeClass().flatMap { pair ->
+        pair.second.mustBeSubClassOf(REQUEST).map { pair }
+    }
 
 fun KtPrimaryConstructor.findFirstParameterOfTypeClass(): Result<Pair<KtParameter, KtClass>> =
     valueParameters
@@ -181,17 +171,20 @@ private fun KtParameter.hasTypeClass(): Pair<KtParameter, KtClass>? =
         ?.let { aClass -> Pair(this, aClass) }
 
 fun KtParameter.toPropertyInfo(): Result<PropertyInfo> =
-    name?.let { name ->
-        typeReference?.let { type ->
-            Result.success(
-                PropertyInfo(
-                    navn = name,
-                    type = type.text,
-                    beskrivelse = docOrEmpty()
-                )
+    requireName().flatMap { name ->
+        requireTypeReference().map { typeRef ->
+            PropertyInfo(
+                navn = name,
+                type = typeRef.text,
+                beskrivelse = docOrEmpty()
             )
-        } ?: Result.failure(illegalState("No type for parameter $name"))
-    } ?: Result.failure(illegalState("No name for parameter"))
+        }
+    }
+
+fun KtParameter.requireTypeReference(): Result<KtTypeReference> =
+    typeReference
+        ?.let { Result.success(it) }
+        ?: Result.failure(illegalState("No type reference for parameter $name"))
 
 
 ///////////////////////////////////////////////////
@@ -200,6 +193,9 @@ fun KtParameter.toPropertyInfo(): Result<PropertyInfo> =
 
 fun KtElement.illegalState(msg: String): IllegalStateException =
     IllegalStateException("$msg, ${containingClass()?.name} [${containingKtFile.name}]")
+
+fun KtElement.requireName(): Result<String> =
+    name?.let { Result.success(it) } ?: Result.failure(illegalState("No name for ${this.javaClass.simpleName}"))
 
 fun KtElement.resolveToKtClass(): Result<KtClass> =
     resolveToDeclaration().flatMap { psiElement ->
@@ -268,6 +264,13 @@ private fun KtProperty.toPropertyInfo(): Result<PropertyInfo> =
 
 fun List<KtProperty>.toPropertyInfo(): Result<List<PropertyInfo>> = map { it.toPropertyInfo() }.toResult()
 
+fun List<KtProperty>.findFlowProperty(flowType: DSLTypeFlow): Result<KtProperty> =
+    this
+        .filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }
+        .find { it.name == flowType.typeName }
+        ?.let { Result.success(it)}
+        ?: Result.failure(IllegalStateException("No override function ${flowType.typeName} found"))
+
 
 ///////////////////////////////////////////////////
 /** KtCallExpression extension functions */
@@ -282,7 +285,7 @@ private fun KtCallExpression.resolveFunctionDeclaration(): Result<Pair<String, F
                 }
         } ?: Result.failure(illegalState("No named reference for called expression"))
 
-private fun KtCallExpression.resolveToDSLTypeBranch(): DSLTypeBranch? =
+private fun KtCallExpression.findDSLTypeBranchOrNull(): DSLTypeBranch? =
     (calleeExpression as? KtNameReferenceExpression)
         ?.getReferencedName()
         ?.let { name -> DSLTypeBranch.fromString(name) }
@@ -356,7 +359,7 @@ private fun KtCallExpression.extractFlyt(): Result<FlowElement.Flow> =
     }
 
 private fun KtCallExpression.extractBranch(): Result<FlowElement>? =
-    resolveToDSLTypeBranch()
+    findDSLTypeBranchOrNull()
         ?.let { dslTypeBranch ->
             when (dslTypeBranch) {
                 FORGRENING -> extractForgrening()
@@ -416,7 +419,7 @@ fun KtBlockExpression.extractRuleServiceFlow(): Result<FlowElement.Flow> =
 fun KtBlockExpression.extractRuleFlowFlow(): Result<FlowElement.Flow> =
     children.mapNotNull { child ->
         when (child) {
-            is KtCallExpression -> child.extractBranch() ?: child.extractFunctionReference()
+            is KtCallExpression -> child.extractBranch() //?: child.extractFunctionReference()
             is KtDotQualifiedExpression -> child.extractFlowReference()
             else -> null
         }
@@ -459,7 +462,7 @@ private fun KtBlockExpression.extractBetingelse(): Result<Condition> =
 private fun KtDotQualifiedExpression.resolveReceiverClass(): Pair<KtClass, DSLTypeAbstract>? =
     (receiverExpression as? KtReferenceExpression)
         ?.resolveToKtClass()?.map { ktClass ->
-            ktClass.matchingDSLTypeAbstractOrNull()
+            ktClass.findDSLTypeAbstractOrNull()
         }
         ?.getOrNull()
 
