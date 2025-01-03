@@ -275,6 +275,19 @@ private fun KtProperty.toPropertyInfo(): Result<PropertyInfo> =
         } ?: Result.failure(illegalState("No type or inferred type for property $name"))
     } ?: Result.failure(illegalState("No name for property"))
 
+private fun KtExpression.extractInitializerExpression(): Result<FlowElement>? =
+    when (this) {
+        is KtCallExpression -> extractFunctionReference()
+        is KtDotQualifiedExpression -> extractFlowReference()
+        else -> null
+    }
+
+private fun KtProperty.extractInitializer(): Result<FlowElement>? =
+    initializer?.extractInitializerExpression()
+
+private fun KtBinaryExpression.extractInitializer(): Result<FlowElement>? =
+    right?.extractInitializerExpression()
+
 fun List<KtProperty>.toPropertyInfo(): Result<List<PropertyInfo>> = map { it.toPropertyInfo() }.toResult()
 
 fun List<KtProperty>?.findFlowProperty(flowType: DSLTypeFlow, caller: KtElement): Result<KtProperty> =
@@ -433,9 +446,11 @@ private fun KtCallExpression.extractFunctionReference(): Result<FlowElement.Func
 fun KtBlockExpression.extractFlowElements(): Result<FlowElement.Flow> =
     children.mapNotNull { child ->
         when (child) {
+            is KtBinaryExpression -> child.extractInitializer()
+            is KtProperty -> child.extractInitializer()
             is KtCallExpression -> child.extractForgreningOrNull() ?: child.extractFunctionReference()
             is KtDotQualifiedExpression -> child.extractFlowReference()
-            is KtWhileExpression -> child.extractWhile()
+            is KtWhileExpression -> child.extractWhile() // see FaktoromregnInntekterBatchFlyt as example
             else -> null
         }
     }
