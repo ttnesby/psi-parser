@@ -2,9 +2,9 @@ package rule.dsl
 
 
 enum class DSLTypeBranch(val typeName: String) {
-    FORGRENING("forgrening"),
-    GREN("gren"),
-    FLYT("flyt");
+    FORGRENING("forgrening");
+//    GREN("gren"),
+//    FLYT("flyt");
 
     override fun toString(): String = typeName
 

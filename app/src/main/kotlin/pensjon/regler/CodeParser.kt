@@ -131,10 +131,7 @@ class CodeParser private constructor(
         findFlowProperty(flowType).flatMap { property ->
             property.getLambdaBlock()
         }.flatMap { block ->
-            when (flowType) {
-                SERVICE -> block.extractRuleServiceFlow()
-                FLOW -> block.extractRuleFlowFlow()
-            }
+            block.extractFlowElements()
         }
 
     private fun KtClass.extractRuleSet(): Result<RuleSetInfo> =

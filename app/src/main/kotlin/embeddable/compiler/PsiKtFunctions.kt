@@ -319,6 +319,15 @@ private fun KtCallExpression.firstArgument(): Result<String> =
             Result.success(arg.text.removeSurrounding("\""))
         } ?: Result.failure(illegalState("No name found for forgrening"))
 
+/**
+ * Extract forgrening
+ * ```
+ * forgrening(string) {lambda block}
+ * ```
+ *
+ * @return A 'Result' wrapping 'FlowElement.Forgrening'
+ */
+
 private fun KtCallExpression.extractForgrening(): Result<FlowElement.Forgrening> =
     firstArgument().flatMap { name ->
         getLambdaBlock().flatMap { blockExpression ->
@@ -332,18 +341,41 @@ private fun KtCallExpression.extractForgrening(): Result<FlowElement.Forgrening>
         }
     }
 
+/**
+ * Extract gren
+ * ```
+ * gren {
+ *      betingelse...
+ *      flyt...
+ * }
+ * ```
+ */
+
 private fun KtCallExpression.extractGren(): Result<FlowElement.Gren> =
     getLambdaBlock().flatMap { blockExpression ->
-        blockExpression.extractBetingelse().flatMap { betingelse ->
-            blockExpression.extractRuleFlowFlow().map { flyt ->
-                FlowElement.Gren(
-                    beskrivelse = extractDocOrEmpty(),
-                    betingelse = betingelse,
-                    flyt = flyt
-                )
+        blockExpression.findBetingelseAndFlyt().flatMap { (betingelseExpr, flytExpr) ->
+            betingelseExpr.extractBetingelse().flatMap { betingelse ->
+                flytExpr.getLambdaBlock().flatMap { flytBlockExpression ->
+                    flytBlockExpression.extractFlowElements().map { flyt ->
+                        FlowElement.Gren(
+                            beskrivelse = extractDocOrEmpty(),
+                            betingelse = betingelse,
+                            flyt = flyt
+                        )
+                    }
+
+                }
+
             }
         }
     }
+
+/**
+ * Extract betingelse
+ * ```
+ *   betingelse(string)? {lambda block}
+ * ```
+ */
 
 private fun KtCallExpression.extractBetingelse(): Result<Condition> =
     getLambdaBlock().map { blockExpression: KtBlockExpression ->
@@ -353,18 +385,13 @@ private fun KtCallExpression.extractBetingelse(): Result<Condition> =
         )
     }
 
-private fun KtCallExpression.extractFlyt(): Result<FlowElement.Flow> =
-    getLambdaBlock().flatMap { blockExpression ->
-        blockExpression.extractRuleFlowFlow()
-    }
-
 private fun KtCallExpression.extractBranch(): Result<FlowElement>? =
     findDSLTypeBranchOrNull()
         ?.let { dslTypeBranch ->
             when (dslTypeBranch) {
                 FORGRENING -> extractForgrening()
-                GREN -> extractGren()
-                FLYT -> extractFlyt()
+//                GREN -> extractGren()
+//                FLYT -> extractFlyt()
             }
         }
 
@@ -392,34 +419,13 @@ private fun KtCallExpression.extractFunctionReference(): Result<FlowElement.Func
 /** KtBlockExpression extension functions */
 ///////////////////////////////////////////////////
 
-fun KtBlockExpression.extractRuleServiceFlow(): Result<FlowElement.Flow> =
-    children.mapNotNull { child ->
-        when (child) {
-            is KtCallExpression -> child.extractBranch() ?: child.extractFunctionReference()
-            is KtDotQualifiedExpression -> child.extractFlowReference()
-            else -> null
-        }
-    }
-        .let { flyt ->
-            if (flyt.isEmpty()) {
-                val context = "${containingClass()?.name} [${containingKtFile.name}]"
-                println("Warning: empty flow with current flow extraction logic, $context")
-                Result.success(FlowElement.Flow(emptyList()))
-                // later when extraction logic is complete
-                // Result.failure(noSuchElement(ParsingError.EMPTY_RULE_SERVICE_FLOW))
-            } else {
-                flyt.toResult().map { FlowElement.Flow(it) }
-            }
-        }
-
-
 // TODO - hvordan håndtere flyt/regelsett (KtDotQualifiedExpression) som er høyresiden på en property
 // TODO - NB! når KDoc er relatert til flow/ruleset/function - this.children -> this.statements
 
-fun KtBlockExpression.extractRuleFlowFlow(): Result<FlowElement.Flow> =
+fun KtBlockExpression.extractFlowElements(): Result<FlowElement.Flow> =
     children.mapNotNull { child ->
         when (child) {
-            is KtCallExpression -> child.extractBranch() //?: child.extractFunctionReference()
+            is KtCallExpression -> child.extractBranch() ?: child.extractFunctionReference()
             is KtDotQualifiedExpression -> child.extractFlowReference()
             else -> null
         }
@@ -436,23 +442,47 @@ fun KtBlockExpression.extractRuleFlowFlow(): Result<FlowElement.Flow> =
         }
 
 /**
- * Extracts gren elements from a forgrening lambda block
+ * Extract a list of 'gren' call expressions from a forgrening lambda block,
+ * and map each call expression to 'FlowElement.Gren'
+ * ```
+ * {
+ *      gren...
+ *      gren...
+ *      ...
+ * }
+ * ```
+ * @return A 'Result' wrapping a list of 'FlowElement.Gren'
  */
+
 private fun KtBlockExpression.extractGrener(): Result<List<FlowElement.Gren>> =
     this.statements
-        .mapNotNull { statement ->
-            (statement as? KtCallExpression)?.extractGren()
+        .mapNotNull { expression -> (expression as? KtCallExpression) }
+        .map { it.extractGren() }
+        .let { aList ->
+            if (aList.isEmpty()) Result.failure(
+                illegalState("Empty 'forgrening', require at least 2 'gren' expressions")
+            )
+            else aList.toResult()
         }
-        .toResult()
 
 /**
- * Extracts betingelse from a gren lambda block
+ * Extract pair of call expressions from gren lambda block
+ *```
+ * {
+ *      betingelse(string)? {lambda block}
+ *      flyt {lambda block}
+ * }
+ * ```
+ * @return A 'Result' wrapping a 'Pair' of call expressions, (betingelse,flyt)
  */
-private fun KtBlockExpression.extractBetingelse(): Result<Condition> =
+
+private fun KtBlockExpression.findBetingelseAndFlyt(): Result<Pair<KtCallExpression, KtCallExpression >> =
     this.statements
-        .firstNotNullOfOrNull { statement ->
-            (statement as? KtCallExpression)?.extractBetingelse()
-        } ?: Result.failure(illegalState("No betingelse found for gren"))
+        .mapNotNull { expression -> (expression as? KtCallExpression) }
+        .let { aList ->
+            if (aList.size == 2) Result.success(Pair(aList[0],aList[1]))
+            else Result.failure(illegalState("Invalid 'gren' content, expected expression 'betingelse' and 'fly'"))
+        }
 
 
 ///////////////////////////////////////////////////
