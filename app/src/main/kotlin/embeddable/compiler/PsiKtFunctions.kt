@@ -94,20 +94,20 @@ fun KtClass.requireBody(): Result<KtClassBody> =
 fun KtClass.findFlowProperty(flowType: DSLTypeFlow): Result<KtProperty> =
     requireBody().flatMap { body?.properties.findFlowProperty(flowType, this) }
 
-private fun KtClass.toRuleFlowReference(): Result<FlowElement.RuleFlow> =
+private fun KtClass.toRuleFlowReference(doc: String): Result<FlowElement.RuleFlow> =
     requireName().map { name ->
         FlowElement.RuleFlow(
             navn = name,
-            beskrivelse = extractDocOrEmpty(),
+            beskrivelse = doc,
             fil = File(containingKtFile.name)
         )
     }
 
-private fun KtClass.toRuleSetReference(): Result<FlowElement.RuleSet> =
+private fun KtClass.toRuleSetReference(doc: String): Result<FlowElement.RuleSet> =
     requireName().map { name ->
         FlowElement.RuleSet(
             navn = name,
-            beskrivelse = extractDocOrEmpty(),
+            beskrivelse = doc,
             fil = File(containingKtFile.name)
         )
     }
@@ -326,8 +326,10 @@ private fun KtCallExpression.getLambdaBlock(): Result<KtBlockExpression> =
         ?: Result.failure(illegalState("No lambda arguments found in call expression"))
 
 private fun KtCallExpression.firstArgumentOrEmpty(): String =
-    valueArguments
-        .firstOrNull()
+    // TODO - sjekk detaljene mellom valueArguments versus valueArgumentList
+    valueArgumentList
+        ?.arguments
+        ?.firstOrNull()
         ?.text
         ?.removeSurrounding("\"")
         ?: ""
@@ -403,8 +405,8 @@ private fun KtCallExpression.extractGren(): Result<FlowElement.Gren> =
 private fun KtCallExpression.extractBetingelse(): Result<Condition> =
     getLambdaBlock().map { blockExpression: KtBlockExpression ->
         Condition(
-            navn = firstArgumentOrEmpty(),
-            uttrykk = blockExpression.text
+            navn = this.firstArgumentOrEmpty(),
+            uttrykk = blockExpression.text.trim().replace("\\s+".toRegex(), " ")
         )
     }
 
@@ -533,15 +535,18 @@ private fun KtWhileExpression.extractWhile(): Result<FlowElement> =
 
 private fun KtDotQualifiedExpression.resolveReceiverClass(): Pair<KtClass, DSLTypeAbstract>? =
     (receiverExpression as? KtReferenceExpression)
-        ?.resolveToKtClass()?.map { it.findDSLTypeAbstractOrNull() }?.getOrNull()
+        ?.resolveToKtClass()?.map {
+            it.findDSLTypeAbstractOrNull()
+        }
+        ?.getOrNull()
 
 
 private fun KtDotQualifiedExpression.extractFlowReference(): Result<FlowElement>? =
     resolveReceiverClass()
         ?.let { (resolvedClass, dslTypeAbstract) ->
             when (dslTypeAbstract) {
-                RULE_FLOW -> resolvedClass.toRuleFlowReference()
-                RULE_SET -> resolvedClass.toRuleSetReference()
+                RULE_FLOW -> resolvedClass.toRuleFlowReference(this.extractDocOrEmpty())
+                RULE_SET -> resolvedClass.toRuleSetReference(this.extractDocOrEmpty())
                 RULE_SERVICE -> null
             }
         }
