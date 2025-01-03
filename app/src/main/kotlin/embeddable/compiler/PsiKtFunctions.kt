@@ -189,8 +189,13 @@ fun KtParameter.requireTypeReference(): Result<KtTypeReference> =
 /** KtElement extension functions */
 ///////////////////////////////////////////////////
 
-fun KtElement.illegalState(msg: String): IllegalStateException =
-    IllegalStateException("$msg, ${containingClass()?.name} [${containingKtFile.name}]")
+fun KtElement.illegalState(msg: String): IllegalStateException {
+    val document = containingKtFile.viewProvider.document
+    val lineNumber = document?.getLineNumber(this.textOffset)?.plus(1) ?: "unknown"
+    return IllegalStateException(
+        "$msg, ${containingClass()?.name} [${containingKtFile.name}] at line $lineNumber"
+    )
+}
 
 fun KtElement.requireName(): Result<String> =
     name?.let { Result.success(it) } ?: Result.failure(illegalState("No name for ${this.javaClass.simpleName}"))
@@ -358,16 +363,19 @@ private fun KtCallExpression.extractGren(): Result<FlowElement.Gren> =
         blockExpression.findBetingelseAndFlyt().flatMap { (betingelseExpr, flytExpr) ->
             betingelseExpr.extractBetingelse().flatMap { betingelse ->
                 flytExpr.getLambdaBlock().flatMap { flytBlockExpression ->
-                    flytBlockExpression.extractFlowElements().map { flyt ->
+                    val flytResult =
+                        // do not extractFlowElements for empty flyt - `flyt {}` - gives error
+                        if (flytBlockExpression.children.isEmpty()) Result.success(FlowElement.Flow(emptyList()))
+                        else flytBlockExpression.extractFlowElements()
+
+                    flytResult.map { flyt ->
                         FlowElement.Gren(
                             beskrivelse = extractDocOrEmpty(),
                             betingelse = betingelse,
                             flyt = flyt
                         )
                     }
-
                 }
-
             }
         }
     }
@@ -427,15 +435,16 @@ fun KtBlockExpression.extractFlowElements(): Result<FlowElement.Flow> =
         when (child) {
             is KtCallExpression -> child.extractForgreningOrNull() ?: child.extractFunctionReference()
             is KtDotQualifiedExpression -> child.extractFlowReference()
+            is KtWhileExpression -> child.extractWhile()
             else -> null
         }
     }
         .let { flyt ->
             if (flyt.isEmpty()) {
-                //println("Warning: empty flow with current flow extraction logic, ${containingClass()?.name} [${containingKtFile.name}]")
-                Result.success(FlowElement.Flow(emptyList()))
+//                println("Warning: empty flow with current flow extraction logic, ${containingClass()?.name} [${containingKtFile.name}]")
+//                Result.success(FlowElement.Flow(emptyList()))
                 // later when extraction logic is complete
-                // Result.failure(noSuchElement(ParsingError.EMPTY_RULE_SERVICE_FLOW))
+                Result.failure(illegalState("Empty FlowElements.Flow"))
             } else {
                 flyt.toResult().map { FlowElement.Flow(it) }
             }
@@ -483,6 +492,24 @@ private fun KtBlockExpression.findBetingelseAndFlyt(): Result<Pair<KtCallExpress
             if (aList.size == 2) Result.success(Pair(aList[0], aList[1]))
             else Result.failure(illegalState("Invalid 'gren' content, expected expression 'betingelse' and 'fly'"))
         }
+
+///////////////////////////////////////////////////
+/** KtWhileExpression extension functions */
+///////////////////////////////////////////////////
+
+private fun KtWhileExpression.extractWhile(): Result<FlowElement> =
+    condition
+        ?.let { expression ->
+            (body as? KtBlockExpression)
+                ?.let { blockExpression ->
+                    blockExpression.extractFlowElements().map { flyt ->
+                        FlowElement.While(
+                            betingelse = expression.text,
+                            flyt = flyt
+                        )
+                    }
+                } ?: Result.failure(illegalState("No block expression for while"))
+        } ?: Result.failure(illegalState("No condition for while"))
 
 
 ///////////////////////////////////////////////////

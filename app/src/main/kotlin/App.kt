@@ -1,6 +1,6 @@
 import embeddable.compiler.BindingContextResolver
 import embeddable.compiler.CompilerContext
-import org.example.generateAsciiDoc
+//import org.example.generateAsciiDoc
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.psi.KtFile
@@ -70,7 +70,7 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
                 }
                 .map { result ->
                     logExtractionResults(result)
-                    generateAsciiDoc(result.filterIsInstance<RuleServiceInfo>(), asciiDocOutput)
+                    //generateAsciiDoc(result.filterIsInstance<RuleServiceInfo>(), asciiDocOutput)
                 }
         }
 

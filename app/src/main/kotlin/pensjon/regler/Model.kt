@@ -59,6 +59,7 @@ data class Condition(
 // called "forgrening"
 sealed class FlowElement {
 
+    data class While(val betingelse: String, val flyt: Flow): FlowElement()
     data class Flow(val elementer: List<FlowElement>) : FlowElement()
     data class Forgrening(val beskrivelse: String, val navn: String, val gren: List<Gren>) :
         FlowElement()
