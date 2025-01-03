@@ -13,7 +13,7 @@ import result.addons.flatMap
 import result.addons.toResult
 import rule.dsl.*
 import rule.dsl.DSLTypeAbstract.*
-import rule.dsl.DSLTypeBranch.*
+import rule.dsl.DSLTypeBranch.FORGRENING
 import rule.dsl.DSLTypeService.REQUEST
 import java.io.File
 
@@ -71,30 +71,28 @@ fun KtClass.docOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
 private fun KtClass.isSubClassOf(type: DSLTypeSuperClass): Boolean =
     superTypeListEntries.any { it.isClassOf(type) }
 
-fun KtClass.findResponseTypeForRuleService(): Result<KtTypeReference> =
-    superTypeListEntries
-        .find { it.isClassOf(RULE_SERVICE) }
-        ?.findGenericTypeReference()
-        ?: Result.failure(illegalState("No service response type found"))
-
 fun KtClass.mustBeSubClassOf(type: DSLTypeService): Result<KtClass> =
     superTypeListEntries
         .find { it.isClassOf(type) }
         ?.let { Result.success(this) }
         ?: Result.failure(illegalState("$name is not sub class of ${type.typeName}"))
 
+fun KtClass.findResponseTypeForRuleService(): Result<KtTypeReference> =
+    superTypeListEntries
+        .find { it.isClassOf(RULE_SERVICE) }
+        ?.findGenericTypeReference()
+        ?: Result.failure(illegalState("No service response type found"))
+
 fun KtClass.requirePrimaryConstructor(): Result<KtPrimaryConstructor> =
     primaryConstructor
         ?.let { Result.success(it) }
         ?: Result.failure(illegalState("No primary constructor found"))
 
-fun KtClass.requireProperties(): Result<List<KtProperty>> =
-    body?.properties?.let { Result.success(it) } ?: Result.failure(illegalState("No properties found"))
+fun KtClass.requireBody(): Result<KtClassBody> =
+    body?.let { Result.success(it) } ?: Result.failure(illegalState("No class body found"))
 
 fun KtClass.findFlowProperty(flowType: DSLTypeFlow): Result<KtProperty> =
-    requireProperties().flatMap { properties ->
-        properties.findFlowProperty(flowType)
-    }
+    requireBody().flatMap { body?.properties.findFlowProperty(flowType, this) }
 
 private fun KtClass.toRuleFlowReference(): Result<FlowElement.RuleFlow> =
     requireName().map { name ->
@@ -203,8 +201,8 @@ fun KtElement.resolveToKtClass(): Result<KtClass> =
             ?.let { ktClass ->
                 Result.success(ktClass)
             } ?: Result.failure(
-                illegalState("Declaration is not a KtClass, but ${psiElement.javaClass.simpleName}")
-            )
+            illegalState("Declaration is not a KtClass, but ${psiElement.javaClass.simpleName}")
+        )
     }
 
 /**
@@ -222,13 +220,23 @@ fun KtElement.extractDocOrEmpty(): String =
 
 
 ///////////////////////////////////////////////////
+/** KtLambdaExpression extension functions */
+///////////////////////////////////////////////////
+
+private fun KtLambdaExpression?.requireLambdaBlock(caller: KtElement): Result<KtBlockExpression> =
+    this
+        ?.let {
+            bodyExpression
+                ?.let { Result.success(it) }
+                ?: Result.failure(illegalState("No lambda block found for lambda expression"))
+        } ?: Result.failure(caller.illegalState("No lambda expression"))
+
+///////////////////////////////////////////////////
 /** KtProperty extension functions */
 ///////////////////////////////////////////////////
 
 fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> =
-    (initializer as? KtLambdaExpression)
-        ?.bodyExpression
-        ?.let { Result.success(it) } ?: Result.failure(illegalState("No lambda block found in property"))
+    (initializer as? KtLambdaExpression).requireLambdaBlock(this)
 
 private fun KtProperty.toPropertyInfo(): Result<PropertyInfo> =
     name?.let { name ->
@@ -264,12 +272,14 @@ private fun KtProperty.toPropertyInfo(): Result<PropertyInfo> =
 
 fun List<KtProperty>.toPropertyInfo(): Result<List<PropertyInfo>> = map { it.toPropertyInfo() }.toResult()
 
-fun List<KtProperty>.findFlowProperty(flowType: DSLTypeFlow): Result<KtProperty> =
-    this
-        .filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }
+fun List<KtProperty>?.findFlowProperty(flowType: DSLTypeFlow, caller: KtElement): Result<KtProperty> =
+    this?.let {
+        filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }
         .find { it.name == flowType.typeName }
-        ?.let { Result.success(it)}
-        ?: Result.failure(IllegalStateException("No override function ${flowType.typeName} found"))
+        ?.let {
+            Result.success(it)
+        } ?: Result.failure(caller.illegalState("No override function ${flowType.typeName} found"))
+    } ?: Result.failure(caller.illegalState("No properties found"))
 
 
 ///////////////////////////////////////////////////
@@ -283,7 +293,7 @@ private fun KtCallExpression.resolveFunctionDeclaration(): Result<Pair<String, F
                 .resolveToDeclaration().map { declaration ->
                     Pair(namedReference.text, File(declaration.containingFile.name))
                 }
-        } ?: Result.failure(illegalState("No named reference for called expression"))
+        } ?: Result.failure(illegalState("No named reference for call expression"))
 
 private fun KtCallExpression.findDSLTypeBranchOrNull(): DSLTypeBranch? =
     (calleeExpression as? KtNameReferenceExpression)
@@ -293,17 +303,9 @@ private fun KtCallExpression.findDSLTypeBranchOrNull(): DSLTypeBranch? =
 private fun KtCallExpression.getLambdaBlock(): Result<KtBlockExpression> =
     lambdaArguments // is multiple lambda args possible?
         .firstOrNull()
-        ?.let { lambdaArg ->
-            lambdaArg
-                .getLambdaExpression()
-                ?.let { functionLiteral ->
-                    functionLiteral
-                        .bodyExpression
-                        ?.let { ktBlockExpression ->
-                            Result.success(ktBlockExpression)
-                        } // do we need to raise high resolution failure?
-                } // do we need to raise high resolution failure?
-        } ?: Result.failure(illegalState("No lambda arguments found in call expression"))
+        ?.getLambdaExpression()
+        ?.requireLambdaBlock(this)
+        ?: Result.failure(illegalState("No lambda arguments found in call expression"))
 
 private fun KtCallExpression.firstArgumentOrEmpty(): String =
     valueArguments
@@ -464,7 +466,7 @@ private fun KtBlockExpression.extractGrener(): Result<List<FlowElement.Gren>> =
         }
 
 /**
- * Extract pair of call expressions from gren lambda block
+ * Extract a pair of call expressions from gren lambda block
  *```
  * {
  *      betingelse(string)? {lambda block}
@@ -474,11 +476,11 @@ private fun KtBlockExpression.extractGrener(): Result<List<FlowElement.Gren>> =
  * @return A 'Result' wrapping a 'Pair' of call expressions, (betingelse,flyt)
  */
 
-private fun KtBlockExpression.findBetingelseAndFlyt(): Result<Pair<KtCallExpression, KtCallExpression >> =
+private fun KtBlockExpression.findBetingelseAndFlyt(): Result<Pair<KtCallExpression, KtCallExpression>> =
     this.statements
         .mapNotNull { expression -> (expression as? KtCallExpression) }
         .let { aList ->
-            if (aList.size == 2) Result.success(Pair(aList[0],aList[1]))
+            if (aList.size == 2) Result.success(Pair(aList[0], aList[1]))
             else Result.failure(illegalState("Invalid 'gren' content, expected expression 'betingelse' and 'fly'"))
         }
 
@@ -489,17 +491,15 @@ private fun KtBlockExpression.findBetingelseAndFlyt(): Result<Pair<KtCallExpress
 
 private fun KtDotQualifiedExpression.resolveReceiverClass(): Pair<KtClass, DSLTypeAbstract>? =
     (receiverExpression as? KtReferenceExpression)
-        ?.resolveToKtClass()?.map { ktClass ->
-            ktClass.findDSLTypeAbstractOrNull()
-        }
-        ?.getOrNull()
+        ?.resolveToKtClass()?.map { it.findDSLTypeAbstractOrNull() }?.getOrNull()
 
 
 private fun KtDotQualifiedExpression.extractFlowReference(): Result<FlowElement>? =
-    resolveReceiverClass()?.let { (resolvedClass, dslTypeAbstract) ->
-        when (dslTypeAbstract) {
-            RULE_FLOW -> resolvedClass.toRuleFlowReference()
-            RULE_SET -> resolvedClass.toRuleSetReference()
-            RULE_SERVICE -> null
+    resolveReceiverClass()
+        ?.let { (resolvedClass, dslTypeAbstract) ->
+            when (dslTypeAbstract) {
+                RULE_FLOW -> resolvedClass.toRuleFlowReference()
+                RULE_SET -> resolvedClass.toRuleSetReference()
+                RULE_SERVICE -> null
+            }
         }
-    }
