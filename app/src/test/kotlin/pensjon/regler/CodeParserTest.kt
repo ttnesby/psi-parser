@@ -63,7 +63,7 @@ class CodeParserTest {
                 compilerContext.createKtFile(fileInfo.file.absolutePathString(), fileInfo.content)
             }
         val bindingContext = compilerContext.buildBindingContext(psiFiles).getOrThrow()
-
+				// TODO - reset singleton after each test case
         // singleton for binding resolution
         BindingContextResolver.initialize(bindingContext)
 
