@@ -243,6 +243,12 @@ private fun KtLambdaExpression?.requireLambdaBlock(caller: KtElement): Result<Kt
 fun KtProperty.getLambdaBlock(): Result<KtBlockExpression> =
     (initializer as? KtLambdaExpression).requireLambdaBlock(this)
 
+// TODO - need to wrap up type management with more for;
+// - KtProperty.toPropertyInfo()
+// - KtExpression.extractInitializerExpression()
+// - KtProperty.extractInitializer()
+// - KtBinaryExpression.extractInitializer()
+
 private fun KtProperty.toPropertyInfo(): Result<PropertyInfo> =
     name?.let { name ->
 
