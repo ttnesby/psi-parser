@@ -3,6 +3,9 @@ package pensjon.regler
 import java.io.File
 import java.net.URI
 
+// TODO
+// hele pakke stien for Regel service, flyt og sett.
+
 sealed interface RuleInfo {
     val navn: String
     val beskrivelse: String

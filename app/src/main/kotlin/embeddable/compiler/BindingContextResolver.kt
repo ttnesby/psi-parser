@@ -1,5 +1,6 @@
 package embeddable.compiler
 
+import org.jetbrains.annotations.TestOnly
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.psi.KtElement
@@ -8,6 +9,8 @@ import org.jetbrains.kotlin.psi.KtReferenceExpression
 import org.jetbrains.kotlin.psi.KtTypeReference
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
+import org.slf4j.LoggerFactory
+import pensjon.regler.Repo
 import result.addons.flatMap
 
 /**
@@ -22,41 +25,65 @@ import result.addons.flatMap
  */
 
 object BindingContextResolver {
-    private lateinit var bindingContext: BindingContext
+
+    private val logger = LoggerFactory.getLogger(BindingContextResolver::class.java)
+
+    private var bindingContext: BindingContext? = null
 
     fun initialize(context: BindingContext) {
         bindingContext = context
     }
 
-    private fun KtElement.resolveToDescriptor(): Result<DeclarationDescriptor?> =
-        when (this) {
-            is KtNameReferenceExpression -> Result.success(
-                bindingContext[BindingContext.REFERENCE_TARGET, this]
-            )
+    @TestOnly
+    fun reset() {
+        bindingContext = null
+    }
 
-            is KtTypeReference -> Result.success(
-                bindingContext.get(BindingContext.TYPE, this)
-                    ?.constructor
-                    ?.declarationDescriptor
-            )
-
-            is KtReferenceExpression -> Result.success(
-                bindingContext.getType(this)
-                    ?.constructor
-                    ?.declarationDescriptor
-            )
-
-            else -> Result.failure(
-                IllegalArgumentException(
-                    "Unsupported element type: ${this.javaClass.simpleName} for binding context resolution"
-                )
-            )
+    fun printBindingContextElements() {
+        val context = bindingContext ?: run {
+            println("BindingContextResolver is not initialized")
+            return
         }
+
+        context.getSliceContents(BindingContext.RESOLVED_CALL).forEach { (k, v) ->
+            println("Slice: ${BindingContext.RESOLVED_CALL}  |  Key: $k  =>  Value: $v")
+        }
+
+
+    }
+
+    private fun KtElement.resolveToDescriptor(): Result<DeclarationDescriptor?> =
+        bindingContext?.let { bctx ->
+            when (this) {
+                is KtNameReferenceExpression -> Result.success(
+                    bctx[BindingContext.REFERENCE_TARGET, this]
+                )
+
+                is KtTypeReference -> Result.success(
+                    bctx.get(BindingContext.TYPE, this)
+                        ?.constructor
+                        ?.declarationDescriptor
+                )
+
+                is KtReferenceExpression -> Result.success(
+                    bctx.getType(this)
+                        ?.constructor
+                        ?.declarationDescriptor
+                )
+
+                else -> Result.failure(
+                    IllegalArgumentException(
+                        "Unsupported element type: ${this.javaClass.simpleName} for binding context resolution"
+                    )
+                )
+            }
+        } ?: Result.failure(illegalState("BindingContextResolver Singleton is not initialized"))
 
     fun KtElement.resolveToDeclaration(): Result<PsiElement> =
         resolveToDescriptor().flatMap { descriptor ->
             descriptor
                 ?.let {
+                    logger.info("Descriptor: ${descriptor.name}")
                     DescriptorToSourceUtils
                         .getSourceFromDescriptor(descriptor)
                         ?.let { psiElement ->

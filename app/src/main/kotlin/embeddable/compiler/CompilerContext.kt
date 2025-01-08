@@ -17,6 +17,7 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.resolve.BindingContext
 import java.io.File
 import org.jetbrains.kotlin.idea.KotlinFileType
+import org.slf4j.LoggerFactory
 
 class CompilerContext private constructor(
     val configuration: CompilerConfiguration,
@@ -24,6 +25,8 @@ class CompilerContext private constructor(
     val psiFactory: PsiFileFactoryImpl
 ) {
     companion object {
+
+        private val logger = LoggerFactory.getLogger(CompilerContext::class.java)
 
         fun new(
             jdkHome: File = File(System.getProperty("java.home")),
@@ -48,8 +51,8 @@ class CompilerContext private constructor(
                     environment = environment,
                     psiFactory = psiFactory
                 ).also { _ ->
-                    println("Created Compiler Context")
-                    println("No need to add jar dependencies to classpath for now")
+                    logger.info("Created Compiler Context")
+                    logger.info("No need to add jar dependencies to classpath for now")
 //                    val jarDependencies = jarDependencies(libsPath)
 //                    context.configuration.addJvmClasspathRoots(jarDependencies)
 //                    println("Added ${jarDependencies.size} jar files from $libsPath to Classpath\n")

@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.containingClass
+import org.slf4j.LoggerFactory
 import pensjon.regler.Condition
 import pensjon.regler.FlowElement
 import pensjon.regler.PropertyInfo
@@ -16,6 +17,8 @@ import rule.dsl.DSLTypeAbstract.*
 import rule.dsl.DSLTypeBranch.FORGRENING
 import rule.dsl.DSLTypeService.REQUEST
 import java.io.File
+
+private val logger = LoggerFactory.getLogger("PsiKtFunctions")
 
 /**
  * Feilhåndtering for parsing av Kotlin PSI elementer gjøres etter følgende prinsipper:
@@ -358,8 +361,10 @@ private fun KtCallExpression.firstArgument(): Result<String> =
 
 private fun KtCallExpression.extractForgrening(): Result<FlowElement.Forgrening> =
     firstArgument().flatMap { name ->
+        logger.info("===== forgrening $name - BEGIN =====]")
         getLambdaBlock().flatMap { blockExpression ->
             blockExpression.extractGrener().map { grener ->
+                logger.info("===== forgrening $name - END =====]")
                 FlowElement.Forgrening(
                     beskrivelse = extractDocOrEmpty(),
                     navn = name,
@@ -438,7 +443,7 @@ private fun KtCallExpression.extractFunctionReference(doc: String): Result<FlowE
         .fold(
             onSuccess = { Result.success(it) },
             onFailure = {
-                println("Warning: Missing func ${(this.calleeExpression as? KtNameReferenceExpression)?.getReferencedName()} in binding context ${it.message}")
+                logger.warn("Missing func ${(this.calleeExpression as? KtNameReferenceExpression)?.getReferencedName()} in binding context ${it.message}")
                 null
             }
         )
@@ -466,10 +471,10 @@ fun KtBlockExpression.extractFlowElements(): Result<FlowElement.Flow> =
     }
         .let { flyt ->
             if (flyt.isEmpty()) {
-                println(illegalState("Warning: empty flow with current flow extraction logic").message)
-                Result.success(FlowElement.Flow(emptyList()))
+                logger.error(illegalState("!!! empty flow with current flow extraction logic").message)
+                //Result.success(FlowElement.Flow(emptyList()))
                 // later when extraction logic is complete
-                //Result.failure(illegalState("Empty FlowElements.Flow"))
+                Result.failure(illegalState("Empty FlowElements.Flow"))
             } else {
                 flyt.toResult().map { FlowElement.Flow(it) }
             }

@@ -4,6 +4,7 @@ import embeddable.compiler.*
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
+import org.slf4j.LoggerFactory
 import result.addons.flatMap
 import result.addons.toResult
 import rule.dsl.DSLTypeAbstract
@@ -21,6 +22,8 @@ class CodeParser private constructor(
         fun new(repo: Repo, psiFiles: List<KtFile>): CodeParser =
             CodeParser(repo, psiFiles)
     }
+
+    private val logger = LoggerFactory.getLogger(Repo::class.java)
 
     fun toModel(): Result<List<RuleInfo>> =
         psiFiles.mapNotNull { file ->
@@ -40,10 +43,12 @@ class CodeParser private constructor(
 
     private fun KtClass.extractRuleService(): Result<RuleServiceInfo> =
         requireName().flatMap { name ->
+            logger.info("=== Rule service $name - BEGIN ===")
             extractServiceRequestFields().flatMap { requestFields ->
                 extractServiceResponseFields().flatMap { responseFields ->
                     extractFlow(SERVICE).flatMap { flow ->
                         repo.toGithubURI(containingKtFile.name).map { gitHubUri ->
+                            logger.info("=== Rule service $name - END ===")
                             RuleServiceInfo(
                                 navn = name,
                                 beskrivelse = docOrEmpty(),
@@ -98,9 +103,11 @@ class CodeParser private constructor(
 
     private fun KtClass.extractRuleFlow(): Result<RuleFlowInfo> =
         requireName().flatMap { name ->
+            logger.info("=== Rule flow $name - BEGIN ===")
             extractFlowRequestFields().flatMap { requestFields ->
                 extractFlow(FLOW).flatMap { flow ->
                     repo.toGithubURI(containingKtFile.name).map { gitHubUri ->
+                        logger.info("=== Rule flow $name - END ===")
                         RuleFlowInfo(
                             navn = name,
                             beskrivelse = docOrEmpty(),
@@ -131,12 +138,15 @@ class CodeParser private constructor(
         findFlowProperty(flowType).flatMap { property ->
             property.getLambdaBlock()
         }.flatMap { block ->
+            logger.info("Flow extraction [${flowType.typeName}]")
             block.extractFlowElements()
         }
 
     private fun KtClass.extractRuleSet(): Result<RuleSetInfo> =
         requireName().flatMap { name ->
+            logger.info("=== Rule set $name - BEGIN ===")
             repo.toGithubURI(containingKtFile.name).map { gitHubUri ->
+                logger.info("=== Rule set $name - END ===")
                 RuleSetInfo(
                     navn = name,
                     beskrivelse = docOrEmpty(),

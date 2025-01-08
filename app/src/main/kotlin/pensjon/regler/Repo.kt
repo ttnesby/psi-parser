@@ -1,6 +1,8 @@
 package pensjon.regler
 
+import embeddable.compiler.CompilerContext
 import org.jetbrains.annotations.TestOnly
+import org.slf4j.LoggerFactory
 import java.net.URI
 import java.nio.file.Path
 import kotlin.io.path.*
@@ -9,6 +11,9 @@ private const val ORG_NAVIKT = "https://github.com/navikt"
 private const val BRANCH = "blob/master/"
 
 class Repo(private val localRoot: Path) {
+
+    private val logger = LoggerFactory.getLogger(Repo::class.java)
+
     private val gitHubUri: URI = URI("$ORG_NAVIKT/${localRoot.last()}/$BRANCH")
 
     private var isSourceRoot: (Path) -> Boolean = createDefaultFilter()
@@ -30,14 +35,14 @@ class Repo(private val localRoot: Path) {
 
     val sourceRoots: List<Path> by lazy {
         findSourceRoots().also {
-            println("Found ${it.size} source roots")
-            println(it.joinToString("\n"))
+            logger.info("Found ${it.size} source roots")
+            logger.info(it.joinToString("\n"))
         }
     }
 
     private val sourceRootFiles: List<FileInfo> by lazy {
         sourceFiles().also {
-            println("Finished mapping ${it.size} kt files to PSI format")
+            logger.info("Finished mapping ${it.size} kt files to PSI format")
         }
     }
 

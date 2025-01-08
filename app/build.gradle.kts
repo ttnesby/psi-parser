@@ -20,6 +20,15 @@ dependencies {
     implementation(kotlin("stdlib"))
     implementation(kotlin("compiler-embeddable"))
 
+    // https://mvnrepository.com/artifact/com.sksamuel.hoplite/hoplite-core
+    implementation("com.sksamuel.hoplite:hoplite-core:2.9.0")
+
+    // https://mvnrepository.com/artifact/org.slf4j/slf4j-api
+    implementation("org.slf4j:slf4j-api:2.0.16")
+
+    // https://mvnrepository.com/artifact/ch.qos.logback/logback-classic
+    implementation("ch.qos.logback:logback-classic:1.5.16")
+
     testImplementation(kotlin("test"))
 }
 

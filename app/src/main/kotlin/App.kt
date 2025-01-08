@@ -1,3 +1,6 @@
+@file:OptIn(ExperimentalHoplite::class)
+
+import com.sksamuel.hoplite.ConfigAlias
 import embeddable.compiler.BindingContextResolver
 import embeddable.compiler.CompilerContext
 //import org.example.generateAsciiDoc
@@ -8,21 +11,20 @@ import org.jetbrains.kotlin.utils.addToStdlib.measureTimeMillisWithResult
 import pensjon.regler.*
 import result.addons.flatMap
 import java.nio.file.Path
-import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.isDirectory
+import com.sksamuel.hoplite.ConfigLoader
+import com.sksamuel.hoplite.ExperimentalHoplite
+import com.sksamuel.hoplite.PropertySource
+import org.slf4j.LoggerFactory
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
 
-// TODO:
-// - logging
-
-private const val USAGE_ERROR = "Usage: <path to repository> <path to output folder>"
 private const val REPO_ERROR = "Path to repository is not a directory"
 private const val OUTPUT_ERROR = "Path to output folder is not a directory"
 
-private fun validateDirectoryPath(path: String, errorMessage: String): Path =
-    Path(path).also {
-        if (!it.isDirectory()) throw IllegalArgumentException(errorMessage)
-    }
+private fun validateDirectoryPath(path: Path, errorMessage: String) =
+    if (!path.isDirectory()) throw IllegalArgumentException(errorMessage) else Unit
 
 private fun buildAndLogPsiFiles(compilerContext: CompilerContext, repo: Repo): List<KtFile> =
     repo.files().map { fileInfo ->
@@ -35,16 +37,33 @@ private fun logExtractionResults(result: List<RuleInfo>) {
     println("Found ${result.filterIsInstance<RuleSetInfo>().size} rule sets\n")
 }
 
+data class AppConfig(
+    @ConfigAlias("repo")
+    val repoPath: Path,
+    @ConfigAlias("output")
+    val outputPath: Path,
+    @ConfigAlias("log")
+    val level: String = "INFO",
+)
+
+private val logger = LoggerFactory.getLogger("bootstrap")
+
 fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
     runCatching {
-        if (args.size != 2) throw IllegalArgumentException(USAGE_ERROR)
 
-        val repoRoot = validateDirectoryPath(args[0], REPO_ERROR)
-            .also { println("Repo root is: $it") }
-        val asciiDocOutputPath = validateDirectoryPath(args[1], OUTPUT_ERROR)
-            .also { println("AsciiDoc output path is: $it \n") }
+        val config = ConfigLoader.builder()
+            .withExplicitSealedTypes()
+            .addPropertySource(PropertySource.commandLine(args)) // Highest precedence
+            .build()
+            .loadConfigOrThrow<AppConfig>()
 
-        repoRoot to asciiDocOutputPath
+        validateDirectoryPath(config.repoPath, REPO_ERROR)
+        validateDirectoryPath(config.outputPath, OUTPUT_ERROR)
+
+        val rootLogger = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
+        rootLogger.level = Level.toLevel(config.level)
+
+        config.repoPath to config.outputPath
     }
         .flatMap { (repoRoot, asciiDocOutput) ->
             CompilerContext.new(disposable = disposable)
@@ -52,14 +71,14 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
                     val repo = Repo(repoRoot)
                     val psiFiles = buildAndLogPsiFiles(compilerContext, repo)
 
-                    print("Building binding context for ${psiFiles.size} files - ... ")
+                    logger.info("Building binding context for ${psiFiles.size} files - ... ")
 
                     val (elapsed, bindingContextResult) = measureTimeMillisWithResult {
                         compilerContext.buildBindingContext(psiFiles)
                     }
 
                     bindingContextResult.map { bindingContext ->
-                        println(" done in ${formatElapsedTime(elapsed)}\n")
+                        logger.info(" binding context done in ${formatElapsedTime(elapsed)}\n")
                         BindingContextResolver.initialize(bindingContext) // singleton for static binding context
                         CodeParser.new(repo, psiFiles)
 
@@ -73,11 +92,6 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
                     //generateAsciiDoc(result.filterIsInstance<RuleServiceInfo>(), asciiDocOutput)
                 }
         }
-
-/**
- * arg[0] - sti til repository (C:\\data\\pensjon-regler)
- * arg[2] - sti til output mappe for AsciiDoc filer
- */
 
 private const val EXIT_CODE_SUCCESS = 0
 private const val EXIT_CODE_FAILURE = 1
