@@ -284,28 +284,28 @@ private fun KtProperty.toPropertyInfo(): Result<PropertyInfo> =
         } ?: Result.failure(illegalState("No type or inferred type for property $name"))
     } ?: Result.failure(illegalState("No name for property"))
 
-private fun KtExpression.extractInitializerExpression(): Result<FlowElement>? =
+private fun KtExpression.extractInitializerExpression(doc: String): Result<FlowElement>? =
     when (this) {
-        is KtCallExpression -> extractFunctionReference(extractDocOrEmpty())
-        is KtDotQualifiedExpression -> extractFlowReference()
+        is KtCallExpression -> extractFunctionReference(doc)
+        is KtDotQualifiedExpression -> extractFlowReference(doc)
         else -> null
     }
 
-private fun KtProperty.extractInitializer(): Result<FlowElement>? =
-    initializer?.extractInitializerExpression()
+private fun KtProperty.extractInitializer(doc: String): Result<FlowElement>? =
+    initializer?.extractInitializerExpression(doc)
 
-private fun KtBinaryExpression.extractInitializer(): Result<FlowElement>? =
-    right?.extractInitializerExpression()
+private fun KtBinaryExpression.extractInitializer(doc: String): Result<FlowElement>? =
+    right?.extractInitializerExpression(doc)
 
 fun List<KtProperty>.toPropertyInfo(): Result<List<PropertyInfo>> = map { it.toPropertyInfo() }.toResult()
 
 fun List<KtProperty>?.findFlowProperty(flowType: DSLTypeFlow, caller: KtElement): Result<KtProperty> =
     this?.let {
         filter { it.hasModifier(KtTokens.OVERRIDE_KEYWORD) }
-        .find { it.name == flowType.typeName }
-        ?.let {
-            Result.success(it)
-        } ?: Result.failure(caller.illegalState("No override function ${flowType.typeName} found"))
+            .find { it.name == flowType.typeName }
+            ?.let {
+                Result.success(it)
+            } ?: Result.failure(caller.illegalState("No override function ${flowType.typeName} found"))
     } ?: Result.failure(caller.illegalState("No properties found"))
 
 
@@ -361,10 +361,10 @@ private fun KtCallExpression.firstArgument(): Result<String> =
 
 private fun KtCallExpression.extractForgrening(): Result<FlowElement.Forgrening> =
     firstArgument().flatMap { name ->
-        logger.info("===== forgrening $name - BEGIN =====]")
+        logger.trace("forgrening $name - BEGIN]")
         getLambdaBlock().flatMap { blockExpression ->
             blockExpression.extractGrener().map { grener ->
-                logger.info("===== forgrening $name - END =====]")
+                logger.trace("forgrening $name - END]")
                 FlowElement.Forgrening(
                     beskrivelse = extractDocOrEmpty(),
                     navn = name,
@@ -460,11 +460,12 @@ private fun KtCallExpression.extractFunctionReference(doc: String): Result<FlowE
 fun KtBlockExpression.extractFlowElements(): Result<FlowElement.Flow> =
     children.mapNotNull { child ->
         when (child) {
-            is KtBinaryExpression -> child.extractInitializer()
-            is KtProperty -> child.extractInitializer()
+            is KtBinaryExpression -> child.extractInitializer(child.extractDocOrEmpty())
+            is KtProperty -> child.extractInitializer(child.extractDocOrEmpty())
             is KtCallExpression ->
-                child.extractForgreningOrNull() ?: child.extractFunctionReference(extractDocOrEmpty())
-            is KtDotQualifiedExpression -> child.extractFlowReference()
+                child.extractForgreningOrNull() ?: child.extractFunctionReference(child.extractDocOrEmpty())
+
+            is KtDotQualifiedExpression -> child.extractFlowReference(child.extractDocOrEmpty())
             is KtWhileExpression -> child.extractWhile() // see FaktoromregnInntekterBatchFlyt as example
             else -> null
         }
@@ -554,12 +555,12 @@ private fun KtDotQualifiedExpression.resolveReceiverClass(): Pair<KtClass, DSLTy
         ?.getOrNull()
 
 
-private fun KtDotQualifiedExpression.extractFlowReference(): Result<FlowElement>? =
+private fun KtDotQualifiedExpression.extractFlowReference(doc: String): Result<FlowElement>? =
     resolveReceiverClass()
         ?.let { (resolvedClass, dslTypeAbstract) ->
             when (dslTypeAbstract) {
-                RULE_FLOW -> resolvedClass.toRuleFlowReference(this.extractDocOrEmpty())
-                RULE_SET -> resolvedClass.toRuleSetReference(this.extractDocOrEmpty())
+                RULE_FLOW -> resolvedClass.toRuleFlowReference(doc)
+                RULE_SET -> resolvedClass.toRuleSetReference(doc)
                 RULE_SERVICE -> null
             }
         }

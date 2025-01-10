@@ -1,6 +1,5 @@
 package pensjon.regler
 
-import embeddable.compiler.CompilerContext
 import org.jetbrains.annotations.TestOnly
 import org.slf4j.LoggerFactory
 import java.net.URI
@@ -36,7 +35,7 @@ class Repo(private val localRoot: Path) {
     val sourceRoots: List<Path> by lazy {
         findSourceRoots().also {
             logger.info("Found ${it.size} source roots")
-            logger.info(it.joinToString("\n"))
+            logger.debug(it.joinToString(", "))
         }
     }
 

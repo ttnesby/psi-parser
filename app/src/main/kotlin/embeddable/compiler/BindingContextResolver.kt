@@ -10,7 +10,6 @@ import org.jetbrains.kotlin.psi.KtTypeReference
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 import org.slf4j.LoggerFactory
-import pensjon.regler.Repo
 import result.addons.flatMap
 
 /**
@@ -39,18 +38,18 @@ object BindingContextResolver {
         bindingContext = null
     }
 
-    fun printBindingContextElements() {
-        val context = bindingContext ?: run {
-            println("BindingContextResolver is not initialized")
-            return
-        }
-
-        context.getSliceContents(BindingContext.RESOLVED_CALL).forEach { (k, v) ->
-            println("Slice: ${BindingContext.RESOLVED_CALL}  |  Key: $k  =>  Value: $v")
-        }
-
-
-    }
+//    fun printBindingContextElements() {
+//        val context = bindingContext ?: run {
+//            println("BindingContextResolver is not initialized")
+//            return
+//        }
+//
+//        context.getSliceContents(BindingContext.RESOLVED_CALL).forEach { (k, v) ->
+//            println("Slice: ${BindingContext.RESOLVED_CALL}  |  Key: $k  =>  Value: $v")
+//        }
+//
+//
+//    }
 
     private fun KtElement.resolveToDescriptor(): Result<DeclarationDescriptor?> =
         bindingContext?.let { bctx ->
@@ -83,7 +82,7 @@ object BindingContextResolver {
         resolveToDescriptor().flatMap { descriptor ->
             descriptor
                 ?.let {
-                    logger.info("Descriptor: ${descriptor.name}")
+                    logger.debug("Descriptor: {}", descriptor.name)
                     DescriptorToSourceUtils
                         .getSourceFromDescriptor(descriptor)
                         ?.let { psiElement ->

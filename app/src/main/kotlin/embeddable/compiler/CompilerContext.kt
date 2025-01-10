@@ -52,7 +52,7 @@ class CompilerContext private constructor(
                     psiFactory = psiFactory
                 ).also { _ ->
                     logger.info("Created Compiler Context")
-                    logger.info("No need to add jar dependencies to classpath for now")
+                    logger.trace("No need to add jar dependencies to classpath for now")
 //                    val jarDependencies = jarDependencies(libsPath)
 //                    context.configuration.addJvmClasspathRoots(jarDependencies)
 //                    println("Added ${jarDependencies.size} jar files from $libsPath to Classpath\n")

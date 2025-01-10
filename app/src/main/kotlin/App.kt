@@ -1,24 +1,24 @@
 @file:OptIn(ExperimentalHoplite::class)
 
+//import org.example.generateAsciiDoc
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
 import com.sksamuel.hoplite.ConfigAlias
+import com.sksamuel.hoplite.ConfigLoader
+import com.sksamuel.hoplite.ExperimentalHoplite
+import com.sksamuel.hoplite.PropertySource
 import embeddable.compiler.BindingContextResolver
 import embeddable.compiler.CompilerContext
-//import org.example.generateAsciiDoc
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.utils.addToStdlib.measureTimeMillisWithResult
+import org.slf4j.LoggerFactory
 import pensjon.regler.*
 import result.addons.flatMap
 import java.nio.file.Path
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.isDirectory
-import com.sksamuel.hoplite.ConfigLoader
-import com.sksamuel.hoplite.ExperimentalHoplite
-import com.sksamuel.hoplite.PropertySource
-import org.slf4j.LoggerFactory
-import ch.qos.logback.classic.Level
-import ch.qos.logback.classic.Logger
 
 private const val REPO_ERROR = "Path to repository is not a directory"
 private const val OUTPUT_ERROR = "Path to output folder is not a directory"
@@ -37,23 +37,33 @@ private fun logExtractionResults(result: List<RuleInfo>) {
     println("Found ${result.filterIsInstance<RuleSetInfo>().size} rule sets\n")
 }
 
+// easier with custom enum versus reuse of logback level and custom decoder
+enum class LogLevel {
+    ALL,
+    TRACE,
+    DEBUG,
+    INFO,
+    WARN,
+    ERROR,
+    OFF;
+}
+
 data class AppConfig(
-    @ConfigAlias("repo")
+    @param:ConfigAlias("repo")
     val repoPath: Path,
-    @ConfigAlias("output")
+    @param:ConfigAlias("output")
     val outputPath: Path,
-    @ConfigAlias("log")
-    val level: String = "INFO",
+    @param:ConfigAlias("log")
+    val level: LogLevel = LogLevel.INFO
 )
 
 private val logger = LoggerFactory.getLogger("bootstrap")
 
 fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
     runCatching {
-
         val config = ConfigLoader.builder()
+            .addPropertySource(PropertySource.commandLine(args))
             .withExplicitSealedTypes()
-            .addPropertySource(PropertySource.commandLine(args)) // Highest precedence
             .build()
             .loadConfigOrThrow<AppConfig>()
 
@@ -61,7 +71,7 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
         validateDirectoryPath(config.outputPath, OUTPUT_ERROR)
 
         val rootLogger = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
-        rootLogger.level = Level.toLevel(config.level)
+        rootLogger.level = Level.valueOf(config.level.toString())
 
         config.repoPath to config.outputPath
     }
@@ -71,7 +81,7 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
                     val repo = Repo(repoRoot)
                     val psiFiles = buildAndLogPsiFiles(compilerContext, repo)
 
-                    logger.info("Building binding context for ${psiFiles.size} files - ... ")
+                    logger.info("Building binding context for ${psiFiles.size} files")
 
                     val (elapsed, bindingContextResult) = measureTimeMillisWithResult {
                         compilerContext.buildBindingContext(psiFiles)

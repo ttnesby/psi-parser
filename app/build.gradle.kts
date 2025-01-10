@@ -20,6 +20,9 @@ dependencies {
     implementation(kotlin("stdlib"))
     implementation(kotlin("compiler-embeddable"))
 
+    // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-reflect
+    //implementation("org.jetbrains.kotlin:kotlin-reflect:2.1.0")
+
     // https://mvnrepository.com/artifact/com.sksamuel.hoplite/hoplite-core
     implementation("com.sksamuel.hoplite:hoplite-core:2.9.0")
 

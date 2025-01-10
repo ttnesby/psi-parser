@@ -33,7 +33,7 @@ class AppKtTest {
     }
 
     @Test
-    fun `test bootstrap with valid repository and output paths`() {
+    fun `test bootstrap with valid and empty repository and output paths`() {
         val repoPath = (tempDir / "testRepo").also { it.createDirectories() }
         val outputPath = (tempDir / "testOutput").also { it.createDirectories() }
 
