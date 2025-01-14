@@ -1,11 +1,12 @@
 package embeddable.compiler
 
-import embeddable.compiler.BindingContextResolver.resolveToDeclaration
+import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiWhiteSpace
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.containingClass
+import org.jetbrains.kotlin.resolve.BindingContext
 import org.slf4j.LoggerFactory
 import pensjon.regler.Condition
 import pensjon.regler.FlowElement
@@ -17,6 +18,9 @@ import rule.dsl.DSLTypeAbstract.*
 import rule.dsl.DSLTypeBranch.FORGRENING
 import rule.dsl.DSLTypeService.REQUEST
 import java.io.File
+import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
+import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
+import pensjon.regler.ParserConfig
 
 private val logger = LoggerFactory.getLogger("PsiKtFunctions")
 
@@ -146,14 +150,14 @@ private fun KtSuperTypeListEntry.findGenericTypeReference(): Result<KtTypeRefere
 
 // TODO - er det rimelig å anta at service request param er 1. param av typen klasse?
 
-fun KtPrimaryConstructor.findParameterDSLTypeServiceRequest(): Result<Pair<KtParameter, KtClass>> =
-    findFirstParameterOfTypeClass().flatMap { pair ->
+fun KtPrimaryConstructor.findParameterDSLTypeServiceRequest(config: ParserConfig): Result<Pair<KtParameter, KtClass>> =
+    findFirstParameterOfTypeClass(config).flatMap { pair ->
         pair.second.mustBeSubClassOf(REQUEST).map { pair }
     }
 
-fun KtPrimaryConstructor.findFirstParameterOfTypeClass(): Result<Pair<KtParameter, KtClass>> =
+fun KtPrimaryConstructor.findFirstParameterOfTypeClass(config: ParserConfig): Result<Pair<KtParameter, KtClass>> =
     valueParameters
-        .firstNotNullOfOrNull { it.hasTypeClass() }
+        .firstNotNullOfOrNull { it.hasTypeClass(config) }
         ?.let { Result.success(it) }
         ?: Result.failure(illegalState("No parameter of type class found in primary constructor"))
 
@@ -166,9 +170,9 @@ fun KtPrimaryConstructor.toPropertyInfo(): Result<List<PropertyInfo>> =
 
 fun KtParameter.docOrEmpty(): String = docComment?.formatOrEmpty() ?: ""
 
-private fun KtParameter.hasTypeClass(): Pair<KtParameter, KtClass>? =
+private fun KtParameter.hasTypeClass(config: ParserConfig): Pair<KtParameter, KtClass>? =
     typeReference
-        ?.resolveToKtClass()?.getOrNull()
+        ?.resolveToKtClass(config)?.getOrNull()
         ?.let { aClass -> Pair(this, aClass) }
 
 fun KtParameter.toPropertyInfo(): Result<PropertyInfo> =
@@ -200,11 +204,53 @@ fun KtElement.illegalState(msg: String): IllegalStateException {
     )
 }
 
+typealias KtElementToDescriptorResult = KtElement.() -> Result<DeclarationDescriptor?>
+
+val initResolveToDescriptorFunction: (BindingContext) -> KtElementToDescriptorResult =
+    { bindingContext ->
+        {
+            when (this) {
+                is KtNameReferenceExpression -> Result.success(
+                    bindingContext[BindingContext.REFERENCE_TARGET, this]
+                )
+                is KtTypeReference -> Result.success(
+                    bindingContext.get(BindingContext.TYPE, this)
+                        ?.constructor
+                        ?.declarationDescriptor
+                )
+                is KtReferenceExpression -> Result.success(
+                    bindingContext.getType(this)
+                        ?.constructor
+                        ?.declarationDescriptor
+                )
+                else -> Result.failure(
+                    IllegalArgumentException(
+                        "Unsupported element type: ${this.javaClass.simpleName} " +
+                                "for binding context resolution"
+                    )
+                )
+            }
+        }
+    }
+
+fun KtElement.resolveToDeclaration(resolver: KtElementToDescriptorResult): Result<PsiElement> =
+    resolver().flatMap { descriptor ->
+        descriptor
+            ?.let {
+                logger.debug("Descriptor: {}", descriptor.name)
+                DescriptorToSourceUtils
+                    .getSourceFromDescriptor(descriptor)
+                    ?.let { psiElement ->
+                        Result.success(psiElement)
+                    } ?: Result.failure(illegalState("Could not resolve to declaration"))
+            } ?: Result.failure(illegalState("Could not resolve descriptor"))
+    }
+
 fun KtElement.requireName(): Result<String> =
     name?.let { Result.success(it) } ?: Result.failure(illegalState("No name for ${this.javaClass.simpleName}"))
 
-fun KtElement.resolveToKtClass(): Result<KtClass> =
-    resolveToDeclaration().flatMap { psiElement ->
+fun KtElement.resolveToKtClass(config: ParserConfig): Result<KtClass> =
+    resolveToDeclaration(config.resolveToDescriptor).flatMap { psiElement ->
         (psiElement as? KtClass)
             ?.let { ktClass ->
                 Result.success(ktClass)
@@ -284,18 +330,18 @@ private fun KtProperty.toPropertyInfo(): Result<PropertyInfo> =
         } ?: Result.failure(illegalState("No type or inferred type for property $name"))
     } ?: Result.failure(illegalState("No name for property"))
 
-private fun KtExpression.extractInitializerExpression(doc: String): Result<FlowElement>? =
+private fun KtExpression.extractInitializerExpression(doc: String, config: ParserConfig): Result<FlowElement>? =
     when (this) {
-        is KtCallExpression -> extractFunctionReference(doc)
-        is KtDotQualifiedExpression -> extractFlowReference(doc)
+        is KtCallExpression -> extractFunctionReference(doc, config)
+        is KtDotQualifiedExpression -> extractFlowReference(doc, config)
         else -> null
     }
 
-private fun KtProperty.extractInitializer(doc: String): Result<FlowElement>? =
-    initializer?.extractInitializerExpression(doc)
+private fun KtProperty.extractInitializer(doc: String, config: ParserConfig): Result<FlowElement>? =
+    initializer?.extractInitializerExpression(doc, config)
 
-private fun KtBinaryExpression.extractInitializer(doc: String): Result<FlowElement>? =
-    right?.extractInitializerExpression(doc)
+private fun KtBinaryExpression.extractInitializer(doc: String, config: ParserConfig): Result<FlowElement>? =
+    right?.extractInitializerExpression(doc, config)
 
 fun List<KtProperty>.toPropertyInfo(): Result<List<PropertyInfo>> = map { it.toPropertyInfo() }.toResult()
 
@@ -313,11 +359,11 @@ fun List<KtProperty>?.findFlowProperty(flowType: DSLTypeFlow, caller: KtElement)
 /** KtCallExpression extension functions */
 ///////////////////////////////////////////////////
 
-private fun KtCallExpression.resolveFunctionDeclaration(): Result<Pair<String, File>> =
+private fun KtCallExpression.resolveFunctionDeclaration(config: ParserConfig): Result<Pair<String, File>> =
     (this.calleeExpression as? KtNameReferenceExpression)
         ?.let { namedReference ->
             namedReference
-                .resolveToDeclaration().map { declaration ->
+                .resolveToDeclaration(config.resolveToDescriptor).map { declaration ->
                     Pair(namedReference.text, File(declaration.containingFile.name))
                 }
         } ?: Result.failure(illegalState("No named reference for call expression"))
@@ -359,11 +405,11 @@ private fun KtCallExpression.firstArgument(): Result<String> =
  * @return A 'Result' wrapping 'FlowElement.Forgrening'
  */
 
-private fun KtCallExpression.extractForgrening(): Result<FlowElement.Forgrening> =
+private fun KtCallExpression.extractForgrening(config: ParserConfig): Result<FlowElement.Forgrening> =
     firstArgument().flatMap { name ->
         logger.trace("forgrening $name - BEGIN]")
         getLambdaBlock().flatMap { blockExpression ->
-            blockExpression.extractGrener().map { grener ->
+            blockExpression.extractGrener(config).map { grener ->
                 logger.trace("forgrening $name - END]")
                 FlowElement.Forgrening(
                     beskrivelse = extractDocOrEmpty(),
@@ -384,7 +430,7 @@ private fun KtCallExpression.extractForgrening(): Result<FlowElement.Forgrening>
  * ```
  */
 
-private fun KtCallExpression.extractGren(): Result<FlowElement.Gren> =
+private fun KtCallExpression.extractGren(config: ParserConfig): Result<FlowElement.Gren> =
     getLambdaBlock().flatMap { blockExpression ->
         blockExpression.findBetingelseAndFlyt().flatMap { (betingelseExpr, flytExpr) ->
             betingelseExpr.extractBetingelse().flatMap { betingelse ->
@@ -392,7 +438,7 @@ private fun KtCallExpression.extractGren(): Result<FlowElement.Gren> =
                     val flytResult =
                         // do not extractFlowElements for empty flyt - `flyt {}` - gives error
                         if (flytBlockExpression.children.isEmpty()) Result.success(FlowElement.Flow(emptyList()))
-                        else flytBlockExpression.extractFlowElements()
+                        else flytBlockExpression.extractFlowElements(config)
 
                     flytResult.map { flyt ->
                         FlowElement.Gren(
@@ -421,16 +467,16 @@ private fun KtCallExpression.extractBetingelse(): Result<Condition> =
         )
     }
 
-private fun KtCallExpression.extractForgreningOrNull(): Result<FlowElement>? =
+private fun KtCallExpression.extractForgreningOrNull(config: ParserConfig): Result<FlowElement>? =
     findDSLTypeBranchOrNull()
         ?.let { dslTypeBranch ->
             when (dslTypeBranch) {
-                FORGRENING -> extractForgrening()
+                FORGRENING -> extractForgrening(config)
             }
         }
 
-private fun KtCallExpression.extractFunctionReference(doc: String): Result<FlowElement.Function>? =
-    resolveFunctionDeclaration()
+private fun KtCallExpression.extractFunctionReference(doc: String, config: ParserConfig): Result<FlowElement.Function>? =
+    resolveFunctionDeclaration(config)
         .map { (name, file) ->
             FlowElement.Function(
                 navn = name,
@@ -457,16 +503,16 @@ private fun KtCallExpression.extractFunctionReference(doc: String): Result<FlowE
 // TODO - se StartVilkårsprøvYtelseFlyt linje 204, hva skal vi gjøre her?
 // TODO - NB! når KDoc er relatert til flow/ruleset/function - this.children -> this.statements
 
-fun KtBlockExpression.extractFlowElements(): Result<FlowElement.Flow> =
+fun KtBlockExpression.extractFlowElements(config: ParserConfig): Result<FlowElement.Flow> =
     children.mapNotNull { child ->
         when (child) {
-            is KtBinaryExpression -> child.extractInitializer(child.extractDocOrEmpty())
-            is KtProperty -> child.extractInitializer(child.extractDocOrEmpty())
+            is KtBinaryExpression -> child.extractInitializer(child.extractDocOrEmpty(), config)
+            is KtProperty -> child.extractInitializer(child.extractDocOrEmpty(), config)
             is KtCallExpression ->
-                child.extractForgreningOrNull() ?: child.extractFunctionReference(child.extractDocOrEmpty())
+                child.extractForgreningOrNull(config) ?: child.extractFunctionReference(child.extractDocOrEmpty(), config)
 
-            is KtDotQualifiedExpression -> child.extractFlowReference(child.extractDocOrEmpty())
-            is KtWhileExpression -> child.extractWhile() // see FaktoromregnInntekterBatchFlyt as example
+            is KtDotQualifiedExpression -> child.extractFlowReference(child.extractDocOrEmpty(), config)
+            is KtWhileExpression -> child.extractWhile(config) // see FaktoromregnInntekterBatchFlyt as example
             else -> null
         }
     }
@@ -494,10 +540,10 @@ fun KtBlockExpression.extractFlowElements(): Result<FlowElement.Flow> =
  * @return A 'Result' wrapping a list of 'FlowElement.Gren'
  */
 
-private fun KtBlockExpression.extractGrener(): Result<List<FlowElement.Gren>> =
+private fun KtBlockExpression.extractGrener(config: ParserConfig): Result<List<FlowElement.Gren>> =
     this.statements
         .mapNotNull { expression -> (expression as? KtCallExpression) }
-        .map { it.extractGren() }
+        .map { it.extractGren(config) }
         .let { aList ->
             if (aList.isEmpty()) Result.failure(
                 illegalState("Empty 'forgrening', require at least 2 'gren' expressions")
@@ -528,12 +574,12 @@ private fun KtBlockExpression.findBetingelseAndFlyt(): Result<Pair<KtCallExpress
 /** KtWhileExpression extension functions */
 ///////////////////////////////////////////////////
 
-private fun KtWhileExpression.extractWhile(): Result<FlowElement> =
+private fun KtWhileExpression.extractWhile(config: ParserConfig): Result<FlowElement> =
     condition
         ?.let { expression ->
             (body as? KtBlockExpression)
                 ?.let { blockExpression ->
-                    blockExpression.extractFlowElements().map { flyt ->
+                    blockExpression.extractFlowElements(config).map { flyt ->
                         FlowElement.While(
                             betingelse = expression.text,
                             flyt = flyt
@@ -547,16 +593,16 @@ private fun KtWhileExpression.extractWhile(): Result<FlowElement> =
 /** KtDotQualifiedExpression extension functions */
 ///////////////////////////////////////////////////
 
-private fun KtDotQualifiedExpression.resolveReceiverClass(): Pair<KtClass, DSLTypeAbstract>? =
+private fun KtDotQualifiedExpression.resolveReceiverClass(config: ParserConfig): Pair<KtClass, DSLTypeAbstract>? =
     (receiverExpression as? KtReferenceExpression)
-        ?.resolveToKtClass()?.map {
+        ?.resolveToKtClass(config)?.map {
             it.findDSLTypeAbstractOrNull()
         }
         ?.getOrNull()
 
 
-private fun KtDotQualifiedExpression.extractFlowReference(doc: String): Result<FlowElement>? =
-    resolveReceiverClass()
+private fun KtDotQualifiedExpression.extractFlowReference(doc: String, config: ParserConfig): Result<FlowElement>? =
+    resolveReceiverClass(config)
         ?.let { (resolvedClass, dslTypeAbstract) ->
             when (dslTypeAbstract) {
                 RULE_FLOW -> resolvedClass.toRuleFlowReference(doc)

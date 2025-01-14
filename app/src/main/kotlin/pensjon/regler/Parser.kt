@@ -15,17 +15,21 @@ import rule.dsl.DSLTypeFlow.FLOW
 import rule.dsl.DSLTypeFlow.SERVICE
 import rule.dsl.DSLTypeService.RESPONSE
 
-
 private val logger = LoggerFactory.getLogger("parser")
+
+data class ParserConfig(
+    val toGitHubURI: StringPathToUriResult,
+    val resolveToDescriptor: KtElementToDescriptorResult
+)
 
 fun psiFilesToModel(
     psiFiles: List<KtFile>,
-    toGitHubURI: StringPathToUriResult
+    config: ParserConfig
 ): Result<List<RuleInfo>> =
     psiFiles.mapNotNull { file ->
         file.firstDSLTypeAbstractOrNull()
             ?.let { (ktClass, dslTypeAbstract) ->
-                ktClass.extractRuleInfo(dslTypeAbstract, toGitHubURI)
+                ktClass.extractRuleInfo(dslTypeAbstract, config)
             }
     }.also {
         psiFiles.forEach { (it as PsiFileImpl).clearCaches() }
@@ -33,20 +37,20 @@ fun psiFilesToModel(
 
 private fun KtClass.extractRuleInfo(
     dslType: DSLTypeAbstract,
-    toGitHubURI: StringPathToUriResult
+    config: ParserConfig
 ): Result<RuleInfo> = when (dslType) {
-    RULE_SERVICE -> extractRuleService(toGitHubURI)
-    RULE_FLOW -> extractRuleFlow(toGitHubURI)
-    RULE_SET -> extractRuleSet(toGitHubURI)
+    RULE_SERVICE -> extractRuleService(config)
+    RULE_FLOW -> extractRuleFlow(config)
+    RULE_SET -> extractRuleSet(config)
 }
 
-private fun KtClass.extractRuleService(toGitHubURI: StringPathToUriResult): Result<RuleServiceInfo> =
+private fun KtClass.extractRuleService(config: ParserConfig): Result<RuleServiceInfo> =
     requireName().flatMap { name ->
         logger.info("Rule service $name - BEGIN")
-        extractServiceRequestFields().flatMap { requestFields ->
-            extractServiceResponseFields().flatMap { responseFields ->
-                extractFlow(SERVICE).flatMap { flow ->
-                    toGitHubURI(containingKtFile.name).map { gitHubUri ->
+        extractServiceRequestFields(config).flatMap { requestFields ->
+            extractServiceResponseFields(config).flatMap { responseFields ->
+                extractFlow(SERVICE, config).flatMap { flow ->
+                    config.toGitHubURI(containingKtFile.name).map { gitHubUri ->
                         logger.info("Rule service $name - END")
                         RuleServiceInfo(
                             navn = name,
@@ -62,10 +66,10 @@ private fun KtClass.extractRuleService(toGitHubURI: StringPathToUriResult): Resu
         }
     }
 
-private fun KtClass.extractServiceRequestFields(): Result<List<PropertyInfo>> =
+private fun KtClass.extractServiceRequestFields(config: ParserConfig): Result<List<PropertyInfo>> =
     requirePrimaryConstructor()
         .flatMap { primConstr ->
-            primConstr.findParameterDSLTypeServiceRequest()
+            primConstr.findParameterDSLTypeServiceRequest(config)
         }.flatMap { (parameter, serviceRequestClass) ->
             serviceRequestClass
                 .requirePrimaryConstructor().flatMap { primConstr ->
@@ -80,10 +84,10 @@ private fun KtClass.extractServiceRequestFields(): Result<List<PropertyInfo>> =
                 }
         }
 
-private fun KtClass.extractServiceResponseFields(): Result<List<PropertyInfo>> =
+private fun KtClass.extractServiceResponseFields(config: ParserConfig): Result<List<PropertyInfo>> =
     findResponseTypeForRuleService()
         .flatMap { typeReference ->
-            typeReference.resolveToKtClass()
+            typeReference.resolveToKtClass(config)
         }.flatMap { aClass ->
             aClass.mustBeSubClassOf(RESPONSE)
         }.flatMap { serviceResponseClass ->
@@ -100,12 +104,12 @@ private fun KtClass.extractServiceResponseFields(): Result<List<PropertyInfo>> =
                 }
         }
 
-private fun KtClass.extractRuleFlow(toGitHubURI: StringPathToUriResult): Result<RuleFlowInfo> =
+private fun KtClass.extractRuleFlow(config: ParserConfig): Result<RuleFlowInfo> =
     requireName().flatMap { name ->
         logger.info("Rule flow $name - BEGIN")
-        extractFlowRequestFields().flatMap { requestFields ->
-            extractFlow(FLOW).flatMap { flow ->
-                toGitHubURI(containingKtFile.name).map { gitHubUri ->
+        extractFlowRequestFields(config).flatMap { requestFields ->
+            extractFlow(FLOW, config).flatMap { flow ->
+                config.toGitHubURI(containingKtFile.name).map { gitHubUri ->
                     logger.info("Rule flow $name - END")
                     RuleFlowInfo(
                         navn = name,
@@ -119,9 +123,9 @@ private fun KtClass.extractRuleFlow(toGitHubURI: StringPathToUriResult): Result<
         }
     }
 
-private fun KtClass.extractFlowRequestFields(): Result<List<PropertyInfo>> =
+private fun KtClass.extractFlowRequestFields(config: ParserConfig): Result<List<PropertyInfo>> =
     requirePrimaryConstructor().flatMap { primConstr ->
-        primConstr.findFirstParameterOfTypeClass()
+        primConstr.findFirstParameterOfTypeClass(config)
     }.flatMap { (parameter, aClass) ->
         parameter.toPropertyInfo().flatMap { property ->
             aClass.getProperties().toPropertyInfo().map { properties ->
@@ -133,20 +137,20 @@ private fun KtClass.extractFlowRequestFields(): Result<List<PropertyInfo>> =
         }
     }
 
-private fun KtClass.extractFlow(flowType: DSLTypeFlow): Result<FlowElement.Flow> =
+private fun KtClass.extractFlow(flowType: DSLTypeFlow, config: ParserConfig): Result<FlowElement.Flow> =
     findFlowProperty(flowType).flatMap { property ->
         property.getLambdaBlock()
     }.flatMap { block ->
         logger.info("Flow extraction ${flowType.typeName} - BEGIN")
-        block.extractFlowElements().also {
+        block.extractFlowElements(config).also {
             logger.info("Flow extraction ${flowType.typeName} - END")
         }
     }
 
-private fun KtClass.extractRuleSet(toGitHubURI: StringPathToUriResult): Result<RuleSetInfo> =
+private fun KtClass.extractRuleSet(config: ParserConfig): Result<RuleSetInfo> =
     requireName().flatMap { name ->
         logger.info("Rule set $name - BEGIN")
-        toGitHubURI(containingKtFile.name).map { gitHubUri ->
+        config.toGitHubURI(containingKtFile.name).map { gitHubUri ->
             logger.info("Rule set $name - END")
             RuleSetInfo(
                 navn = name,

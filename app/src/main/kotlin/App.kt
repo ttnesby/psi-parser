@@ -1,6 +1,6 @@
 //import org.example.generateAsciiDoc
-import embeddable.compiler.BindingContextResolver
 import embeddable.compiler.initCompiler
+import embeddable.compiler.initResolveToDescriptorFunction
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.utils.addToStdlib.measureTimeMillisWithResult
@@ -35,15 +35,17 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
                     compilerFunctions.buildBindingContext(psiFiles)
                 }
 
-                bindingContextResult.map { bindingContext ->
+                bindingContextResult.flatMap { bindingContext ->
                     logger.info(" binding context done in ${formatElapsedTime(elapsed)}\n")
-                    BindingContextResolver.initialize(bindingContext) // singleton for static binding context
-                }
 
-                psiFilesToModel(
-                    psiFiles,
-                    sourceInfo.toGitHubURI
-                )
+                    psiFilesToModel(
+                        psiFiles,
+                        ParserConfig(
+                            toGitHubURI = sourceInfo.toGitHubURI,
+                            resolveToDescriptor = initResolveToDescriptorFunction(bindingContext)
+                        )
+                    )
+                }
             }
         }
     }

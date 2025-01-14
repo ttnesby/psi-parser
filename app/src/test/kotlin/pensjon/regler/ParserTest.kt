@@ -1,26 +1,19 @@
 package pensjon.regler
 
-import embeddable.compiler.BindingContextResolver
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.net.URI
 import java.nio.file.Path
 import kotlin.io.path.Path
-import kotlin.io.path.absolutePathString
-import kotlin.io.path.div
-import kotlin.io.path.isDirectory
 
-class CodeParserTest {
+class ParserTest {
 
-    private val logger = LoggerFactory.getLogger(CodeParserTest::class.java)
+    private val logger = LoggerFactory.getLogger(ParserTest::class.java)
 
     companion object {
         private lateinit var repoRoot: Path
@@ -51,7 +44,6 @@ class CodeParserTest {
 
     @AfterEach
     fun tearDownEach() {
-        BindingContextResolver.reset()
         disposable.dispose()
     }
 
