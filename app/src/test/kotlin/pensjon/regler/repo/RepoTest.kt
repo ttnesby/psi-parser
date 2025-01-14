@@ -27,14 +27,41 @@ class RepoTest {
     }
 
     @Test
-    fun `should find source root paths based on default filter`() {
-        (tempDir / "repository" / "src" / "main" / "kotlin").also { it.createDirectories() }
-        (tempDir / "system" / "src" / "main" / "kotlin").also { it.createDirectories() }
+    fun `should find source root paths and files based on default filter`() {
+        val repoKotlinDir = (tempDir / "repository" / "src" / "main" / "kotlin").also { it.createDirectories() }
+        val systemKotlinDir = (tempDir / "system" / "src" / "main" / "kotlin").also { it.createDirectories() }
+        // not part of default source root filter
         (tempDir / "other" / "src" / "main" / "java").also { it.createDirectories() }
+
+        val createFile: (Path, String) -> Unit = {path, prefix ->
+            (path / "${prefix}Class.kt").writeText(
+                """
+        package ${prefix.lowercase()}
+        
+        class ${prefix}Class {
+            fun hello() = "Hello from ${prefix}Class!"
+        }
+        """.trimIndent()
+            )
+
+        }
+
+        createFile(repoKotlinDir, "Repo")
+        createFile(repoKotlinDir, "Repo2")
+        createFile(repoKotlinDir, "Repo3")
+        createFile(systemKotlinDir, "System")
+        createFile(systemKotlinDir, "System2")
+
+        val sourceInfo = repoSourceInfo(tempDir, initDefaultSourceRootFilterFunction).getOrThrow()
 
         assertEquals(
             2,
-            repoSourceInfo(tempDir, initDefaultSourceRootFilterFunction).getOrThrow().roots.size
+            sourceInfo.roots.size
+        )
+
+        assertEquals(
+            5,
+            sourceInfo.files.size
         )
     }
 
@@ -60,6 +87,8 @@ class RepoTest {
     fun `should find custom source root paths`() {
         (tempDir / "customRepo" / "src").also { it.createDirectories() }
         (tempDir / "customRepo" / "tests").also { it.createDirectories() }
+        // not part of custom source roots
+        (tempDir / "exclude" / "tests").also { it.createDirectories() }
 
         val initCustomSourceRoots: (Path) -> ((Path) -> Boolean) = { localRoot ->
             { path ->
