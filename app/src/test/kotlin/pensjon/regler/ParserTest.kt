@@ -1,15 +1,23 @@
 package pensjon.regler
 
+import embeddable.compiler.initCompiler
+import embeddable.compiler.initResolveToDescriptorFunction
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
+import pensjon.regler.repo.initDefaultSourceRootFilterFunction
+import pensjon.regler.repo.repoSourceInfo
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.nio.file.Path
 import kotlin.io.path.Path
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.div
+import org.junit.jupiter.api.Assertions.assertEquals
 
 class ParserTest {
 
@@ -47,33 +55,36 @@ class ParserTest {
         disposable.dispose()
     }
 
-//    @Test
-//    fun `test new CodeParser for non-existing Path`() {
-//
-//        val localRoot = repoRoot / "app" / "src" / "test" / "resources" / "DONOTEXIST"
-//        val repo = Repo(localRoot)
-//        val compilerContext = CompilerContext.new(disposable = disposable).getOrThrow()
-//        val psiFiles = repo.files()
-//            .map { fileInfo ->
-//                compilerContext.createKtFile(fileInfo.file.absolutePathString(), fileInfo.content)
-//            }
-//        val bindingContext = compilerContext.buildBindingContext(psiFiles).getOrThrow()
-//        // singleton for binding resolution
-//        BindingContextResolver.initialize(bindingContext)
-//
-//        val codeParser = CodeParser.new(
-//            repo = repo,
-//            psiFiles = psiFiles,
-//        )
-//        assertEquals(0, repo.sourceRoots.size)
-//
-//        codeParser.toModel().map { result ->
-//            assertEquals(0, result.filterIsInstance<RuleServiceInfo>().size)
-//            assertEquals(0, result.filterIsInstance<RuleFlowInfo>().size)
-//            assertEquals(0, result.filterIsInstance<RuleSetInfo>().size)
-//        }.onFailure { assert(false) }
-//
-//    }
+    @Test
+    fun `test parser for non-existing Path`() {
+
+        val localRoot = repoRoot / "app" / "src" / "test" / "resources" / "DONOTEXIST"
+
+        val compilerFunctions = initCompiler(disposable).getOrThrow()
+        val sourceInfo = repoSourceInfo(localRoot, initDefaultSourceRootFilterFunction).getOrThrow()
+
+        val psiFiles = sourceInfo.files.map { sourceFile ->
+            compilerFunctions.kotlinToPSI(sourceFile.path.absolutePathString(), sourceFile.content)
+        }
+
+        val bindingContext = compilerFunctions.buildBindingContext(psiFiles).getOrThrow()
+
+        val result = psiFilesToModel(
+            psiFiles,
+            ParserConfig(
+                toGitHubURI = sourceInfo.toGitHubURI,
+                resolveToDescriptor = initResolveToDescriptorFunction(bindingContext),
+                relaxedMode = true
+            )
+        ).getOrThrow()
+
+        assertEquals(0, sourceInfo.roots.size)
+        assertEquals(0, sourceInfo.files.size)
+        assertEquals(0, result.filterIsInstance<RuleServiceInfo>().size)
+        assertEquals(0, result.filterIsInstance<RuleFlowInfo>().size)
+        assertEquals(0, result.filterIsInstance<RuleSetInfo>().size)
+
+    }
 //
 //    @Test
 //    fun `test new CodeParser for FastsettTrygdetid`() {

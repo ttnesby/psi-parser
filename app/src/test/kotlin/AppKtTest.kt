@@ -28,7 +28,7 @@ class AppKtTest {
 
     @AfterEach
     fun tearDown() {
-        //tempDir.toFile().deleteRecursively()
+        tempDir.toFile().deleteRecursively()
         disposable.dispose()
     }
 
@@ -38,7 +38,11 @@ class AppKtTest {
         val outputPath = (tempDir / "testOutput").also { it.createDirectories() }
 
         val result = bootstrap(
-            arrayOf("--repo=${repoPath.toString()}", "--output=${outputPath.toString()}"),
+            arrayOf(
+                "--repo=${repoPath}",
+                "--output=${outputPath}",
+                "--relaxed=true"
+            ),
             disposable
         )
         assertTrue(result.isSuccess)
@@ -62,7 +66,11 @@ class AppKtTest {
 
         assertFailsWith<IllegalArgumentException> {
             bootstrap(
-                arrayOf("--repo=${repoPath.toString()}", "--output=${outputPath.toString()}"),
+                arrayOf(
+                    "--repo=${repoPath}",
+                    "--output=${outputPath}",
+                    "--relaxed=true"
+                ),
                 disposable
             ).getOrThrow()
         }
@@ -75,7 +83,11 @@ class AppKtTest {
 
         assertFailsWith<IllegalArgumentException> {
             bootstrap(
-                arrayOf("--repo=${repoPath.toString()}", "--output=${outputPath.toString()}"),
+                arrayOf(
+                    "--repo=${repoPath}",
+                    "--output=${outputPath}",
+                    "--relaxed=true"
+                ),
                 disposable
             ).getOrThrow()
         }
