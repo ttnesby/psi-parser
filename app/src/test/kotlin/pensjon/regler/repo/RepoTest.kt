@@ -1,4 +1,4 @@
-package pensjon.regler
+package pensjon.regler.repo
 
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -23,7 +23,7 @@ class RepoTest {
 
     @AfterEach
     fun tearDown() {
-        //tempDir.toFile().deleteRecursively()
+        tempDir.toFile().deleteRecursively()
     }
 
     @Test
@@ -32,7 +32,10 @@ class RepoTest {
         (tempDir / "system" / "src" / "main" / "kotlin").also { it.createDirectories() }
         (tempDir / "other" / "src" / "main" / "java").also { it.createDirectories() }
 
-        assertEquals(2, Repo(tempDir).sourceRoots.size)
+        assertEquals(
+            2,
+            getSourceInfo(tempDir, initDefaultSourceRootFilterFunction).getOrThrow().roots.size
+        )
     }
 
     @Test
@@ -43,12 +46,9 @@ class RepoTest {
             it.resolve("Example.kt").writeText("package example")
         }
 
-        val repo = Repo(localRoot)
-        val uri = repo.toGithubURI(file.absolutePathString()).getOrThrow()
-
         assertEquals(
             URI("https://github.com/navikt/testRepo/blob/master/repository/src/main/kotlin/Example.kt"),
-            uri
+            initToGitHubURIFunction(localRoot)(file.absolutePathString()).getOrThrow()
         )
     }
 
@@ -58,11 +58,16 @@ class RepoTest {
         (tempDir / "customRepo" / "src").also { it.createDirectories() }
         (tempDir / "customRepo" / "tests").also { it.createDirectories() }
 
-        val repo = Repo(tempDir).defineSourceRoots { path ->
-            path.startsWith(tempDir / "customRepo" / "src") ||
-                    path.startsWith(tempDir / "customRepo" / "tests")
+        val initCustomSourceRoots: (Path) -> ((Path) -> Boolean) = { localRoot ->
+            { path ->
+                path.startsWith(localRoot / "customRepo" / "src") ||
+                        path.startsWith(localRoot / "customRepo" / "tests")
+            }
         }
 
-        assertEquals(2, repo.sourceRoots.size)
+        assertEquals(
+            2,
+            getSourceInfo(tempDir, initCustomSourceRoots).getOrThrow().roots.size
+        )
     }
 }

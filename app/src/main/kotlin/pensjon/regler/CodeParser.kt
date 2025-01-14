@@ -5,6 +5,7 @@ import org.jetbrains.kotlin.com.intellij.psi.impl.source.PsiFileImpl
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtFile
 import org.slf4j.LoggerFactory
+import pensjon.regler.repo.StringPathToUriResult
 import result.addons.flatMap
 import result.addons.toResult
 import rule.dsl.DSLTypeAbstract
@@ -15,15 +16,15 @@ import rule.dsl.DSLTypeFlow.SERVICE
 import rule.dsl.DSLTypeService.RESPONSE
 
 class CodeParser private constructor(
-    private val repo: Repo,
+    private val toGitHubURI: StringPathToUriResult,
     private val psiFiles: List<KtFile>,
 ) {
     companion object {
-        fun new(repo: Repo, psiFiles: List<KtFile>): CodeParser =
-            CodeParser(repo, psiFiles)
+        fun new(toGitHubURI: StringPathToUriResult, psiFiles: List<KtFile>): CodeParser =
+            CodeParser(toGitHubURI, psiFiles)
     }
 
-    private val logger = LoggerFactory.getLogger(Repo::class.java)
+    private val logger = LoggerFactory.getLogger(CodeParser::class.java)
 
     fun toModel(): Result<List<RuleInfo>> =
         psiFiles.mapNotNull { file ->
@@ -41,13 +42,15 @@ class CodeParser private constructor(
         RULE_SET -> extractRuleSet()
     }
 
+    private fun KtClass.toGitHubURI() = toGitHubURI(containingKtFile.name)
+
     private fun KtClass.extractRuleService(): Result<RuleServiceInfo> =
         requireName().flatMap { name ->
             logger.info("Rule service $name - BEGIN")
             extractServiceRequestFields().flatMap { requestFields ->
                 extractServiceResponseFields().flatMap { responseFields ->
                     extractFlow(SERVICE).flatMap { flow ->
-                        repo.toGithubURI(containingKtFile.name).map { gitHubUri ->
+                        toGitHubURI().map { gitHubUri ->
                             logger.info("Rule service $name - END")
                             RuleServiceInfo(
                                 navn = name,
@@ -106,7 +109,7 @@ class CodeParser private constructor(
             logger.info("Rule flow $name - BEGIN")
             extractFlowRequestFields().flatMap { requestFields ->
                 extractFlow(FLOW).flatMap { flow ->
-                    repo.toGithubURI(containingKtFile.name).map { gitHubUri ->
+                    toGitHubURI().map { gitHubUri ->
                         logger.info("Rule flow $name - END")
                         RuleFlowInfo(
                             navn = name,
@@ -147,7 +150,7 @@ class CodeParser private constructor(
     private fun KtClass.extractRuleSet(): Result<RuleSetInfo> =
         requireName().flatMap { name ->
             logger.info("Rule set $name - BEGIN")
-            repo.toGithubURI(containingKtFile.name).map { gitHubUri ->
+            toGitHubURI().map { gitHubUri ->
                 logger.info("Rule set $name - END")
                 RuleSetInfo(
                     navn = name,
