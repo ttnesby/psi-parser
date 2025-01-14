@@ -32,7 +32,7 @@ fun initCompiler(disposable: Disposable): Result<CompilerFunctions> =
 
         /**
          * Partial application for binding PsiFileFactory
-         * 
+         *
          * Creates a function that, given a [PsiFileFactoryImpl], returns a [SourceCodeToPSI].
          *
          * The resulting [SourceCodeToPSI] is itself a function taking:
