@@ -42,7 +42,8 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
                         psiFiles,
                         ParserConfig(
                             toGitHubURI = sourceInfo.toGitHubURI,
-                            resolveToDescriptor = initResolveToDescriptorFunction(bindingContext)
+                            resolveToDescriptor = initResolveToDescriptorFunction(bindingContext),
+                            relaxedMode = config.relaxedMode
                         )
                     )
                 }

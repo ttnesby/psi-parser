@@ -19,7 +19,8 @@ private val logger = LoggerFactory.getLogger("parser")
 
 data class ParserConfig(
     val toGitHubURI: StringPathToUriResult,
-    val resolveToDescriptor: KtElementToDescriptorResult
+    val resolveToDescriptor: KtElementToDescriptorResult,
+    val relaxedMode: Boolean
 )
 
 fun psiFilesToModel(

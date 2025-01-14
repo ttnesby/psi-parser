@@ -29,8 +29,10 @@ data class AppConfig(
     val repoPath: Path,
     @param:ConfigAlias("output")
     val outputPath: Path,
+    @param:ConfigAlias("relaxed")
+    val relaxedMode: Boolean,
     @param:ConfigAlias("log")
-    val level: LogLevel = LogLevel.INFO
+    val level: LogLevel = LogLevel.INFO,
 )
 
 fun validateConfig(args: Array<String>): Result<AppConfig> = runCatching {
