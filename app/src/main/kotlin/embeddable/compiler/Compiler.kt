@@ -30,12 +30,42 @@ fun initCompiler(disposable: Disposable): Result<CompilerFunctions> =
     createCompiler(File(System.getProperty("java.home")),disposable).map { (config, env) ->
         val psiFactory = PsiFileFactory.getInstance(env.project) as PsiFileFactoryImpl
 
+        /**
+         * Partial application for binding PsiFileFactory
+         * 
+         * Creates a function that, given a [PsiFileFactoryImpl], returns a [SourceCodeToPSI].
+         *
+         * The resulting [SourceCodeToPSI] is itself a function taking:
+         * - [fileName] (name of the file to be created),
+         * - [content] (file content as a string),
+         *
+         * and returns a [KtFile] by using the provided [PsiFileFactoryImpl].
+         *
+         * @receiver A [PsiFileFactoryImpl] used to create PSI files
+         * @return A [SourceCodeToPSI] function that converts a file name and content
+         *         into a [KtFile] using the receiver [PsiFileFactoryImpl].
+         */
+
         val kotlinToPSIFunction: (PsiFileFactoryImpl) -> SourceCodeToPSI = { factory ->
             { fileName, content ->
                 factory.createFileFromText(fileName, KotlinFileType.INSTANCE, content) as KtFile
             }
         }
 
+        /**
+         * Partial application for binding CompilerConfiguration and KotlinCoreEnvironment
+         *
+         * Creates a higher-order function that, given a [CompilerConfiguration] and a [KotlinCoreEnvironment],
+         * returns a [PSIFilesToBindingContextResult]. The resulting function accepts a list of [KtFile]s
+         * and produces a [Result] wrapping a [BindingContext].
+         *
+         * Internally, this function:
+         * 1. Initializes an [AnalyzerWithCompilerReport] using the [configuration].
+         * 2. Creates a [CliBindingTrace] bound to the [environment.project].
+         * 3. Analyzes the provided list of [KtFile]s via [TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration].
+         * 4. Captures the resulting [BindingContext] in a [Result]. If the analysis fails, the exception
+         *    is captured instead.
+         */
         val buildBindingContextFunction:
                     (CompilerConfiguration, KotlinCoreEnvironment) -> PSIFilesToBindingContextResult =
             { configuration, environment ->
@@ -71,17 +101,16 @@ fun initCompiler(disposable: Disposable): Result<CompilerFunctions> =
 private fun createCompiler(
     jdkHome: File,
     disposable: Disposable
-): Result<Pair<CompilerConfiguration, KotlinCoreEnvironment>> =
-    runCatching {
-        val configuration = createConfiguration(jdkHome)
-        val environment = createEnvironment(configuration, disposable)
+): Result<Pair<CompilerConfiguration, KotlinCoreEnvironment>> = runCatching {
+    val configuration = createConfiguration(jdkHome)
+    val environment = createEnvironment(configuration, disposable)
 
 
-        logger.info("Compiler created")
-        logger.trace("No need to add jar dependencies to classpath for now")
+    logger.info("Compiler created")
+    logger.trace("No need to add jar dependencies to classpath for now")
 
-        configuration to environment
-    }
+    configuration to environment
+}
 
 private fun createConfiguration(jdkHome: File): CompilerConfiguration =
     CompilerConfiguration().apply {

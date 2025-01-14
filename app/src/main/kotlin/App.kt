@@ -29,7 +29,7 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
                     compilerFunctions.kotlinToPSI(sourceFile.path.absolutePathString(), sourceFile.content)
                 }
 
-                logger.info("${psiFiles.size} kotlin files converted to PSI format")
+                logger.info("${psiFiles.size} kotlin files mapped to PSI format")
                 logger.info("Building binding context for PSI files")
 
                 val (elapsed, bindingContextResult) = measureTimeMillisWithResult {
