@@ -83,8 +83,8 @@ class ParserTest {
         assertEquals(0, result.filterIsInstance<RuleServiceInfo>().size)
         assertEquals(0, result.filterIsInstance<RuleFlowInfo>().size)
         assertEquals(0, result.filterIsInstance<RuleSetInfo>().size)
-
     }
+}
 //
 //    @Test
 //    fun `test new CodeParser for FastsettTrygdetid`() {
@@ -211,4 +211,3 @@ class ParserTest {
 //        assertEquals("Ja", forgrening.gren.first().betingelse.navn)
 //        assertEquals("Nei", forgrening.gren.last().betingelse.navn)
 //    }
-}

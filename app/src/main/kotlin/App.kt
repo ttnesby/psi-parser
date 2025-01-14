@@ -11,13 +11,14 @@ import pensjon.regler.repo.repoSourceInfo
 import result.addons.flatMap
 import kotlin.io.path.absolutePathString
 
-private fun logExtractionResults(result: List<RuleInfo>) {
-    println("\nFound ${result.filterIsInstance<RuleServiceInfo>().size} rule services")
-    println("Found ${result.filterIsInstance<RuleFlowInfo>().size} rule flows")
-    println("Found ${result.filterIsInstance<RuleSetInfo>().size} rule sets\n")
-}
-
 private val logger = LoggerFactory.getLogger("bootstrap")
+
+private fun logExtractionResults(result: List<RuleInfo>) {
+    logger.info("--- RESULT ---\n")
+    logger.info("Found ${result.filterIsInstance<RuleServiceInfo>().size} rule services")
+    logger.info("Found ${result.filterIsInstance<RuleFlowInfo>().size} rule flows")
+    logger.info("Found ${result.filterIsInstance<RuleSetInfo>().size} rule sets\n")
+}
 
 fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
     validateConfig(args).flatMap { config ->
@@ -36,7 +37,8 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
                 }
 
                 bindingContextResult.flatMap { bindingContext ->
-                    logger.info(" binding context done in ${formatElapsedTime(elapsed)}\n")
+                    logger.info("binding context done in ${formatElapsedTime(elapsed)}\n")
+                    logger.info("start parsing")
 
                     psiFilesToModel(
                         psiFiles,

@@ -23,8 +23,8 @@ dependencies {
     // https://mvnrepository.com/artifact/org.jetbrains.kotlin/kotlin-reflect
     //implementation("org.jetbrains.kotlin:kotlin-reflect:2.1.0")
 
-//    // https://mvnrepository.com/artifact/io.arrow-kt/arrow-core
-//    implementation("io.arrow-kt:arrow-core:2.0.0")
+    // https://mvnrepository.com/artifact/io.arrow-kt/arrow-core
+    //implementation("io.arrow-kt:arrow-core:2.0.0")
 
     // https://mvnrepository.com/artifact/com.sksamuel.hoplite/hoplite-core
     implementation("com.sksamuel.hoplite:hoplite-core:2.9.0")
@@ -36,7 +36,6 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.5.16")
 
     testImplementation(kotlin("test"))
-
 }
 
 // Apply a specific Java toolchain to ease working on different environments.
