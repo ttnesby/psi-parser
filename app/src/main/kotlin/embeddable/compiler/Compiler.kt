@@ -27,74 +27,13 @@ data class CompilerFunctions(
 )
 
 fun initCompiler(disposable: Disposable): Result<CompilerFunctions> =
-    createCompiler(File(System.getProperty("java.home")),disposable).map { (config, env) ->
-        val psiFactory = PsiFileFactory.getInstance(env.project) as PsiFileFactoryImpl
-
-        /**
-         * Partial application for binding PsiFileFactory
-         *
-         * Creates a function that, given a [PsiFileFactoryImpl], returns a [SourceCodeToPSI].
-         *
-         * The resulting [SourceCodeToPSI] is itself a function taking:
-         * - [fileName] (name of the file to be created),
-         * - [content] (file content as a string),
-         *
-         * and returns a [KtFile] by using the provided [PsiFileFactoryImpl].
-         *
-         * @receiver A [PsiFileFactoryImpl] used to create PSI files
-         * @return A [SourceCodeToPSI] function that converts a file name and content
-         *         into a [KtFile] using the receiver [PsiFileFactoryImpl].
-         */
-
-        val kotlinToPSIFunction: (PsiFileFactoryImpl) -> SourceCodeToPSI = { factory ->
-            { fileName, content ->
-                factory.createFileFromText(fileName, KotlinFileType.INSTANCE, content) as KtFile
-            }
+    createCompiler(File(System.getProperty("java.home")),disposable).map { (configuration, environment) ->
+        (PsiFileFactory.getInstance(environment.project) as PsiFileFactoryImpl).let { psiFactory ->
+            CompilerFunctions(
+                kotlinToPSI = initKotlinToPSIFunction(psiFactory),
+                buildBindingContext = initBuildBindingContextFunction(configuration, environment)
+            )
         }
-
-        /**
-         * Partial application for binding CompilerConfiguration and KotlinCoreEnvironment
-         *
-         * Creates a higher-order function that, given a [CompilerConfiguration] and a [KotlinCoreEnvironment],
-         * returns a [PSIFilesToBindingContextResult]. The resulting function accepts a list of [KtFile]s
-         * and produces a [Result] wrapping a [BindingContext].
-         *
-         * Internally, this function:
-         * 1. Initializes an [AnalyzerWithCompilerReport] using the [configuration].
-         * 2. Creates a [CliBindingTrace] bound to the [environment.project].
-         * 3. Analyzes the provided list of [KtFile]s via [TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration].
-         * 4. Captures the resulting [BindingContext] in a [Result]. If the analysis fails, the exception
-         *    is captured instead.
-         */
-        val buildBindingContextFunction:
-                    (CompilerConfiguration, KotlinCoreEnvironment) -> PSIFilesToBindingContextResult =
-            { configuration, environment ->
-                { files ->
-                    runCatching {
-                        val analyzer =
-                            AnalyzerWithCompilerReport(
-                                configuration,
-                            )
-                        val trace = CliBindingTrace(environment.project)
-
-                        analyzer.analyzeAndReport(files) {
-                            TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration(
-                                environment.project,
-                                files,
-                                trace,
-                                environment.configuration,
-                                environment::createPackagePartProvider
-                            )
-                        }
-                        analyzer.analysisResult.bindingContext
-                    }
-                }
-        }
-
-        CompilerFunctions(
-            kotlinToPSI = kotlinToPSIFunction(psiFactory),
-            buildBindingContext = buildBindingContextFunction(config, env)
-        )
     }
 
 
@@ -153,3 +92,64 @@ private fun createEnvironment(
         configuration,
         EnvironmentConfigFiles.JVM_CONFIG_FILES
     )
+
+/**
+ * Partial application for binding PsiFileFactory
+ *
+ * Creates a function that, given a [PsiFileFactoryImpl], returns a [SourceCodeToPSI].
+ *
+ * The resulting [SourceCodeToPSI] is itself a function taking:
+ * - [fileName] (name of the file to be created),
+ * - [content] (file content as a string),
+ *
+ * and returns a [KtFile] by using the provided [PsiFileFactoryImpl].
+ *
+ * @receiver A [PsiFileFactoryImpl] used to create PSI files
+ * @return A [SourceCodeToPSI] function that converts a file name and content
+ *         into a [KtFile] using the receiver [PsiFileFactoryImpl].
+ */
+
+private val initKotlinToPSIFunction: (PsiFileFactoryImpl) -> SourceCodeToPSI = { factory ->
+    { fileName, content ->
+        factory.createFileFromText(fileName, KotlinFileType.INSTANCE, content) as KtFile
+    }
+}
+
+/**
+ * Partial application for binding CompilerConfiguration and KotlinCoreEnvironment
+ *
+ * Creates a higher-order function that, given a [CompilerConfiguration] and a [KotlinCoreEnvironment],
+ * returns a [PSIFilesToBindingContextResult]. The resulting function accepts a list of [KtFile]s
+ * and produces a [Result] wrapping a [BindingContext].
+ *
+ * Internally, this function:
+ * 1. Initializes an [AnalyzerWithCompilerReport] using the [configuration].
+ * 2. Creates a [CliBindingTrace] bound to the [environment.project].
+ * 3. Analyzes the provided list of [KtFile]s via [TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration].
+ * 4. Captures the resulting [BindingContext] in a [Result]. If the analysis fails, the exception
+ *    is captured instead.
+ */
+val initBuildBindingContextFunction:
+            (CompilerConfiguration, KotlinCoreEnvironment) -> PSIFilesToBindingContextResult =
+    { configuration, environment ->
+        { files ->
+            runCatching {
+                val analyzer =
+                    AnalyzerWithCompilerReport(
+                        configuration,
+                    )
+                val trace = CliBindingTrace(environment.project)
+
+                analyzer.analyzeAndReport(files) {
+                    TopDownAnalyzerFacadeForJVM.analyzeFilesWithJavaIntegration(
+                        environment.project,
+                        files,
+                        trace,
+                        environment.configuration,
+                        environment::createPackagePartProvider
+                    )
+                }
+                analyzer.analysisResult.bindingContext
+            }
+        }
+    }

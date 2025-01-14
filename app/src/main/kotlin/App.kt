@@ -7,7 +7,6 @@ import org.jetbrains.kotlin.utils.addToStdlib.measureTimeMillisWithResult
 import org.slf4j.LoggerFactory
 import pensjon.regler.*
 import pensjon.regler.repo.initDefaultSourceRootFilterFunction
-import pensjon.regler.repo.initToGitHubURIFunction
 import pensjon.regler.repo.repoSourceInfo
 import result.addons.flatMap
 import kotlin.io.path.absolutePathString
@@ -23,7 +22,7 @@ private val logger = LoggerFactory.getLogger("bootstrap")
 fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
     validateConfig(args).flatMap { config ->
         initCompiler(disposable = disposable).flatMap { compilerFunctions ->
-            repoSourceInfo(config.repoPath, initDefaultSourceRootFilterFunction).map { sourceInfo ->
+            repoSourceInfo(config.repoPath, initDefaultSourceRootFilterFunction).flatMap { sourceInfo ->
 
                 val psiFiles = sourceInfo.files.map { sourceFile ->
                     compilerFunctions.kotlinToPSI(sourceFile.path.absolutePathString(), sourceFile.content)
@@ -41,13 +40,10 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
                     BindingContextResolver.initialize(bindingContext) // singleton for static binding context
                 }
 
-                CodeParser.new(initToGitHubURIFunction(config.repoPath), psiFiles)
+                psiFilesToModel(sourceInfo.toGitHubURI, psiFiles)
             }
         }
     }
-        .flatMap { codeParser ->
-            codeParser.toModel()
-        }
         .map { result ->
             logExtractionResults(result)
             //generateAsciiDoc(result.filterIsInstance<RuleServiceInfo>(), asciiDocOutput)

@@ -9,10 +9,6 @@ class MessageCollectorSummary : MessageCollector {
     private var warningCount = 0
     private var infoCount = 0
 
-    fun getErrorCount(): Int {
-        return errorCount
-    }
-
     override fun clear() {
         errorCount = 0
         warningCount = 0

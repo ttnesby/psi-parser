@@ -17,9 +17,12 @@ data class FileInfo(
     val content: String
 )
 
+typealias StringPathToUriResult = (String) -> Result<URI>
+
 data class SourceInfo(
     val roots: List<Path>,
-    val files: List<FileInfo>
+    val files: List<FileInfo>,
+    val toGitHubURI: StringPathToUriResult
 )
 
 typealias PathToBoolean = (Path) -> Boolean
@@ -83,16 +86,11 @@ fun repoSourceInfo(localRoot: Path, isSourceRoot: (Path) -> PathToBoolean): Resu
         findSourceFiles(sourceRoots).map { sourceFiles ->
             SourceInfo(
                 roots = sourceRoots,
-                files = sourceFiles
+                files = sourceFiles,
+                toGitHubURI = initToGitHubURIFunction(localRoot)
             )
         }
     }
-
-/**
- * Converts a local file path into a GitHub URI, based on the localRoot.
- */
-
-typealias StringPathToUriResult = (String) -> Result<URI>
 
 /**
  * Creates a function [StringPathToUriResult] for generating a GitHub [URI] based on the given [localRoot].
@@ -111,7 +109,7 @@ typealias StringPathToUriResult = (String) -> Result<URI>
  * @receiver The [localRoot] directory against which paths are resolved.
  * @return A function [StringPathToUriResult] that transforms a [localFilePath] into a [Result] of [URI].
  */
-val initToGitHubURIFunction: (Path) -> StringPathToUriResult = { localRoot ->
+private val initToGitHubURIFunction: (Path) -> StringPathToUriResult = { localRoot ->
     { localFilePath ->
         // The “root” GitHub URI for this repo’s folder.
         val rootRepoUri = URI("$ORG_NAVIKT/${localRoot.last()}/$BRANCH")
