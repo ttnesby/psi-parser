@@ -63,7 +63,7 @@ private fun findSourceFiles(sourceRoots: List<Path>): Result<List<FileInfo>> = r
         }
 }
 
-fun getSourceInfo(localRoot: Path, isSourceRoot: (Path) -> PathToBoolean): Result<SourceInfo> =
+fun repoSourceInfo(localRoot: Path, isSourceRoot: (Path) -> PathToBoolean): Result<SourceInfo> =
     findSourceRoots(localRoot, isSourceRoot(localRoot)).flatMap { sourceRoots ->
         findSourceFiles(sourceRoots).map { sourceFiles ->
             SourceInfo(

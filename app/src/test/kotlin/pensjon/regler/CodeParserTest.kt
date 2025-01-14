@@ -1,7 +1,6 @@
 package pensjon.regler
 
 import embeddable.compiler.BindingContextResolver
-import embeddable.compiler.CompilerContext
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.junit.jupiter.api.AfterEach

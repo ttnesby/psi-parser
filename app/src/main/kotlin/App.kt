@@ -1,14 +1,14 @@
 //import org.example.generateAsciiDoc
 import embeddable.compiler.BindingContextResolver
-import embeddable.compiler.CompilerContext
+import embeddable.compiler.initCompiler
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.utils.addToStdlib.measureTimeMillisWithResult
 import org.slf4j.LoggerFactory
 import pensjon.regler.*
-import pensjon.regler.repo.getSourceInfo
 import pensjon.regler.repo.initDefaultSourceRootFilterFunction
 import pensjon.regler.repo.initToGitHubURIFunction
+import pensjon.regler.repo.repoSourceInfo
 import result.addons.flatMap
 import kotlin.io.path.absolutePathString
 
@@ -22,18 +22,18 @@ private val logger = LoggerFactory.getLogger("bootstrap")
 
 fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
     validateConfig(args).flatMap { config ->
-        CompilerContext.new(disposable = disposable).flatMap { compilerContext ->
-            getSourceInfo(config.repoPath, initDefaultSourceRootFilterFunction).map { sourceInfo ->
+        initCompiler(disposable = disposable).flatMap { compilerFunctions ->
+            repoSourceInfo(config.repoPath, initDefaultSourceRootFilterFunction).map { sourceInfo ->
 
                 val psiFiles = sourceInfo.files.map { sourceFile ->
-                    compilerContext.createKtFile(sourceFile.path.absolutePathString(), sourceFile.content)
+                    compilerFunctions.kotlinToPSI(sourceFile.path.absolutePathString(), sourceFile.content)
                 }
 
                 logger.info("${psiFiles.size} kotlin files converted to PSI format")
                 logger.info("Building binding context for PSI files")
 
                 val (elapsed, bindingContextResult) = measureTimeMillisWithResult {
-                    compilerContext.buildBindingContext(psiFiles)
+                    compilerFunctions.buildBindingContext(psiFiles)
                 }
 
                 bindingContextResult.map { bindingContext ->

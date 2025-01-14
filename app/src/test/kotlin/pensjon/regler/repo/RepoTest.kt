@@ -34,7 +34,7 @@ class RepoTest {
 
         assertEquals(
             2,
-            getSourceInfo(tempDir, initDefaultSourceRootFilterFunction).getOrThrow().roots.size
+            repoSourceInfo(tempDir, initDefaultSourceRootFilterFunction).getOrThrow().roots.size
         )
     }
 
@@ -67,7 +67,7 @@ class RepoTest {
 
         assertEquals(
             2,
-            getSourceInfo(tempDir, initCustomSourceRoots).getOrThrow().roots.size
+            repoSourceInfo(tempDir, initCustomSourceRoots).getOrThrow().roots.size
         )
     }
 }
