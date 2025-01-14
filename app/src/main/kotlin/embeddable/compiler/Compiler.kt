@@ -28,12 +28,10 @@ data class CompilerFunctions(
 
 fun initCompiler(disposable: Disposable): Result<CompilerFunctions> =
     createCompiler(File(System.getProperty("java.home")),disposable).map { (configuration, environment) ->
-        (PsiFileFactory.getInstance(environment.project) as PsiFileFactoryImpl).let { psiFactory ->
-            CompilerFunctions(
-                kotlinToPSI = initKotlinToPSIFunction(psiFactory),
-                buildBindingContext = initBuildBindingContextFunction(configuration, environment)
-            )
-        }
+        CompilerFunctions(
+            kotlinToPSI = initKotlinToPSIFunction((PsiFileFactory.getInstance(environment.project) as PsiFileFactoryImpl)),
+            buildBindingContext = initBuildBindingContextFunction(configuration, environment)
+        )
     }
 
 

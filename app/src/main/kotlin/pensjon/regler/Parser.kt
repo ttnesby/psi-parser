@@ -19,8 +19,8 @@ import rule.dsl.DSLTypeService.RESPONSE
 private val logger = LoggerFactory.getLogger("parser")
 
 fun psiFilesToModel(
-    toGitHubURI: StringPathToUriResult,
-    psiFiles: List<KtFile>
+    psiFiles: List<KtFile>,
+    toGitHubURI: StringPathToUriResult
 ): Result<List<RuleInfo>> =
     psiFiles.mapNotNull { file ->
         file.firstDSLTypeAbstractOrNull()

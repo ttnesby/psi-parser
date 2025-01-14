@@ -40,7 +40,10 @@ fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
                     BindingContextResolver.initialize(bindingContext) // singleton for static binding context
                 }
 
-                psiFilesToModel(sourceInfo.toGitHubURI, psiFiles)
+                psiFilesToModel(
+                    psiFiles,
+                    sourceInfo.toGitHubURI
+                )
             }
         }
     }
