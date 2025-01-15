@@ -106,9 +106,7 @@ class AppIntegrationTest {
             assertEquals(45, flows.size)
             assertEquals(263, sets.size)
 
-            `verify rule service FastsettTrygdetidService`(
-                services.find { it.navn == "FastsettTrygdetidService" }!!,
-                Path(pensjonRegler))
+            `verify rule service FastsettTrygdetidService`(services.find { it.navn == "FastsettTrygdetidService" }!!)
 
             `verify rule flow StartTrygdetidFlyt`(flows.find { it.navn == "StartTrygdetidFlyt" }!!)
 
@@ -117,7 +115,7 @@ class AppIntegrationTest {
         }
     }
 
-    private fun `verify rule service FastsettTrygdetidService`(ruleService: RuleServiceInfo, localRoot: Path) {
+    private fun `verify rule service FastsettTrygdetidService`(ruleService: RuleServiceInfo) {
 
         assertEquals("FastsettTrygdetidService", ruleService.navn)
         assertEquals("", ruleService.beskrivelse)

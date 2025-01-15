@@ -19,6 +19,7 @@ import rule.dsl.DSLTypeBranch.FORGRENING
 import rule.dsl.DSLTypeService.REQUEST
 import java.io.File
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
+import org.jetbrains.kotlin.psi.psiUtil.referenceExpression
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 import pensjon.regler.ParserConfig
 
@@ -592,8 +593,20 @@ private fun KtWhileExpression.extractWhile(config: ParserConfig): Result<FlowEle
 /** KtDotQualifiedExpression extension functions */
 ///////////////////////////////////////////////////
 
+fun KtDotQualifiedExpression.findReferenceExpressionInChain(): KtReferenceExpression? =
+    // can have deep nesting of KtDotQualifiedExpression, see BeregnPoengrekke_EØStilAPFlyt, line 44
+    // run is the first, the receiver class is the second, then all the package prefixed
+    // TODO - all KIs are talking about the deepest level, e.g. `no` for FQN - to be done
+
+    when (val nextReceiver = this.receiverExpression) {
+            is KtDotQualifiedExpression -> nextReceiver.selectorExpression
+            else -> this.receiverExpression
+    }.let {
+        it as? KtReferenceExpression
+    }
+
 private fun KtDotQualifiedExpression.resolveReceiverClass(config: ParserConfig): Pair<KtClass, DSLTypeAbstract>? =
-    (receiverExpression as? KtReferenceExpression)
+    findReferenceExpressionInChain()
         ?.resolveToKtClass(config)?.map {
             it.findDSLTypeAbstractOrNull()
         }
