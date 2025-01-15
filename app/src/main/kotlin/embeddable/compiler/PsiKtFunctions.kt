@@ -341,8 +341,18 @@ private fun KtExpression.extractInitializerExpression(doc: String, config: Parse
 private fun KtProperty.extractInitializer(doc: String, config: ParserConfig): Result<FlowElement>? =
     initializer?.extractInitializerExpression(doc, config)
 
+// TODO sjekk med Erik/Jens - må sjekke med EQ og forskjellen mellom Postfix versus DotQualified...
+private fun KtBinaryExpression.extractOppdater(doc: String): Result<FlowElement> =
+    Result.success(
+        FlowElement.Oppdater(
+            beskrivelse = doc,
+            uttrykk = this.text
+        )
+    )
+
 private fun KtBinaryExpression.extractInitializer(doc: String, config: ParserConfig): Result<FlowElement>? =
-    right?.extractInitializerExpression(doc, config)
+    if (right is KtPostfixExpression) extractOppdater(doc)
+    else right?.extractInitializerExpression(doc, config)
 
 fun List<KtProperty>.toPropertyInfo(): Result<List<PropertyInfo>> = map { it.toPropertyInfo() }.toResult()
 
@@ -612,6 +622,7 @@ private fun KtDotQualifiedExpression.resolveReceiverClass(config: ParserConfig):
         }
         ?.getOrNull()
 
+// TODO verifiser med Erik/Jens - gjelder for flyt som har 2 children?
 private fun KtDotQualifiedExpression.extractMerknad(doc: String): Result<FlowElement> =
     Result.success(
         FlowElement.Merknad(

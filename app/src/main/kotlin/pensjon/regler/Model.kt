@@ -62,6 +62,7 @@ data class Condition(
 // called "forgrening"
 sealed class FlowElement {
 
+    data class Oppdater(val beskrivelse: String, val uttrykk: String) : FlowElement()
     data class Merknad(val beskrivelse: String, val uttrykk: String) : FlowElement()
     data class While(val betingelse: String, val flyt: Flow): FlowElement()
     data class Flow(val elementer: List<FlowElement>) : FlowElement()
