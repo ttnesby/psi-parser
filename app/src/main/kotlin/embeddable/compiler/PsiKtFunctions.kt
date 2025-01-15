@@ -612,13 +612,22 @@ private fun KtDotQualifiedExpression.resolveReceiverClass(config: ParserConfig):
         }
         ?.getOrNull()
 
+private fun KtDotQualifiedExpression.extractMerknad(doc: String): Result<FlowElement> =
+    Result.success(
+        FlowElement.Merknad(
+            beskrivelse = doc,
+            uttrykk = this.text
+        )
+    )
 
 private fun KtDotQualifiedExpression.extractFlowReference(doc: String, config: ParserConfig): Result<FlowElement>? =
-    resolveReceiverClass(config)
-        ?.let { (resolvedClass, dslTypeAbstract) ->
-            when (dslTypeAbstract) {
-                RULE_FLOW -> resolvedClass.toRuleFlowReference(doc)
-                RULE_SET -> resolvedClass.toRuleSetReference(doc)
-                RULE_SERVICE -> null
+    if (doc.contains("merknad", ignoreCase = true)) extractMerknad(doc)
+    else
+        resolveReceiverClass(config)
+            ?.let { (resolvedClass, dslTypeAbstract) ->
+                when (dslTypeAbstract) {
+                    RULE_FLOW -> resolvedClass.toRuleFlowReference(doc)
+                    RULE_SET -> resolvedClass.toRuleSetReference(doc)
+                    RULE_SERVICE -> null
+                }
             }
-        }

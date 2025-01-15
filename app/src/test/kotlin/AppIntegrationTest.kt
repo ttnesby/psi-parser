@@ -9,12 +9,13 @@ import org.slf4j.LoggerFactory
 import pensjon.regler.*
 import result.addons.flatMap
 import java.net.URI
-import java.nio.file.LinkOption
 import java.nio.file.Path
-import kotlin.io.path.div
-import kotlin.io.path.isDirectory
-import kotlin.io.path.name
 import kotlin.io.path.Path
+import kotlin.io.path.div
+import kotlin.io.path.name
+
+//TODO - opprett egen sourceSet i gradle, for integrasjonsTest - strict skille mellom unit - og integrasjons tester
+// er idiomatisk
 
 @Tag("integration")
 class AppIntegrationTest {
@@ -46,7 +47,7 @@ class AppIntegrationTest {
             "--log=WARN"
         )
 
-        val fastsettTrygdetidPathPrefix = Path("repository")/
+        val fastsettTrygdetidPathPrefix = Path("repository") /
                 "nav-repository-pensjon" /
                 "src" /
                 "main" /
@@ -62,36 +63,41 @@ class AppIntegrationTest {
                 "tjeneste" /
                 "fastsetttrygdetid"
 
-        val fastsettTrygdeTidKomponent = fastsettTrygdetidPathPrefix/
-                "komponent"/
+        val fastsettTrygdeTidKomponent = fastsettTrygdetidPathPrefix /
+                "komponent" /
                 "trygdetid"
 
-        val stotteKomponent = fastsettTrygdetidPathPrefix/
-                "komponent"/
+        val stotteKomponent = fastsettTrygdetidPathPrefix /
+                "komponent" /
                 "stottefunksjoner"
 
-        val kontrollerinformasjonsgrunnlagKomponent = fastsettTrygdetidPathPrefix/
-                "komponent"/
+        val kontrollerinformasjonsgrunnlagKomponent = fastsettTrygdetidPathPrefix /
+                "komponent" /
                 "kontrollerinformasjonsgrunnlag"
 
-        val poengrekkeKomponent = fastsettTrygdetidPathPrefix/
-                "komponent"/
+        val poengrekkeKomponent = fastsettTrygdetidPathPrefix /
+                "komponent" /
                 "poengrekke"
+
+        val sluttpoengtallKomponent = fastsettTrygdetidPathPrefix /
+                "komponent" /
+                "sluttpoengtall"
 
         //"system/nav-system-pensjon-domain/src/main/kotlin/no/nav/pensjon/regler/internal/to/TrygdetidRequest.kt"
 
         val initCustomSourceRoots: (Path) -> ((Path) -> Boolean) = { localRoot ->
             { path ->
                 path.startsWith(localRoot / fastsettTrygdeTidTjeneste) ||
-                path.startsWith(localRoot / fastsettTrygdeTidKomponent) ||
-                path.startsWith(localRoot / stotteKomponent) ||
-                path.startsWith(localRoot / kontrollerinformasjonsgrunnlagKomponent) ||
-                path.startsWith(localRoot / poengrekkeKomponent) || (
-                    path.startsWith(localRoot / "system") &&
-                    path.name == "kotlin" &&
-                    path.parent?.name == "main" &&
-                    path.parent?.parent?.name == "src"
-                )
+                        path.startsWith(localRoot / fastsettTrygdeTidKomponent) ||
+                        path.startsWith(localRoot / stotteKomponent) ||
+                        path.startsWith(localRoot / kontrollerinformasjonsgrunnlagKomponent) ||
+                        path.startsWith(localRoot / poengrekkeKomponent) ||
+                        path.startsWith(localRoot / sluttpoengtallKomponent) || (
+                        path.startsWith(localRoot / "system") &&
+                                path.name == "kotlin" &&
+                                path.parent?.name == "main" &&
+                                path.parent?.parent?.name == "src"
+                        )
             }
         }
 
@@ -103,8 +109,8 @@ class AppIntegrationTest {
             val sets = result.filterIsInstance<RuleSetInfo>()
 
             assertEquals(1, services.size)
-            assertEquals(45, flows.size)
-            assertEquals(263, sets.size)
+            assertEquals(48, flows.size)
+            assertEquals(276, sets.size)
 
             `verify rule service FastsettTrygdetidService`(services.find { it.navn == "FastsettTrygdetidService" }!!)
 
