@@ -28,6 +28,8 @@ data class SourceInfo(
 typealias PathToBoolean = (Path) -> Boolean
 
 /**
+ * Partial application for binding localRoot
+ *
  * Creates a filter function [PathToBoolean] that checks whether a given [Path] is considered a
  * "default source root" under the specified [localRoot].
  *
@@ -44,22 +46,31 @@ typealias PathToBoolean = (Path) -> Boolean
  */
 val initDefaultSourceRootFilterFunction: (Path) -> PathToBoolean = { localRoot ->
     { path ->
-        path.isDirectory(LinkOption.NOFOLLOW_LINKS) &&
-                (path.startsWith(localRoot / "repository") || path.startsWith(localRoot / "system")) &&
-                path.name == "kotlin" &&
-                path.parent?.name == "main" &&
-                path.parent?.parent?.name == "src"
+        (path.startsWith(localRoot / "repository") || path.startsWith(localRoot / "system")) &&
+        path.name == "kotlin" &&
+        path.parent?.name == "main" &&
+        path.parent?.parent?.name == "src"
     }
 }
 
 private fun findSourceRoots(localRoot: Path, isSourceRoot: PathToBoolean): Result<List<Path>> = runCatching {
     localRoot
-        .walk(PathWalkOption.INCLUDE_DIRECTORIES)
+        .walk(PathWalkOption.INCLUDE_DIRECTORIES, PathWalkOption.BREADTH_FIRST)
+        .filter { it.isDirectory(LinkOption.NOFOLLOW_LINKS)}
         .filter { isSourceRoot(it) }
         .toList()
+        .let { it
+            .filter {candidate ->
+                // candidate is NOT a parent of any other path
+                it.none { other ->
+                    // Make sure we skip checking the same path against itself
+                    candidate != other && other.startsWith(candidate)
+                }
+            }
+        }
         .also {
             logger.info("Found ${it.size} source roots")
-            logger.debug(it.joinToString(", "))
+            logger.debug(it.map {path -> path.relativeTo(localRoot)}.joinToString(", "))
         }
 }
 
@@ -93,6 +104,8 @@ fun repoSourceInfo(localRoot: Path, isSourceRoot: (Path) -> PathToBoolean): Resu
     }
 
 /**
+ * Partial application for binding localRoot
+ *
  * Creates a function [StringPathToUriResult] for generating a GitHub [URI] based on the given [localRoot].
  *
  * The returned function accepts a local file path ([localFilePath]) and produces a [Result] wrapping the

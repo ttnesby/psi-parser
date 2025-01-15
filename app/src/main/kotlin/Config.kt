@@ -29,8 +29,8 @@ data class AppConfig(
     val repoPath: Path,
     @param:ConfigAlias("output")
     val outputPath: Path,
-    @param:ConfigAlias("relaxed")
-    val relaxedMode: Boolean,
+    @param:ConfigAlias("allow_empty_flow")
+    val allowEmptyFlow: Boolean = false,
     @param:ConfigAlias("log")
     val level: LogLevel = LogLevel.INFO,
 )

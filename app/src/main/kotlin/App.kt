@@ -6,12 +6,50 @@ import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.utils.addToStdlib.measureTimeMillisWithResult
 import org.slf4j.LoggerFactory
 import pensjon.regler.*
+import pensjon.regler.repo.PathToBoolean
 import pensjon.regler.repo.initDefaultSourceRootFilterFunction
 import pensjon.regler.repo.repoSourceInfo
 import result.addons.flatMap
+import java.nio.file.Path
 import kotlin.io.path.absolutePathString
 
 private val logger = LoggerFactory.getLogger("bootstrap")
+
+fun codeToModel(
+    config: AppConfig,
+    disposable: Disposable,
+    sourceRootsFilter: (Path) -> PathToBoolean
+): Result<List<RuleInfo>> =
+
+    initCompiler(disposable = disposable).flatMap { compilerFunctions ->
+        repoSourceInfo(config.repoPath, sourceRootsFilter).flatMap { sourceInfo ->
+
+            val psiFiles = sourceInfo.files.map { sourceFile ->
+                compilerFunctions.kotlinToPSI(sourceFile.path.absolutePathString(), sourceFile.content)
+            }
+
+            logger.info("${psiFiles.size} kotlin files mapped to PSI format")
+            logger.info("Building binding context for PSI files")
+
+            val (elapsed, bindingContextResult) = measureTimeMillisWithResult {
+                compilerFunctions.buildBindingContext(psiFiles)
+            }
+
+            bindingContextResult.flatMap { bindingContext ->
+                logger.info("binding context done in ${formatElapsedTime(elapsed)}\n")
+                logger.info("start parsing")
+
+                psiFilesToModel(
+                    psiFiles,
+                    ParserConfig(
+                        toGitHubURI = sourceInfo.toGitHubURI,
+                        resolveToDescriptor = initResolveToDescriptorFunction(bindingContext),
+                        allowEmptyFlow = config.allowEmptyFlow
+                    )
+                )
+            }
+        }
+    }
 
 private fun logExtractionResults(result: List<RuleInfo>) {
     logger.info("--- RESULT ---\n")
@@ -22,40 +60,11 @@ private fun logExtractionResults(result: List<RuleInfo>) {
 
 fun bootstrap(args: Array<String>, disposable: Disposable): Result<Unit> =
     validateConfig(args).flatMap { config ->
-        initCompiler(disposable = disposable).flatMap { compilerFunctions ->
-            repoSourceInfo(config.repoPath, initDefaultSourceRootFilterFunction).flatMap { sourceInfo ->
-
-                val psiFiles = sourceInfo.files.map { sourceFile ->
-                    compilerFunctions.kotlinToPSI(sourceFile.path.absolutePathString(), sourceFile.content)
-                }
-
-                logger.info("${psiFiles.size} kotlin files mapped to PSI format")
-                logger.info("Building binding context for PSI files")
-
-                val (elapsed, bindingContextResult) = measureTimeMillisWithResult {
-                    compilerFunctions.buildBindingContext(psiFiles)
-                }
-
-                bindingContextResult.flatMap { bindingContext ->
-                    logger.info("binding context done in ${formatElapsedTime(elapsed)}\n")
-                    logger.info("start parsing")
-
-                    psiFilesToModel(
-                        psiFiles,
-                        ParserConfig(
-                            toGitHubURI = sourceInfo.toGitHubURI,
-                            resolveToDescriptor = initResolveToDescriptorFunction(bindingContext),
-                            relaxedMode = config.relaxedMode
-                        )
-                    )
-                }
-            }
-        }
+        codeToModel(config, disposable, initDefaultSourceRootFilterFunction)
+    }.map { result ->
+        logExtractionResults(result)
+        //generateAsciiDoc(result.filterIsInstance<RuleServiceInfo>(), asciiDocOutput)
     }
-        .map { result ->
-            logExtractionResults(result)
-            //generateAsciiDoc(result.filterIsInstance<RuleServiceInfo>(), asciiDocOutput)
-        }
 
 private const val EXIT_CODE_SUCCESS = 0
 private const val EXIT_CODE_FAILURE = 1
@@ -76,7 +85,6 @@ fun main(args: Array<String>) {
     }
 
     println("Elapsed time: ${formatElapsedTime(elapsed)}")
-
     cleanupAndExit(disposable, exitCode)
 }
 

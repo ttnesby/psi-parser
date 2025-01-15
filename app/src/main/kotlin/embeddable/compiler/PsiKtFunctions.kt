@@ -519,7 +519,7 @@ fun KtBlockExpression.extractFlowElements(config: ParserConfig): Result<FlowElem
         .let { flyt ->
             if (flyt.isEmpty()) {
                 logger.error(illegalState("Empty flow with current flow extraction logic").message)
-                if (config.relaxedMode) Result.success(FlowElement.Flow(emptyList()))
+                if (config.allowEmptyFlow) Result.success(FlowElement.Flow(emptyList()))
                 else Result.failure(illegalState("Empty FlowElements.Flow"))
             } else {
                 flyt.toResult().map { FlowElement.Flow(it) }

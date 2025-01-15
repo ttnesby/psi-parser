@@ -74,7 +74,7 @@ class ParserTest {
             ParserConfig(
                 toGitHubURI = sourceInfo.toGitHubURI,
                 resolveToDescriptor = initResolveToDescriptorFunction(bindingContext),
-                relaxedMode = true
+                allowEmptyFlow = true
             )
         ).getOrThrow()
 
