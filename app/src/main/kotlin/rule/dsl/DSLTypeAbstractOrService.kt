@@ -7,7 +7,7 @@ import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtSuperTypeListEntry
-import pensjon.regler.ParserConfig
+import rule.dsl.model.ParserConfig
 
 /**
  * Represents a sealed interface for defining different types of DSL classifications related to
@@ -65,7 +65,7 @@ fun KtClass.mustBeSubClassOf(type: DSLTypeService): Result<KtClass> =
  * Implements the `DSLTypeAbstractOrService` interface, which requires providing a `typeName`
  * property used for classification and type matching purposes.
  */
-enum class DSLTypeAbstract(override val typeName: String) : DSLTypeAbstractOrService{
+enum class DSLTypeAbstract(override val typeName: String) : DSLTypeAbstractOrService {
     RULE_SERVICE("AbstractPensjonRuleService"),
     RULE_FLOW("AbstractPensjonRuleflow"),
     RULE_SET("AbstractPensjonRuleset");

@@ -3,7 +3,6 @@ package rule.dsl.model
 import embeddable.compiler.*
 import org.jetbrains.kotlin.psi.*
 import org.slf4j.LoggerFactory
-import pensjon.regler.ParserConfig
 import result.addons.flatMap
 import result.addons.toResult
 import rule.dsl.DSLTypeAbstract.*
@@ -21,7 +20,7 @@ sealed class FlowElement {
 
     data class Oppdater(val beskrivelse: String, val uttrykk: String) : FlowElement()
     data class Merknad(val beskrivelse: String, val uttrykk: String) : FlowElement()
-    data class While(val betingelse: String, val flyt: Flow): FlowElement()
+    data class While(val betingelse: String, val flyt: Flow) : FlowElement()
     data class Flow(val elementer: List<FlowElement>) : FlowElement()
     data class Forgrening(val beskrivelse: String, val navn: String, val gren: List<Gren>) :
         FlowElement()
@@ -53,7 +52,10 @@ fun KtBlockExpression.extractFlowElements(config: ParserConfig): Result<FlowElem
             is KtBinaryExpression -> child.extractInitializer(child.extractDocOrEmpty(), config)
             is KtProperty -> child.extractInitializer(child.extractDocOrEmpty(), config)
             is KtCallExpression ->
-                child.extractForgreningOrNull(config) ?: child.extractFunctionReference(child.extractDocOrEmpty(), config)
+                child.extractForgreningOrNull(config) ?: child.extractFunctionReference(
+                    child.extractDocOrEmpty(),
+                    config
+                )
 
             is KtDotQualifiedExpression -> child.extractFlowReference(child.extractDocOrEmpty(), config)
             is KtWhileExpression -> child.extractWhile(config) // see FaktoromregnInntekterBatchFlyt as example
@@ -125,7 +127,10 @@ private fun KtClass.toRuleSetReference(doc: String): Result<FlowElement.RuleSet>
         )
     }
 
-private fun KtCallExpression.extractFunctionReference(doc: String, config: ParserConfig): Result<FlowElement.Function>? =
+private fun KtCallExpression.extractFunctionReference(
+    doc: String,
+    config: ParserConfig
+): Result<FlowElement.Function>? =
     resolveFunctionDeclaration(config)
         .map { (name, file) ->
             FlowElement.Function(
@@ -143,7 +148,6 @@ private fun KtCallExpression.extractFunctionReference(doc: String, config: Parse
                 null
             }
         )
-
 
 
 // TODO verifiser med Erik/Jens - gjelder for flyt som har 2 children?

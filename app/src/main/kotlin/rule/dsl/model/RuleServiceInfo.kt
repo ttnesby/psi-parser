@@ -6,7 +6,6 @@ import org.jetbrains.kotlin.psi.KtParameter
 import org.jetbrains.kotlin.psi.KtPrimaryConstructor
 import org.jetbrains.kotlin.psi.KtTypeReference
 import org.slf4j.LoggerFactory
-import pensjon.regler.*
 import result.addons.flatMap
 import rule.dsl.DSLTypeAbstract.RULE_SERVICE
 import rule.dsl.DSLTypeFlow.SERVICE

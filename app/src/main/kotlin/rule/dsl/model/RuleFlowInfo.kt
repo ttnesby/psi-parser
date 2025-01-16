@@ -1,10 +1,11 @@
 package rule.dsl.model
 
-import embeddable.compiler.*
+import embeddable.compiler.docOrEmpty
+import embeddable.compiler.findFirstParameterOfTypeClass
+import embeddable.compiler.requireName
+import embeddable.compiler.requirePrimaryConstructor
 import org.jetbrains.kotlin.psi.KtClass
 import org.slf4j.LoggerFactory
-import pensjon.regler.ParserConfig
-import pensjon.regler.extractFlow
 import result.addons.flatMap
 import rule.dsl.DSLTypeFlow.FLOW
 import java.net.URI

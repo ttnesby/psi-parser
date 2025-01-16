@@ -14,6 +14,7 @@ private fun validateDirectoryPath(path: Path, errorMessage: String) =
     if (!path.isDirectory()) throw IllegalArgumentException(errorMessage) else Unit
 
 // easier with custom enum versus reuse of logback level and custom decoder
+@Suppress("Unused") // each can be used as parameter to app
 enum class LogLevel {
     ALL,
     TRACE,

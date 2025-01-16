@@ -44,7 +44,7 @@ class AppIntegrationTest {
             "--repo=${pensjonRegler}",
             "--output=${output}",
             "--allow_empty_flow=true",
-            "--log=WARN"
+            "--log=ALL"
         )
 
         val fastsettTrygdetidPathPrefix = Path("repository") /
@@ -82,8 +82,6 @@ class AppIntegrationTest {
         val sluttpoengtallKomponent = fastsettTrygdetidPathPrefix /
                 "komponent" /
                 "sluttpoengtall"
-
-        //"system/nav-system-pensjon-domain/src/main/kotlin/no/nav/pensjon/regler/internal/to/TrygdetidRequest.kt"
 
         val initCustomSourceRoots: (Path) -> ((Path) -> Boolean) = { localRoot ->
             { path ->

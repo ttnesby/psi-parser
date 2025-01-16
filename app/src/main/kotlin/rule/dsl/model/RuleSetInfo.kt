@@ -4,7 +4,6 @@ import embeddable.compiler.docOrEmpty
 import embeddable.compiler.requireName
 import org.jetbrains.kotlin.psi.KtClass
 import org.slf4j.LoggerFactory
-import pensjon.regler.ParserConfig
 import result.addons.flatMap
 import java.net.URI
 

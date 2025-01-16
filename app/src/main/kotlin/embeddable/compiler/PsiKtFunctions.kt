@@ -9,8 +9,8 @@ import org.jetbrains.kotlin.psi.psiUtil.containingClass
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 import org.slf4j.LoggerFactory
-import pensjon.regler.ParserConfig
 import result.addons.flatMap
+import rule.dsl.model.ParserConfig
 import java.io.File
 
 private val logger = LoggerFactory.getLogger("PsiKtFunctions")
@@ -231,7 +231,6 @@ fun KtCallExpression.firstArgumentOrEmpty(): String =
         ?.text
         ?.removeSurrounding("\"")
         ?: ""
-
 
 
 ///////////////////////////////////////////////////
