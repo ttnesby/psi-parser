@@ -6,8 +6,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
-import pensjon.regler.*
 import result.addons.flatMap
+import rule.dsl.model.*
 import java.net.URI
 import java.nio.file.Path
 import kotlin.io.path.Path

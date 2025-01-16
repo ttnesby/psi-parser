@@ -18,6 +18,9 @@ import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.div
 import org.junit.jupiter.api.Assertions.assertEquals
+import rule.dsl.model.RuleFlowInfo
+import rule.dsl.model.RuleServiceInfo
+import rule.dsl.model.RuleSetInfo
 
 class ParserTest {
 
