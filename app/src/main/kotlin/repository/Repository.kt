@@ -1,4 +1,4 @@
-package pensjon.regler.repo
+package repository
 
 import org.slf4j.LoggerFactory
 import java.net.URI
@@ -10,7 +10,7 @@ import result.addons.flatMap
 private const val ORG_NAVIKT = "https://github.com/navikt"
 private const val BRANCH = "blob/master/"
 
-private val logger = LoggerFactory.getLogger("repo")
+private val logger = LoggerFactory.getLogger("Repository")
 
 data class FileInfo(
     val path: Path,
@@ -70,7 +70,7 @@ private fun findSourceRoots(localRoot: Path, isSourceRoot: PathToBoolean): Resul
         }
         .also {
             logger.info("Found ${it.size} source roots")
-            logger.debug(it.map {path -> path.relativeTo(localRoot)}.joinToString(", "))
+            logger.debug(it.map { path -> path.relativeTo(localRoot)}.joinToString(", "))
         }
 }
 

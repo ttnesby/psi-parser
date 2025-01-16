@@ -5,15 +5,15 @@ import org.jetbrains.kotlin.com.intellij.openapi.Disposable
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer
 import org.jetbrains.kotlin.utils.addToStdlib.measureTimeMillisWithResult
 import org.slf4j.LoggerFactory
-import pensjon.regler.*
-import pensjon.regler.repo.PathToBoolean
-import pensjon.regler.repo.initDefaultSourceRootFilterFunction
-import pensjon.regler.repo.repoSourceInfo
+import repository.PathToBoolean
+import repository.initDefaultSourceRootFilterFunction
+import repository.repoSourceInfo
 import result.addons.flatMap
+import rule.dsl.model.*
 import java.nio.file.Path
 import kotlin.io.path.absolutePathString
 
-private val logger = LoggerFactory.getLogger("bootstrap")
+private val logger = LoggerFactory.getLogger("application")
 
 fun codeToModel(
     config: AppConfig,

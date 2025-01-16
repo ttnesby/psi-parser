@@ -1,4 +1,4 @@
-package pensjon.regler.repo
+package repository
 
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -12,7 +12,7 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.div
 import kotlin.io.path.writeText
 
-class RepoTest {
+class RepositoryTest {
 
     private lateinit var tempDir: Path
 

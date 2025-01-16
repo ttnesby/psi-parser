@@ -6,8 +6,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
-import pensjon.regler.*
 import result.addons.flatMap
+import rule.dsl.model.*
 import java.net.URI
 import java.nio.file.Path
 import kotlin.io.path.Path
@@ -44,7 +44,7 @@ class AppIntegrationTest {
             "--repo=${pensjonRegler}",
             "--output=${output}",
             "--allow_empty_flow=true",
-            "--log=WARN"
+            "--log=ALL"
         )
 
         val fastsettTrygdetidPathPrefix = Path("repository") /
@@ -82,8 +82,6 @@ class AppIntegrationTest {
         val sluttpoengtallKomponent = fastsettTrygdetidPathPrefix /
                 "komponent" /
                 "sluttpoengtall"
-
-        //"system/nav-system-pensjon-domain/src/main/kotlin/no/nav/pensjon/regler/internal/to/TrygdetidRequest.kt"
 
         val initCustomSourceRoots: (Path) -> ((Path) -> Boolean) = { localRoot ->
             { path ->
