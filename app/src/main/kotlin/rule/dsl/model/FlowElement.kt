@@ -18,8 +18,13 @@ private val logger = LoggerFactory.getLogger("FlowElement")
 
 sealed class FlowElement {
 
-    data class Oppdater(val beskrivelse: String, val uttrykk: String) : FlowElement()
-    data class Merknad(val beskrivelse: String, val uttrykk: String) : FlowElement()
+    // TODO
+    // Det er en modningsprosess mtp. hva som skal inkluderes i flow for å gi en `god nok` dokumentasjon
+    // Eksempler er Merknad og Oppdatere, `litt for mye` per nå(?) samtidig som det ikke ønskes tom flow.
+    // Oppretter `EmptyFlow` som en markør for modning
+//    data class Oppdater(val beskrivelse: String, val uttrykk: String) : FlowElement()
+//    data class Merknad(val beskrivelse: String, val uttrykk: String) : FlowElement()
+    data class EmptyFlow(val comment: String?) : FlowElement()
     data class While(val betingelse: String, val flyt: Flow) : FlowElement()
     data class Flow(val elementer: List<FlowElement>) : FlowElement()
     data class Forgrening(val beskrivelse: String, val navn: String, val gren: List<Gren>) :
@@ -45,7 +50,8 @@ fun KtClass.extractFlow(flowType: DSLTypeFlow, config: ParserConfig): Result<Flo
         }
     }
 
-// TODO - NB! når KDoc er relatert til flow/ruleset/function - this.children -> this.statements
+// TODO -
+// Istedenfor `extract*`, finn ut hva som skal gjøres, sa gjør det, eller null
 fun KtBlockExpression.extractFlowElements(config: ParserConfig): Result<FlowElement.Flow> =
     children.mapNotNull { child ->
         when (child) {
@@ -64,9 +70,15 @@ fun KtBlockExpression.extractFlowElements(config: ParserConfig): Result<FlowElem
     }
         .let { flyt ->
             if (flyt.isEmpty()) {
-                logger.error(illegalState("Empty flow with current flow extraction logic").message)
-                if (config.allowEmptyFlow) Result.success(FlowElement.Flow(emptyList()))
-                else Result.failure(illegalState("Empty FlowElements.Flow"))
+                val err =  illegalState("Empty flow with current flow extraction logic")
+                if (config.allowEmptyFlow) {
+                    logger.warn(err.message)
+                    Result.success(FlowElement.Flow(listOf(FlowElement.EmptyFlow(comment = err.message))))
+                }
+                else {
+                    logger.error(err.message)
+                    Result.failure(err)
+                }
             } else {
                 flyt.toResult().map { FlowElement.Flow(it) }
             }
@@ -86,9 +98,11 @@ private fun KtWhileExpression.extractWhile(config: ParserConfig): Result<FlowEle
                 } ?: Result.failure(illegalState("No block expression for while"))
         } ?: Result.failure(illegalState("No condition for while"))
 
+// TODO modning
 private fun KtBinaryExpression.extractInitializer(doc: String, config: ParserConfig): Result<FlowElement>? =
-    if (right is KtPostfixExpression) extractOppdater(doc)
-    else right?.extractInitializerExpression(doc, config)
+//    if (right is KtPostfixExpression) extractOppdater(doc)
+//    else
+        right?.extractInitializerExpression(doc, config)
 
 private fun KtProperty.extractInitializer(doc: String, config: ParserConfig): Result<FlowElement>? =
     initializer?.extractInitializerExpression(doc, config)
@@ -100,14 +114,14 @@ private fun KtExpression.extractInitializerExpression(doc: String, config: Parse
         else -> null
     }
 
-// TODO sjekk med Erik/Jens - må sjekke med EQ og forskjellen mellom Postfix versus DotQualified...
-private fun KtBinaryExpression.extractOppdater(doc: String): Result<FlowElement> =
-    Result.success(
-        FlowElement.Oppdater(
-            beskrivelse = doc,
-            uttrykk = this.text
-        )
-    )
+// TODO modning
+//private fun KtBinaryExpression.extractOppdater(doc: String): Result<FlowElement> =
+//    Result.success(
+//        FlowElement.Oppdater(
+//            beskrivelse = doc,
+//            uttrykk = this.text
+//        )
+//    )
 
 private fun KtClass.toRuleFlowReference(doc: String): Result<FlowElement.RuleFlow> =
     requireName().map { name ->
@@ -149,19 +163,17 @@ private fun KtCallExpression.extractFunctionReference(
             }
         )
 
-
-// TODO verifiser med Erik/Jens - gjelder for flyt som har 2 children?
-private fun KtDotQualifiedExpression.extractMerknad(doc: String): Result<FlowElement> =
-    Result.success(
-        FlowElement.Merknad(
-            beskrivelse = doc,
-            uttrykk = this.text
-        )
-    )
+//private fun KtDotQualifiedExpression.extractMerknad(doc: String): Result<FlowElement> =
+//    Result.success(
+//        FlowElement.Merknad(
+//            beskrivelse = doc,
+//            uttrykk = this.text
+//        )
+//    )
 
 private fun KtDotQualifiedExpression.extractFlowReference(doc: String, config: ParserConfig): Result<FlowElement>? =
-    if (doc.contains("merknad", ignoreCase = true)) extractMerknad(doc)
-    else
+//    if (doc.contains("merknad", ignoreCase = true)) extractMerknad(doc)
+//    else
         resolveReceiverClass(config)
             ?.let { (resolvedClass, dslTypeAbstract) ->
                 when (dslTypeAbstract) {
@@ -174,7 +186,12 @@ private fun KtDotQualifiedExpression.extractFlowReference(doc: String, config: P
 /**
  * Extract forgrening
  * ```
- * forgrening(string) {lambda block}
+ * forgrening(string) {
+ *      gren {}
+ *      gren {}
+ *      ...
+ *      gren {}
+ * }
  * ```
  *
  * @return A 'Result' wrapping 'FlowElement.Forgrening'

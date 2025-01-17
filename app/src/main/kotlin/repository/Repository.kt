@@ -25,6 +25,11 @@ data class SourceInfo(
     val toGitHubURI: StringPathToUriResult
 )
 
+// TODO -
+// Hvis Repository ikke skal forholde seg til pensjon-regler (rule dsl), må
+// initDefaultSourceRootFilterFunction gis som parameter til programmet
+// F.eks. et kotlin skript som kompileres og brukes
+
 typealias PathToBoolean = (Path) -> Boolean
 
 /**
